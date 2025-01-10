@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>团总的地球Online</title>
+    <link rel="stylesheet" href="css/swiper-bundle.min.css">
+    <link rel="stylesheet" href="layui/css/layui.css">
+    <link rel="stylesheet" href="css/index.css?v=<?php echo time(); ?>">
+    
+    <!-- Live2D依赖项 -->
+    <script src="js/live2d.min.js"></script>
+    <script src="js/live2dcubismcore.min.js"></script>
+    <script src="js/pixi.min.js"></script>
+    <script src="js/utils.min.js"></script>
+    <script src="js/math.min.js"></script>
+    <script src="js/index.min.js"></script>
+</head>
+<body>
+    <div class="game-container">
+        <!-- 左侧角色面板 -->
+        <div class="character-panel panel-base">
+            <div class="layui-tab layui-tab-brief custom-tab" lay-filter="characterTab">
+                <ul class="layui-tab-title">
+                    <li class="layui-this">
+                        <i class="layui-icon layui-icon-user"></i>
+                        角色信息
+                    </li>
+                    <li>
+                        <i class="layui-icon layui-icon-star"></i>
+                        技能
+                    </li>
+                    <li>
+                        <i class="layui-icon layui-icon-fire"></i>
+                        荣誉
+                    </li>
+                </ul>
+                <div class="layui-tab-content">
+                    <!-- 角色信息选项卡 -->
+                    <div class="layui-tab-item layui-show">
+                        <div class="character-stats">
+                            <div class="stat-group">
+                                <div class="stat-item">
+                                    <span>生命值</span>
+                                    <div class="stat-value">
+                                        <div class="stat-bar">
+                                            <div class="stat-bar-inner hp"></div>
+                                        </div>
+                                        <span id="hp">8666/9999</span>
+                                    </div>
+                                </div>
+                                <div class="stat-item">
+                                    <span>魔法值</span>
+                                    <div class="stat-value">
+                                        <div class="stat-bar">
+                                            <div class="stat-bar-inner mp"></div>
+                                        </div>
+                                        <span id="mp">9999/9999</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="stat-group">
+                                <div class="stat-item">
+                                    <span>物攻</span>
+                                    <span id="physicalAtk">99999</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span>物防</span>
+                                    <span id="physicalDef">99999</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span>法防</span>
+                                    <span id="magicDef">99999</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span>速度</span>
+                                    <span id="speed">99999</span>
+                                </div>
+                            </div>
+                            <div class="exp-section">
+                                <div class="exp-bar">
+                                    <div class="exp-bar-inner"></div>
+                                </div>
+                                <div class="exp-info">
+                                    <span class="level">66/100</span>
+                                    <span class="exp">75666/99999</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 技能选项卡 -->
+                    <div class="layui-tab-item">
+                        <div class="skills-list">
+                            <div class="empty-tip">暂无技能</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 荣誉选项卡 -->
+                    <div class="layui-tab-item">
+                        <div class="honors-list">
+                            <div class="empty-tip">暂无荣誉</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中间主内容区 -->
+        <div class="main-content panel-base">
+            <!-- 上半部分：Live2D展示区 -->
+            <div class="main-content-top">
+                <h2 class="panel-title">
+                    <i class="layui-icon layui-icon-location"></i>
+                    游戏世界
+                    <span class="title-decoration"></span>
+                </h2>
+                <div id="live2dContainer"></div>
+            </div>
+            
+            <!-- 下半部分：进行中的任务 -->
+            <div class="main-content-bottom">
+                <h2 class="panel-title">
+                    <i class="layui-icon layui-icon-loading"></i>
+                    进行中的任务
+                    <span class="title-decoration"></span>
+                </h2>
+                <!-- 任务容器 -->
+                <div class="active-tasks-wrapper">
+                    <div class="swiper active-tasks-swiper">
+                        <div class="swiper-wrapper">
+                            <!-- 任务将在这里生成 -->
+                        </div>
+                        <div class="swiper-pagination"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧任务列表 -->
+        <div class="task-panel panel-base">
+            <h2 class="panel-title">
+                <i class="layui-icon layui-icon-flag"></i>
+                可用任务
+                <span class="title-decoration"></span>
+            </h2>
+            <div id="taskList">
+                <!-- 任务卡片将通过JS动态加载 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- WebSocket状态显示 -->
+    <div class="websocket-status">
+        <span class="status-dot"></span>
+        <span class="status-text">WebSocket连接中...</span>
+    </div>
+
+    <!-- 脚本引用 -->
+    <script src="js/swiper-bundle.min.js"></script>
+    <script src="layui/layui.js"></script>
+    <script src="js/socket.io.js"></script>
+    <script src="js/live2d-config.js"></script>
+    <script src="js/game.js?v=<?php echo time(); ?>"></script>
+</body>
+</html>
