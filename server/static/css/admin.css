@@ -1,0 +1,271 @@
+body {
+    margin: 0;
+    padding: 20px;
+    background: #0a192f;
+    color: #fff;
+    font-family: Arial, sans-serif;
+}
+
+.admin-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.panel {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(27, 39, 53, 0.5);
+    border: 1px solid rgba(87, 202, 255, 0.2);
+    border-radius: 8px;
+}
+
+h1, h2 {
+    color: #57CAFF;
+}
+
+.layui-table {
+    background: rgba(27, 39, 53, 0.5);
+    color: #fff;
+}
+
+.layui-table th {
+    background: rgba(87, 202, 255, 0.1);
+    color: #57CAFF;
+}
+
+.control-panel {
+    margin-bottom: 20px;
+}
+
+.popup-form {
+    padding: 30px;
+    display: none;
+    background: #0a192f;
+}
+
+.popup-form .layui-form-label {
+    color: #57CAFF;
+    font-weight: bold;
+}
+
+.popup-form .layui-input,
+.popup-form .layui-textarea {
+    background: rgba(27, 39, 53, 0.5);
+    border: 1px solid rgba(87, 202, 255, 0.2);
+    color: #fff;
+    transition: all 0.3s ease;
+}
+
+.popup-form .layui-input:focus,
+.popup-form .layui-textarea:focus {
+    border-color: #57CAFF;
+    box-shadow: 0 0 5px rgba(87, 202, 255, 0.3);
+}
+
+.popup-form .layui-form-item {
+    margin-bottom: 20px;
+}
+
+.popup-form .layui-input-block {
+    margin-left: 110px;
+}
+
+/* 表单验证提示样式 */
+.layui-form-danger:focus {
+    border-color: #FF5722 !important;
+}
+
+/* 按钮样式优化 */
+.control-panel .layui-btn {
+    background-color: #57CAFF;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.control-panel .layui-btn:hover {
+    background-color: #3ba8ff;
+    box-shadow: 0 0 10px rgba(87, 202, 255, 0.3);
+}
+
+/* 弹出层样式优化 */
+.layui-layer {
+    background: #0a192f !important;
+    border: 1px solid rgba(87, 202, 255, 0.2) !important;
+    border-radius: 8px !important;
+}
+
+.layui-layer-title {
+    background: rgba(27, 39, 53, 0.5) !important;
+    color: #57CAFF !important;
+    border-bottom: 1px solid rgba(87, 202, 255, 0.2) !important;
+}
+
+.layui-layer-btn {
+    border-top: 1px solid rgba(87, 202, 255, 0.2) !important;
+    background: rgba(27, 39, 53, 0.5) !important;
+}
+
+.layui-layer-btn a {
+    background-color: #57CAFF !important;
+    border-color: #57CAFF !important;
+    border-radius: 4px !important;
+}
+
+.layui-layer-btn .layui-layer-btn1 {
+    background-color: transparent !important;
+    color: #57CAFF !important;
+    border: 1px solid #57CAFF !important;
+}
+
+/* 进行中任务卡片样式 */
+.task-card.current {
+    position: relative;
+    background: rgba(27, 39, 53, 0.8);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(87, 202, 255, 0.2);
+}
+
+.task-progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: #57CAFF;
+    transition: width 0.3s linear;
+}
+
+.task-content-wrapper {
+    position: relative;
+    z-index: 1;
+}
+
+.task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.task-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.task-type-badge i {
+    margin-right: 4px;
+    font-size: 14px;
+}
+
+.task-timer {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+}
+
+.task-timer i {
+    margin-right: 4px;
+    font-size: 14px;
+}
+
+.task-body {
+    margin: 12px 0;
+}
+
+.task-title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: #fff;
+}
+
+.task-description {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.4;
+}
+
+.task-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(87, 202, 255, 0.1);
+}
+
+.task-rewards {
+    display: flex;
+    gap: 12px;
+}
+
+.reward-item {
+    display: flex;
+    align-items: center;
+    color: rgba(87, 202, 255, 0.9);
+    font-size: 13px;
+}
+
+.reward-item i {
+    margin-right: 4px;
+    font-size: 14px;
+}
+
+/* Swiper样式优化 */
+.active-tasks-swiper {
+    padding: 10px 0;
+}
+
+.swiper-slide {
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.swiper-slide-active {
+    opacity: 1;
+}
+
+.swiper-pagination-bullet {
+    width: 6px;
+    height: 6px;
+    background: rgba(87, 202, 255, 0.5);
+    opacity: 0.5;
+}
+
+.swiper-pagination-bullet-active {
+    opacity: 1;
+    background: #57CAFF;
+}
+
+.swiper-button-next,
+.swiper-button-prev {
+    color: rgba(87, 202, 255, 0.8);
+    width: 30px;
+    height: 30px;
+}
+
+.swiper-button-next:after,
+.swiper-button-prev:after {
+    font-size: 16px;
+}
+
+/* 任务行布局 */
+.active-tasks-row {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+/* 空状态提示 */
+.empty-tip {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 30px;
+    font-size: 14px;
+}

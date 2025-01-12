@@ -5,7 +5,7 @@
 
 # Date: 2025-01-07 14:02:42
 
-# LastEditTime: 2025-01-12 16:11:30
+# LastEditTime: 2025-01-12 23:01:02
 
 # LastEditors: 一根鱼骨棒
 
@@ -16,12 +16,12 @@
 # Copyright 2025 迷舍
 
 
-from flask import Flask, jsonify, request, redirect, send_from_directory
+from flask import Flask, jsonify, request, redirect, send_from_directory, make_response
 from flask_cors import CORS
 import sqlite3
 import os
 from admin import admin_bp
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from datetime import datetime, time, timedelta
 import schedule
 import threading
@@ -135,6 +135,7 @@ def get_db_connection():
         # 创建连接
 
         conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
 
         print(f"Successfully connected to database at {DB_PATH}")  # 调试输出
         return conn
@@ -222,9 +223,12 @@ def get_available_tasks(user_id):
                 t.id,
                 t.name,
                 t.description,
+                t.points,
+                t.stamina_cost,
                 t.task_rewards,
                 t.task_type,
-                t.task_status
+                t.task_status,
+                t.limit_time
             FROM tasks t
             WHERE t.is_enabled = 1 
             AND (t.task_scope = 0 OR t.task_scope = ?)
@@ -308,213 +312,215 @@ def get_current_tasks(user_id):
         conn.close()
 
 
-@app.route('/api/tasks/<int:task_id>/accept', methods=['POST'])
+@app.route('/api/tasks/<int:task_id>/accept', methods=['POST', 'OPTIONS'])
 def accept_task(task_id):
     """接受任务"""
+    # 处理 OPTIONS 预检请求
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST')
+        return response
 
+    conn = None
     try:
-
+        # 打印请求数据以便调试
+        print("Request Data:", request.get_json())
+        
+        # 获取请求数据
+        data = request.get_json()
+        if not data or 'user_id' not in data:
+            print("Missing user_id in request:", data)
+            return jsonify({'error': 'Missing user_id'}), 400
+            
+        user_id = data['user_id']
+        current_timestamp = int(datetime.now().timestamp())
+        
         conn = get_db_connection()
-
         cursor = conn.cursor()
 
         # 检查任务是否存在且可接受
-
         cursor.execute('''
-
-            SELECT status 
-
+            SELECT task_status, limit_time 
             FROM tasks 
-
             WHERE id = ?
-
         ''', (task_id,))
 
         task = cursor.fetchone()
-
         if not task:
-
             return jsonify({'error': 'Task not found'}), 404
 
-        if task['status'] != 'AVAILABLE':
-
+        if task[0] != 'AVAILABLE':
             return jsonify({'error': 'Task is not available'}), 400
 
-        # 更新任务状态
+        # 计算结束时间
+        endtime = current_timestamp + task[1] if task[1] else None
 
+        # 将任务添加到player_task表
         cursor.execute('''
+            INSERT INTO player_task (
+                task_id,
+                user_id,
+                starttime,
+                endtime,
+                status,
+                points_earned
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            task_id,
+            user_id,
+            current_timestamp,
+            endtime,
+            'IN_PROGRESS',
+            0
+        ))
 
+        # 更新任务状态
+        cursor.execute('''
             UPDATE tasks 
-
-            SET status = 'IN_PROGRESS', character_id = 1 
-
+            SET task_status = 'IN_PROGRESS'
             WHERE id = ?
-
         ''', (task_id,))
 
         conn.commit()
-
-        return jsonify({'message': 'Task accepted successfully'})
-
-    except sqlite3.Error as e:
-
-        conn.rollback()
-
-        return jsonify({'error': str(e)}), 500
-
-    finally:
-
-        conn.close()
-
-
-@app.route('/api/tasks/<int:task_id>/complete', methods=['POST'])
-def complete_task(task_id):
-    """完成任务"""
-
-    try:
-
-        conn = get_db_connection()
-
-        cursor = conn.cursor()
-
-        # 检查任务状态
-
-        cursor.execute('''
-
-            SELECT status, reward_exp, reward_gold 
-
-            FROM tasks 
-
-            WHERE id = ? AND character_id = 1
-
-        ''', (task_id,))
-
-        task = cursor.fetchone()
-
-        if not task:
-
-            return jsonify({'error': 'Task not found'}), 404
-
-        if task['status'] != 'IN_PROGRESS':
-
-            return jsonify({'error': 'Task is not in progress'}), 400
-
-        # 更新任务状态
-
-        cursor.execute('''
-
-            UPDATE tasks 
-
-            SET status = 'COMPLETED' 
-
-            WHERE id = ?
-
-        ''', (task_id,))
-
-        # 更新角色属性和经验值
-
-        cursor.execute('''
-
-            UPDATE characters 
-
-            SET exp = exp + ?,
-
-                gold = gold + ?,
-
-                stamina = MIN(stamina + 5, 100),
-
-                intelligence = intelligence + 1,
-
-                strength = strength + 1
-
-            WHERE id = 1
-
-        ''', (task['reward_exp'], task['reward_gold']))
-
-        conn.commit()
-
-        return jsonify({
-
-            'message': 'Task completed successfully',
-
-            'rewards': {
-
-                'exp': task['reward_exp'],
-
-                'gold': task['reward_gold']
-
-            }
-
+        
+        # 添加CORS头部到响应
+        response = jsonify({
+            'message': 'Task accepted successfully',
+            'starttime': current_timestamp,
+            'endtime': endtime
         })
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
 
-    except sqlite3.Error as e:
-
-        conn.rollback()
-
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Error accepting task: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
     finally:
+        if conn:
+            conn.close()
 
-        conn.close()
 
-
-@app.route('/api/tasks/<int:task_id>/abandon', methods=['POST'])
+@app.route('/api/tasks/<int:task_id>/abandon', methods=['POST', 'OPTIONS'])
 def abandon_task(task_id):
     """放弃任务"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST')
+        return response
 
+    conn = None
     try:
+        data = request.get_json()
+        if not data or 'user_id' not in data:
+            return jsonify({'error': 'Missing user_id'}), 400
 
+        user_id = data['user_id']
+        
         conn = get_db_connection()
-
         cursor = conn.cursor()
 
         # 检查任务状态
-
         cursor.execute('''
-
-            SELECT status 
-
+            SELECT task_status 
             FROM tasks 
-
-            WHERE id = ? AND character_id = 1
-
+            WHERE id = ?
         ''', (task_id,))
 
         task = cursor.fetchone()
-
         if not task:
-
             return jsonify({'error': 'Task not found'}), 404
 
-        if task['status'] != 'IN_PROGRESS':
-
+        if task[0] != 'IN_PROGRESS':
             return jsonify({'error': 'Task is not in progress'}), 400
 
         # 更新任务状态
-
         cursor.execute('''
-
             UPDATE tasks 
-
-            SET status = 'ABANDONED' 
-
+            SET task_status = 'ABANDONED'
             WHERE id = ?
-
         ''', (task_id,))
 
         conn.commit()
+        
+        response = jsonify({'message': 'Task abandoned successfully'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
 
-        return jsonify({'message': 'Task abandoned successfully'})
-
-    except sqlite3.Error as e:
-
-        conn.rollback()
-
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Error abandoning task: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
     finally:
+        if conn:
+            conn.close()
 
-        conn.close()
+
+@app.route('/api/tasks/<int:task_id>/complete', methods=['POST', 'OPTIONS'])
+def complete_task(task_id):
+    """完成任务"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST')
+        return response
+
+    conn = None
+    try:
+        data = request.get_json()
+        if not data or 'user_id' not in data:
+            return jsonify({'error': 'Missing user_id'}), 400
+
+        user_id = data['user_id']
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 检查任务状态
+        cursor.execute('''
+            SELECT task_status, task_rewards
+            FROM tasks 
+            WHERE id = ?
+        ''', (task_id,))
+
+        task = cursor.fetchone()
+        if not task:
+            return jsonify({'error': 'Task not found'}), 404
+
+        if task[0] != 'IN_PROGRESS':
+            return jsonify({'error': 'Task is not in progress'}), 400
+
+        # 更新任务状态
+        cursor.execute('''
+            UPDATE tasks 
+            SET task_status = 'COMPLETED'
+            WHERE id = ?
+        ''', (task_id,))
+
+        conn.commit()
+        
+        response = jsonify({
+            'message': 'Task completed successfully',
+            'rewards': task[1]
+        })
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Error completing task: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.route('/api/tasks/nfc_post', methods=['POST'])
@@ -612,7 +618,7 @@ def assign_daily_tasks():
         cursor.execute('''
             SELECT id, task_scope 
             FROM tasks 
-            WHERE is_enabled = 1 AND task_type = 4
+            WHERE is_enabled = 1 AND task_type = 'DAILY'
         ''')
         daily_tasks = cursor.fetchall()
 
@@ -763,8 +769,21 @@ def get_logs():
 def handle_connect():
     """处理WebSocket连接"""
     print("Client connected")
-    # 不在连接时发送数据，而是让客户端通过HTTP请求获取初始数据
     emit('connected', {'status': 'success'})
+
+@socketio.on('subscribe_tasks')
+def handle_task_subscription(data):
+    """处理任务订阅"""
+    user_id = data.get('user_id')
+    if user_id:
+        # 将客户端加入以用户ID命名的房间
+        join_room(f'user_{user_id}')
+        print(f"User {user_id} subscribed to task updates")
+
+def broadcast_task_update(user_id, task_data):
+    """向指定用户广播任务更新"""
+    socketio.emit('task_update', task_data, room=f'user_{user_id}')
+
 # 如果需要自定义静态文件路由
 @app.route('/static/<path:path>')
 def send_static(path):

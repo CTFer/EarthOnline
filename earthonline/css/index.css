@@ -1126,3 +1126,53 @@ body {
     background: #ffc447;
     opacity: 1;
 }
+
+/* 任务状态样式 */
+.task-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.task-status .layui-icon {
+    font-size: 14px;
+}
+
+/* 任务卡片状态样式 */
+.task-card {
+    border-left: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.task-card.available {
+    border-left-color: #4CAF50;
+}
+
+.task-card.in_progress {
+    border-left-color: #2196F3;
+}
+
+.task-card.completed {
+    border-left-color: #9C27B0;
+}
+
+.task-card.abandoned {
+    border-left-color: #9E9E9E;
+    opacity: 0.8;
+}
+
+.task-card.unavailable {
+    border-left-color: #F44336;
+    opacity: 0.7;
+}
+
+/* 禁用状态的接受按钮 */
+.accept-task[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #ccc !important;
+}

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>游戏管理后台</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <script src="/static/js/crypto-js.min.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <h1>游戏管理后台</h1>
+        
+        <!-- 用户管理面板 -->
+        <div class="panel">
+            <h2>用户管理</h2>
+            <div class="control-panel">
+                <button class="layui-btn" onclick="showAddUserForm()">添加用户</button>
+            </div>
+            <table class="layui-table" id="userTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>用户名</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        
+        <!-- 技能管理面板 -->
+        <div class="panel">
+            <h2>技能管理</h2>
+            <div class="control-panel">
+                <button class="layui-btn" onclick="showAddSkillForm()">添加技能</button>
+            </div>
+            <table class="layui-table" id="skillTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>技能名称</th>
+                        <th>熟练度</th>
+                        <th>描述</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        
+        <!-- 任务管理面板 -->
+        <div class="panel">
+            <h2>任务管理</h2>
+            <div class="control-panel">
+                <button class="layui-btn" onclick="showAddTaskForm()">添加任务</button>
+            </div>
+            <table class="layui-table" id="taskTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>任务名称</th>
+                        <th>描述</th>
+                        <th>经验值</th>
+                        <th>金币</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- API文档面板 -->
+        <div class="panel">
+            <h2>API文档</h2>
+            <div class="layui-tab">
+                <ul class="layui-tab-title">
+                    <li class="layui-this">管理API</li>
+                    <li>游戏API</li>
+                </ul>
+                <div class="layui-tab-content">
+                    <div class="layui-tab-item layui-show" id="adminApiList"></div>
+                    <div class="layui-tab-item" id="gameApiList"></div>
+                </div>
+            </div>
+        </div>
+
+        <button class="layui-btn layui-btn-danger" onclick="location.href='/admin/logout'">退出登录</button>
+    </div>
+
+    <!-- 用户表单模板优化 -->
+    <div id="userForm" class="popup-form">
+        <form class="layui-form">
+            <div class="layui-form-item">
+                <label class="layui-form-label">用户名</label>
+                <div class="layui-input-block">
+                    <input type="text" name="username" required lay-verify="required" 
+                           placeholder="请输入用户名" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">密码</label>
+                <div class="layui-input-block">
+                    <input type="password" name="password" required lay-verify="required" 
+                           placeholder="请输入密码" class="layui-input">
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 技能表单模板优化 -->
+    <div id="skillForm" class="popup-form">
+        <form class="layui-form">
+            <div class="layui-form-item">
+                <label class="layui-form-label">技能名称</label>
+                <div class="layui-input-block">
+                    <input type="text" name="name" required lay-verify="required" 
+                           placeholder="请输入技能名称" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">熟练度</label>
+                <div class="layui-input-block">
+                    <input type="number" name="proficiency" required lay-verify="required|number" 
+                           placeholder="请输入熟练度" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">描述</label>
+                <div class="layui-input-block">
+                    <textarea name="description" placeholder="请输入技能描述" 
+                              class="layui-textarea"></textarea>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 任务表单模板优化 -->
+    <div id="taskForm" class="popup-form">
+        <form class="layui-form">
+            <div class="layui-form-item">
+                <label class="layui-form-label">任务名称</label>
+                <div class="layui-input-block">
+                    <input type="text" name="name" required lay-verify="required" 
+                           placeholder="请输入任务名称" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">描述</label>
+                <div class="layui-input-block">
+                    <textarea name="description" placeholder="请输入任务描述" 
+                              class="layui-textarea"></textarea>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">经验值</label>
+                <div class="layui-input-block">
+                    <input type="number" name="exp_reward" required lay-verify="required|number" 
+                           placeholder="请输入经验值奖励" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">金币</label>
+                <div class="layui-input-block">
+                    <input type="number" name="gold_reward" required lay-verify="required|number" 
+                           placeholder="请输入金币奖励" class="layui-input">
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script src="/static/layui/layui.js"></script>
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>
