@@ -5,7 +5,7 @@
 
 # Date: 2025-01-07 14:02:42
 
-# LastEditTime: 2025-01-10 12:21:37
+# LastEditTime: 2025-01-12 16:11:30
 
 # LastEditors: 一根鱼骨棒
 
@@ -16,7 +16,7 @@
 # Copyright 2025 迷舍
 
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, redirect, send_from_directory
 from flask_cors import CORS
 import sqlite3
 import os
@@ -26,9 +26,12 @@ from datetime import datetime, time, timedelta
 import schedule
 import threading
 import time as time_module
+from functools import wraps
+import json
+import uuid
 
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 CORS(app)  # 启用CORS支持跨域请求
 
 
@@ -42,7 +45,82 @@ app.register_blueprint(admin_bp, url_prefix='/admin')
 
 
 # 初始化Flask-SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app,
+                    cors_allowed_origins="*",
+                    ping_timeout=5,
+                    ping_interval=2
+                    )
+
+
+# 添加请求记录列表
+request_logs = []
+MAX_LOGS = 100  # 最多保存100条记录
+
+# 记录请求的装饰器
+
+
+def log_request(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 获取请求信息
+        log_entry = {
+            'id': str(uuid.uuid4()),
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'method': request.method,
+            'path': request.path,
+            'args': dict(request.args),
+            'form': dict(request.form),
+            'headers': {k: v for k, v in request.headers.items()},
+            'remote_addr': request.remote_addr,
+            'request_data': request.get_json() if request.is_json else None
+        }
+
+        # 执行原始函数并捕获响应
+        response = f(*args, **kwargs)
+
+        # 添加响应信息
+        try:
+            # 处理不同类型的响应
+            if isinstance(response, tuple):
+                response_data, status_code = response
+            else:
+                response_data = response
+                status_code = 200
+
+            # 处理Response对象
+            if hasattr(response_data, 'get_json'):
+                response_data = response_data.get_json()
+            elif hasattr(response_data, 'response'):
+                response_data = response_data.response[0].decode('utf-8')
+                try:
+                    response_data = json.loads(response_data)
+                except:
+                    pass
+
+            log_entry['response'] = {
+                'status_code': status_code,
+                'data': response_data
+            }
+        except Exception as e:
+            log_entry['response'] = {
+                'error': str(e),
+                'status_code': 500
+            }
+
+        # 添加新记录并保持最大长度
+        request_logs.insert(0, log_entry)
+        if len(request_logs) > MAX_LOGS:
+            request_logs.pop()
+
+        # 通过WebSocket发送更新
+        socketio.emit('log_update', {
+            'logs': request_logs,
+            'latest': log_entry
+        })
+
+        return response
+
+    return decorated_function
 
 
 def get_db_connection():
@@ -178,30 +256,36 @@ def get_available_tasks(user_id):
 
 @app.route('/api/tasks/current/<int:user_id>', methods=['GET'])
 def get_current_tasks(user_id):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
+    """获取用户当前未过期的任务列表"""
     try:
-        # 获取玩家当前进行中的任务
-        c.execute('''
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 获取当前时间戳
+        current_timestamp = int(datetime.now().timestamp())
+
+        # 获取未过期的任务
+        cursor.execute('''
             SELECT 
                 pt.id,
                 t.name,
                 t.description,
                 t.points,
                 t.stamina_cost,
-                t.task_type,
                 pt.starttime,
                 pt.points_earned,
-                pt.status
+                pt.status,
+                t.task_type,
+                pt.endtime
             FROM player_task pt
             JOIN tasks t ON pt.task_id = t.id
             WHERE pt.user_id = ? 
+            AND pt.endtime > ?
             ORDER BY pt.starttime DESC
-        ''', (user_id,))
+        ''', (user_id, current_timestamp))
 
         tasks = []
-        for row in c.fetchall():
+        for row in cursor.fetchall():
             tasks.append({
                 'id': row[0],
                 'name': row[1],
@@ -211,11 +295,15 @@ def get_current_tasks(user_id):
                 'starttime': row[5],
                 'points_earned': row[6],
                 'status': row[7],
-                'task_type': row[8]
+                'task_type': row[8],
+                'endtime': row[9]
             })
-        
+
         return jsonify(tasks)
 
+    except sqlite3.Error as e:
+        print(f"Database error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -547,7 +635,7 @@ def assign_daily_tasks():
                     WHERE user_id = ? AND task_id = ? 
                     AND starttime = ?
                 ''', (player_id, task_id, start_timestamp))
-                
+
                 if not cursor.fetchone():  # 如果玩家还没有这个任务
                     cursor.execute('''
                         INSERT INTO player_task 
@@ -566,22 +654,125 @@ def assign_daily_tasks():
         if conn:
             conn.close()
 
+
 def run_scheduler():
     """运行调度器"""
     schedule.every().day.at("07:00").do(assign_daily_tasks)
-    
+
     while True:
         schedule.run_pending()
         time_module.sleep(60)  # 每分钟检查一次
 
 # 在应用启动时启动调度器
+
+
 def start_scheduler():
     scheduler_thread = threading.Thread(target=run_scheduler)
     scheduler_thread.daemon = True  # 设置为守护线程
     scheduler_thread.start()
 
-# 在应用启动时调用
+
+# 添加模板目录配置
+TEMPLATE_DIR = os.path.join(os.path.dirname(
+    os.path.abspath(__file__)), 'templates')
+
+
+@app.route('/')
+def index():
+    """显示后端请求记录的首页"""
+    try:
+        template_path = os.path.join(TEMPLATE_DIR, 'index.html')
+
+        # 获取过滤参数
+        method_filter = request.args.get('method', '').upper()
+        path_filter = request.args.get('path', '')
+
+        # 过滤日志
+        filtered_logs = request_logs
+        if method_filter:
+            filtered_logs = [
+                log for log in filtered_logs if log['method'] == method_filter]
+        if path_filter:
+            filtered_logs = [
+                log for log in filtered_logs if path_filter in log['path']]
+
+        with open(template_path, 'r', encoding='utf-8') as f:
+            template = f.read()
+
+        # 生成请求记录HTML
+        logs_html = ''
+        for log in filtered_logs:
+            logs_html += f"""
+                <div class="request-log">
+                    <div class="timestamp">{log['timestamp']}</div>
+                    <div>
+                        <span class="method {log['method']}">{log['method']}</span>
+                        <span class="path">{log['path']}</span>
+                        <span class="ip">from {log['remote_addr']}</span>
+                    </div>
+                    <pre>{json.dumps(log, indent=2, ensure_ascii=False)}</pre>
+                </div>
+            """
+
+        # 替换模板中的占位符
+        html = template.replace('{{request_logs}}', logs_html)
+        return html
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return f"Error: {str(e)}", 500
+# 添加清除日志的路由
+
+
+@app.route('/clear-logs', methods=['POST'])
+def clear_logs():
+    """清除所有请求日志"""
+    global request_logs
+    request_logs = []
+    return redirect('/')
+
+
+# 为所有现有路由添加日志装饰器
+app.view_functions = {
+    endpoint: log_request(func)
+    for endpoint, func in app.view_functions.items()
+}
+
+
+# 添加初始数据加载路由
+@app.route('/api/logs')
+def get_logs():
+    """获取初始日志数据"""
+    method_filter = request.args.get('method', '').upper()
+    path_filter = request.args.get('path', '')
+
+    filtered_logs = request_logs
+    if method_filter:
+        filtered_logs = [
+            log for log in filtered_logs if log['method'] == method_filter]
+    if path_filter:
+        filtered_logs = [
+            log for log in filtered_logs if path_filter in log['path']]
+
+    return jsonify(filtered_logs)
+
+# WebSocket连接处理
+
+
+@socketio.on('connect')
+def handle_connect():
+    """处理WebSocket连接"""
+    print("Client connected")
+    # 不在连接时发送数据，而是让客户端通过HTTP请求获取初始数据
+    emit('connected', {'status': 'success'})
+# 如果需要自定义静态文件路由
+@app.route('/static/<path:path>')
+def send_static(path):
+    return send_from_directory('static', path)
+    # 在应用启动时调用
 if __name__ == '__main__':
     start_scheduler()
     # assign_daily_tasks() 测试使用
-    app.run(debug=True)
+    socketio.run(app, debug=True, host='192.168.1.12', port=5000)
+
+
