@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-12 16:39:10
- * @LastEditTime: 2025-01-12 23:16:39
+ * @LastEditTime: 2025-01-14 20:43:23
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -9,7 +9,7 @@
 -->
 # EarthOnline 
 
-全程AI为主、基于 Python + Flask 构建的真人养成游戏，提供完整的游戏功能支持和管理系统。
+全程AI为主开发、基于 Python + Flask 构建的真人养成游戏，提供完整的游戏功能支持和管理系统。
 
 ## 🚀 特性
 

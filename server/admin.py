@@ -278,17 +278,67 @@ def delete_skill(skill_id):
 @admin_required
 def get_tasks():
     """获取所有任务"""
+    conn = None
     try:
+        print("开始获取任务列表...")  # 调试日志
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM tasks')
-        tasks = [dict(row) for row in cursor.fetchall()]
-        return jsonify({"data": tasks})
+        
+        # 获取分页参数
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        offset = (page - 1) * limit
+        
+        print(f"分页参数: page={page}, limit={limit}, offset={offset}")  # 调试日志
+
+        # 获取总数
+        cursor.execute('SELECT COUNT(*) FROM tasks')
+        total = cursor.fetchone()[0]
+        print(f"总任务数: {total}")  # 调试日志
+
+        # 获取分页数据
+        query = '''
+            SELECT id, name, description, points, stamina_cost, 
+                   is_enabled, repeatable, task_type, task_rewards, 
+                   limit_time, created_at 
+            FROM tasks
+            ORDER BY id DESC
+            LIMIT ? OFFSET ?
+        '''
+        print(f"执行SQL: {query}")  # 调试日志
+        cursor.execute(query, (limit, offset))
+        
+        # 转换为字典列表
+        tasks = []
+        for row in cursor.fetchall():
+            task = dict(row)
+            # 确保布尔值正确转换
+            task['is_enabled'] = bool(task['is_enabled'])
+            task['repeatable'] = bool(task['repeatable'])
+            tasks.append(task)
+        
+        print(f"获取到 {len(tasks)} 条任务数据")  # 调试日志
+        
+        response_data = {
+            "code": 0,
+            "msg": "",
+            "count": total,
+            "data": tasks
+        }
+        print(f"返回数据: {response_data}")  # 调试日志
+        return jsonify(response_data)
+        
     except Exception as e:
-        print(f"Error in get_tasks: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        print(f"获取任务列表出错: {str(e)}")  # 错误日志
+        return jsonify({
+            "code": 1,
+            "msg": f"获取任务列表失败: {str(e)}",
+            "count": 0,
+            "data": []
+        }), 500
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 @admin_bp.route('/api/tasks', methods=['POST'])
 @admin_required
@@ -300,9 +350,22 @@ def add_task():
         cursor = conn.cursor()
         
         cursor.execute('''
-            INSERT INTO tasks (name, description, exp_reward, gold_reward, created_at)
-            VALUES (?, ?, ?, ?, datetime('now'))
-        ''', (data['name'], data['description'], data['exp_reward'], data['gold_reward']))
+            INSERT INTO tasks (
+                name, description, points, stamina_cost, 
+                is_enabled, repeatable, task_type, task_rewards, 
+                limit_time, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ''', (
+            data['name'],
+            data['description'],
+            data['points'],
+            data['stamina_cost'],
+            data.get('is_enabled', True),
+            data.get('repeatable', False),
+            data['task_type'],
+            data['task_rewards'],
+            data.get('limit_time', 0)
+        ))
         
         task_id = cursor.lastrowid
         conn.commit()
@@ -376,6 +439,13 @@ def get_api_docs():
     except Exception as e:
         print(f"Error in get_api_docs: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+# 添加任务管理页面路由
+@admin_bp.route('/tasks')
+@admin_required
+def task_manage():
+    """任务管理页面"""
+    return render_template('task_manage.html')
 
 if __name__ == '__main__':
     app.run(debug=True)

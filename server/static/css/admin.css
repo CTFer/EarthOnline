@@ -24,8 +24,8 @@ h1, h2 {
 }
 
 .layui-table {
-    background: rgba(27, 39, 53, 0.5);
-    color: #fff;
+    background: #1e2128;
+    color: #b0b6c2;
 }
 
 .layui-table th {
@@ -268,4 +268,119 @@ h1, h2 {
     color: rgba(255, 255, 255, 0.5);
     padding: 30px;
     font-size: 14px;
+}
+
+/* 表格样式优化 */
+.layui-table {
+    background: #1e2128;
+    color: #b0b6c2;
+}
+
+/* 表头样式 */
+.layui-table thead tr {
+    background-color: #272b34;
+}
+
+.layui-table thead th {
+    color: #8f96a3;
+    font-weight: 500;
+    border-color: #363a43;
+}
+
+/* 表格内容样式 */
+.layui-table tbody tr {
+    transition: background 0.3s;
+}
+
+.layui-table tbody tr:hover {
+    background-color: #2a2f3a !important;
+}
+
+/* 斑马纹样式 */
+.layui-table tr:nth-child(even) {
+    background-color: #23262f;
+}
+
+/* 表格边框颜色 */
+.layui-table td, .layui-table th {
+    border-color: #363a43;
+}
+
+/* 状态标签样式 */
+.layui-badge {
+    padding: 4px 8px;
+    border-radius: 2px;
+}
+
+.layui-badge.layui-bg-green {
+    background-color: #27ae60 !important;
+}
+
+.layui-badge.layui-bg-gray {
+    background-color: #636e7b !important;
+}
+
+/* 操作按钮样式 */
+.layui-table .layui-btn {
+    padding: 0 10px;
+    height: 24px;
+    line-height: 24px;
+    font-size: 12px;
+    border-radius: 2px;
+}
+
+.layui-table .layui-btn-xs {
+    background-color: #2980b9;
+    border: none;
+}
+
+.layui-table .layui-btn-danger {
+    background-color: #c0392b;
+}
+
+/* 分页样式 */
+.layui-laypage a, .layui-laypage span {
+    background-color: #272b34;
+    color: #b0b6c2;
+    border-color: #363a43;
+}
+
+.layui-laypage a:hover {
+    color: #fff;
+}
+
+.layui-laypage .layui-laypage-curr .layui-laypage-em {
+    background-color: #2980b9;
+}
+
+/* 表格行选中状态 */
+.layui-table-click {
+    background-color: #2a2f3a !important;
+    color: #fff !important;
+}
+
+/* 表格排序图标 */
+.layui-table-sort {
+    width: 10px;
+    height: 20px;
+}
+
+.layui-table-sort-asc {
+    border-bottom-color: #8f96a3;
+}
+
+.layui-table-sort-desc {
+    border-top-color: #8f96a3;
+}
+
+/* 表格工具栏 */
+.layui-table-tool {
+    background-color: #272b34;
+    border-color: #363a43;
+}
+
+/* 空数据提示 */
+.layui-table-none {
+    color: #8f96a3;
+    background-color: #1e2128;
 }

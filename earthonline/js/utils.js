@@ -1,3 +1,12 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-01-10 17:02:48
+ * @LastEditTime: 2025-01-14 22:29:41
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2025 迷舍
+ */
 // 工具函数
 const gameUtils = {
     // 格式化剩余时间
@@ -38,5 +47,19 @@ const gameUtils = {
             return endTime;
         }
         return new Date(parseInt(task.endtime) * 1000);
+    },
+
+    // 格式化日期时间
+    formatDate: function(timestamp) {
+        if (!timestamp) return '永久';
+        
+        const date = new Date(timestamp * 1000);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hour = String(date.getHours()).padStart(2, '0');
+        const minute = String(date.getMinutes()).padStart(2, '0');
+        
+        return `${year}-${month}-${day} ${hour}:${minute}`;
     }
 }; 

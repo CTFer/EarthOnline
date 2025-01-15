@@ -51,23 +51,32 @@
         
         <!-- 任务管理面板 -->
         <div class="panel">
-            <h2>任务管理</h2>
-            <div class="control-panel">
-                <button class="layui-btn" onclick="showAddTaskForm()">添加任务</button>
+            <div class="panel-header">
+                <h2>任务管理</h2>
+                <div class="panel-actions">
+                    <a href="/admin/tasks" class="layui-btn layui-btn-normal">
+                        <i class="layui-icon layui-icon-list"></i> 任务管理界面
+                    </a>
+                    <button class="layui-btn" onclick="showAddTaskForm()">
+                        <i class="layui-icon layui-icon-add-1"></i> 快速添加
+                    </button>
+                </div>
             </div>
-            <table class="layui-table" id="taskTable">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>任务名称</th>
-                        <th>描述</th>
-                        <th>经验值</th>
-                        <th>金币</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div class="panel-body">
+                <table class="layui-table" id="taskTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>任务名称</th>
+                            <th>描述</th>
+                            <th>类型</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
 
         <!-- API文档面板 -->

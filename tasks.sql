@@ -10,7 +10,7 @@
  Target Server Version : 3021000
  File Encoding         : 65001
 
- Date: 12/01/2025 21:56:52
+ Date: 13/01/2025 23:25:19
 */
 
 PRAGMA foreign_keys = false;
@@ -21,7 +21,7 @@ PRAGMA foreign_keys = false;
 DROP TABLE IF EXISTS "tasks";
 CREATE TABLE "tasks" (
   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "name" TEXT NOT NULL,
+  "name" TEXT,
   "description" TEXT,
   "points" INTEGER DEFAULT 0,
   "stamina_cost" INTEGER DEFAULT 0,
@@ -33,7 +33,10 @@ CREATE TABLE "tasks" (
   "task_status" integer,
   "limit_time" integer,
   "task_scope" integer DEFAULT 0,
-  "repeat_time" integer DEFAULT 0
+  "repeat_time" integer DEFAULT 0,
+  "publisher" integer DEFAULT 1,
+  "task_chain_id" INTEGER,
+  "icon" TEXT
 );
 
 -- ----------------------------

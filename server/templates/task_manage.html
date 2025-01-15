@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>任务管理</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <div class="task-manage-header">
+            <h1>任务管理系统</h1>
+            <div class="header-actions">
+                <a href="/admin" class="layui-btn layui-btn-primary">
+                    <i class="layui-icon layui-icon-return"></i> 返回主页
+                </a>
+                <button class="layui-btn" onclick="showAddTaskForm()">
+                    <i class="layui-icon layui-icon-add-1"></i> 添加任务
+                </button>
+            </div>
+        </div>
+
+        <!-- 任务列表卡片 -->
+        <div class="task-card">
+            <!-- 注意：这里添加 lay-filter 属性 -->
+            <table id="taskTable" lay-filter="taskTable"></table>
+        </div>
+    </div>
+
+    <!-- 任务表单模板 -->
+    <script type="text/html" id="taskFormTpl">
+        <form class="layui-form" style="padding: 20px;">
+            <div class="layui-form-item">
+                <label class="layui-form-label">任务名称</label>
+                <div class="layui-input-block">
+                    <input type="text" name="name" required lay-verify="required" placeholder="请输入任务名称" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">任务描述</label>
+                <div class="layui-input-block">
+                    <textarea name="description" placeholder="请输入任务描述" class="layui-textarea"></textarea>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">任务类型</label>
+                <div class="layui-input-block">
+                    <select name="task_type" lay-verify="required">
+                        <option value="DAILY">每日任务</option>
+                        <option value="MAIN">主线任务</option>
+                        <option value="BRANCH">支线任务</option>
+                        <option value="SPECIAL">活动任务</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">经验值</label>
+                <div class="layui-input-block">
+                    <input type="number" name="points" required lay-verify="required|number" placeholder="请输入经验值" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">体力消耗</label>
+                <div class="layui-input-block">
+                    <input type="number" name="stamina_cost" required lay-verify="required|number" placeholder="请输入体力消耗" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">任务奖励</label>
+                <div class="layui-input-block">
+                    <input type="text" name="task_rewards" placeholder="请输入任务奖励" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">限制时间</label>
+                <div class="layui-input-block">
+                    <input type="number" name="limit_time" placeholder="请输入限制时间(秒)" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <div class="layui-input-block">
+                    <input type="checkbox" name="is_enabled" title="启用" checked>
+                    <input type="checkbox" name="repeatable" title="可重复">
+                </div>
+            </div>
+        </form>
+    </script>
+
+    <!-- 表格工具条 -->
+    <script type="text/html" id="tableTools">
+        <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+        <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+    </script>
+
+    <script src="/static/layui/layui.js"></script>
+    <script>
+    layui.use(['table', 'form', 'layer', 'jquery'], function(){
+        var table = layui.table,
+            form = layui.form,
+            layer = layui.layer,
+            $ = layui.jquery;
+
+        console.log('初始化表格...');  // 调试日志
+
+        // 初始化表格
+        var tableIns = table.render({
+            elem: '#taskTable'
+            ,url: '/admin/api/tasks'
+            ,method: 'get'
+            ,headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+            ,request: {
+                pageName: 'page'
+                ,limitName: 'limit'
+            }
+            ,response: {
+                statusName: 'code'
+                ,statusCode: 0
+                ,msgName: 'msg'
+                ,countName: 'count'
+                ,dataName: 'data'
+            }
+            ,page: true
+            ,limit: 10
+            ,limits: [10, 20, 50, 100]
+            ,cols: [[
+                {field:'id', title: 'ID', width:80, sort: true}
+                ,{field:'name', title: '任务名称', width:120}
+                ,{field:'description', title: '描述', width:200}
+                ,{field:'task_type', title: '任务类型', width:100}
+                ,{field:'points', title: '经验值', width:100}
+                ,{field:'stamina_cost', title: '体力消耗', width:100}
+                ,{field:'task_rewards', title: '奖励', width:120}
+                ,{field:'is_enabled', title: '状态', width:80, templet: function(d){
+                    return d.is_enabled ? 
+                        '<span class="layui-badge layui-bg-green">启用</span>' : 
+                        '<span class="layui-badge layui-bg-gray">禁用</span>';
+                }}
+                ,{field:'repeatable', title: '可重复', width:80, templet: function(d){
+                    return d.repeatable ? '是' : '否';
+                }}
+                ,{title:'操作', toolbar: '#tableTools', width:120, fixed: 'right'}
+            ]]
+            ,done: function(res, curr, count){
+                console.log('表格加载完成:', {res, curr, count});  // 调试日志
+                if(res.code !== 0){
+                    layer.msg('数据加载失败：' + res.msg);
+                }
+            }
+            ,error: function(e){
+                console.error('表格加载错误:', e);  // 错误日志
+                layer.msg('数据加载失败，请检查网络连接');
+            }
+        });
+
+        // 监听工具条事件
+        table.on('tool(taskTable)', function(obj){
+            console.log('工具条事件:', obj.event);  // 调试日志
+            var data = obj.data;
+            if(obj.event === 'edit'){
+                showEditTaskForm(data);
+            } else if(obj.event === 'del'){
+                layer.confirm('确认删除此任务？', function(index){
+                    deleteTask(data.id, obj);
+                    layer.close(index);
+                });
+            }
+        });
+
+        // 手动触发表格重载
+        window.reloadTable = function(){
+            tableIns.reload();
+        };
+
+        console.log('表格初始化完成');  // 调试日志
+    });
+
+    // 显示添加任务表单
+    function showAddTaskForm() {
+        layer.open({
+            type: 1,
+            title: '添加任务',
+            area: ['600px', '800px'],
+            content: document.getElementById('taskFormTpl').innerHTML,
+            btn: ['提交', '取消'],
+            yes: function(index, layero){
+                var formData = layui.form.val('taskForm');
+                addTask(formData, index);
+            }
+        });
+        layui.form.render();
+    }
+
+    // 添加任务
+    function addTask(formData, layerIndex) {
+        fetch('/admin/api/tasks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.id) {
+                layer.msg('添加成功');
+                layer.close(layerIndex);
+                layui.table.reload('taskTable');
+            } else {
+                layer.msg('添加失败：' + data.error);
+            }
+        })
+        .catch(error => {
+            layer.msg('添加失败：' + error);
+        });
+    }
+
+    // 删除任务
+    function deleteTask(id, obj) {
+        fetch(`/admin/api/tasks/${id}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                obj.del();
+                layer.msg('删除成功');
+            } else {
+                layer.msg('删除失败：' + data.error);
+            }
+        })
+        .catch(error => {
+            layer.msg('删除失败：' + error);
+        });
+    }
+
+    // 显示编辑任务表单
+    function showEditTaskForm(data) {
+        layer.open({
+            type: 1,
+            title: '编辑任务',
+            area: ['600px', '800px'],
+            content: document.getElementById('taskFormTpl').innerHTML,
+            success: function(layero, index){
+                // 设置表单的 lay-filter 属性
+                var form = layero.find('form');
+                form.attr('lay-filter', 'taskForm');
+                
+                // 为表单设置数据
+                layui.form.val('taskForm', {
+                    'name': data.name,
+                    'description': data.description,
+                    'task_type': data.task_type,
+                    'points': data.points,
+                    'stamina_cost': data.stamina_cost,
+                    'task_rewards': data.task_rewards,
+                    'limit_time': data.limit_time,
+                    'is_enabled': data.is_enabled,
+                    'repeatable': data.repeatable
+                });
+                
+                // 重新渲染表单
+                layui.form.render();
+            },
+            btn: ['提交', '取消'],
+            yes: function(index, layero){
+                var formData = layui.form.val('taskForm');
+                updateTask(data.id, formData, index);
+            }
+        });
+    }
+
+    // 更新任务
+    function updateTask(id, formData, layerIndex) {
+        fetch(`/admin/api/tasks/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                layer.msg('更新成功');
+                layer.close(layerIndex);
+                layui.table.reload('taskTable');
+            } else {
+                layer.msg('更新失败：' + data.error);
+            }
+        })
+        .catch(error => {
+            layer.msg('更新失败：' + error);
+        });
+    }
+
+    // 修改任务表单模板，添加 lay-filter 属性
+    document.getElementById('taskFormTpl').innerHTML = `
+        <form class="layui-form" lay-filter="taskForm" style="padding: 20px;">
+            <!-- 表单内容保持不变 -->
+            ${document.getElementById('taskFormTpl').innerHTML}
+        </form>
+    `;
+    </script>
+</body>
+</html> 
