@@ -1,16 +1,16 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-08 14:41:57
- * @LastEditTime: 2025-01-15 10:43:55
+ * @LastEditTime: 2025-01-21 15:47:20
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
 
 // 后端服务器地址配置
-const SERVER = 'http://127.0.0.1:5000/';
+const SERVER = 'http://192.168.5.18:5000/';
 
 // WebSocket连接
-const socket = io('http://127.0.0.1:5000/');
+const socket = io('http://192.168.5.18:5000/');
 
 // 在文件开头声明全局变量
 let taskManager;
@@ -20,6 +20,7 @@ class TaskManager {
     constructor() {
         this.activeTasksSwiper = null;
         this.playerId = localStorage.getItem('playerId') || '1';
+        this.loading = false;
         this.initWebSocket();
     }
 
@@ -101,7 +102,7 @@ class TaskManager {
         }
     }
 
-    // 统一的消息显示方法
+    // 显示通知
     showNotification(data) {
         const typeInfo = data.task?.task_type ? 
             gameUtils.getTaskTypeInfo(data.task.task_type) : 
@@ -237,6 +238,12 @@ class TaskManager {
 
     // 加载可用任务列表
     async loadTasks() {
+        if (this.loading) return;
+        
+        this.loading = true;
+        const taskList = document.getElementById('taskList');
+        taskList.innerHTML = '<div class="loading-state">加载中...</div>';
+        
         try {
             const response = await fetch(`${SERVER}/api/tasks/available/${this.playerId}`);
             let tasks = await response.json();
@@ -276,7 +283,9 @@ class TaskManager {
 
         } catch (error) {
             console.error('加载任务失败:', error);
-            this.showError('task-list-wrapper', '加载任务失败');
+            this.showError('taskList', '加载任务失败，请稍后重试');
+        } finally {
+            this.loading = false;
         }
     }
 
@@ -286,7 +295,7 @@ class TaskManager {
         taskCard.className = 'task-card';
         taskCard.dataset.endtime = task.endtime;
         
-        const taskTypeInfo = gameUtils.getTaskTypeInfo(task.task_type);
+        const taskTypeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
         
         taskCard.innerHTML = `
             <div class="task-header" style="background-color: ${taskTypeInfo.color}">
@@ -526,31 +535,51 @@ class TaskManager {
     // 接受任务
     async acceptTask(taskId) {
         try {
-            console.log('Accepting task with player_id:', this.playerId); // 调试日志
+            console.group('接受任务请求');
+            console.log('任务ID:', taskId);
+            console.log('玩家ID:', this.playerId);
             
             const response = await fetch(`${SERVER}/api/tasks/${taskId}/accept`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     player_id: this.playerId
                 })
             });
             
+            const data = await response.json();
+            console.log('API响应状态:', response.status);
+            console.log('API响应数据:', data);
+
             if (response.ok) {
-                const data = await response.json();
-                console.log('Task accepted:', data); // 调试日志
-                layer.msg('成功接受任务', {icon: 1});
+                layer.msg(`成功接受任务: ${data.task_name}`, {icon: 1});
                 await this.refreshTasks();
             } else {
-                const data = await response.json();
-                throw new Error(data.error || '接受任务失败');
+                // 根据错误代码显示不同的提示信息
+                let errorMsg = data.error;
+                let icon = 2;
+                
+                switch(data.code) {
+                    case 'PREREQUISITE_NOT_STARTED':
+                    case 'PREREQUISITE_NOT_COMPLETED':
+                        icon = 0; // 使用信息图标
+                        break;
+                    case 'TASK_ALREADY_ACCEPTED':
+                        icon = 4; // 使用锁定图标
+                        break;
+                    default:
+                        errorMsg = '接受任务失败: ' + (data.error || '未知错误');
+                }
+                
+                layer.msg(errorMsg, {icon: icon});
             }
         } catch (error) {
             console.error('接受任务失败:', error);
-            layer.msg('接受任务失败', {icon: 2});
+            layer.msg('接受任务失败，请检查网络连接', {icon: 2});
+        } finally {
+            console.groupEnd();
         }
     }
 
@@ -846,7 +875,7 @@ class TaskManager {
 
     // 创建进行中的任务卡片
     createActiveTaskCard(task) {
-        const taskTypeInfo = gameUtils.getTaskTypeInfo(task.task_type);
+        const taskTypeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
         const currentTime = Math.floor(Date.now()/1000);
         const progressPercent = Math.max(0, Math.min(100, 
             ((task.endtime - currentTime) / (task.endtime - task.starttime)) * 100

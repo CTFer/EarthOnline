@@ -1,0 +1,123 @@
+/*
+ Navicat Premium Data Transfer
+
+ Source Server         : game
+ Source Server Type    : SQLite
+ Source Server Version : 3021000
+ Source Schema         : main
+
+ Target Server Type    : SQLite
+ Target Server Version : 3021000
+ File Encoding         : 65001
+
+ Date: 20/01/2025 18:28:15
+*/
+
+PRAGMA foreign_keys = false;
+
+-- ----------------------------
+-- Table structure for player_task
+-- ----------------------------
+DROP TABLE IF EXISTS "player_task";
+CREATE TABLE "player_task" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "player_id" INTEGER,
+  "task_id" INTEGER,
+  "starttime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "points_earned" INTEGER,
+  "endtime" TIMESTAMP,
+  "status" text,
+  "comment" TEXT,
+  "complete_time" integer,
+  FOREIGN KEY ("task_id") REFERENCES "tasks" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION,
+  FOREIGN KEY ("player_id") REFERENCES "player_data" ("player_id") ON DELETE NO ACTION ON UPDATE NO ACTION
+);
+
+-- ----------------------------
+-- Records of player_task
+-- ----------------------------
+INSERT INTO "player_task" VALUES (1, 1, 1, 1717402800000, 10, NULL, 'COMPLETED', NULL, 1736773874);
+INSERT INTO "player_task" VALUES (2, 1, 1, 1716463600, NULL, 1736517600, 'COMPLETED', NULL, 1736773874);
+INSERT INTO "player_task" VALUES (3, 1, 3, 1716463600, NULL, 1736517600, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (4, 2, 3, 1716463600, NULL, 1736517600, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (5, 1, 6, 1736463600, NULL, 1736517600, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (6, 2, 6, 1736463600, NULL, 1736517600, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (7, 1, 7, 1736463600, NULL, 1736517600, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (8, 2, 7, 1736463600, NULL, 1736517600, 'COMPLETE', NULL, NULL);
+INSERT INTO "player_task" VALUES (9, 1, 8, 1736463600, NULL, 1736517600, 'COMPLETE', NULL, NULL);
+INSERT INTO "player_task" VALUES (10, 2, 8, 1736463600, NULL, 1736517600, 'COMPLETE', NULL, NULL);
+INSERT INTO "player_task" VALUES (11, 1, 1, 1736636400, NULL, 1736690400, 'COMPLETED', NULL, 1736773874);
+INSERT INTO "player_task" VALUES (12, 1, 3, 1736636400, NULL, 1736690400, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (13, 2, 3, 1736636400, NULL, 1736690400, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (14, 1, 6, 1736636400, NULL, 1736690400, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (15, 2, 6, 1736636400, NULL, 1736690400, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (16, 1, 7, 1736636400, NULL, 1736690400, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (17, 2, 7, 1736636400, NULL, 1736690400, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (18, 1, 8, 1736636400, NULL, 1736690400, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (19, 2, 8, 1736636400, NULL, 1736690400, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (20, 1, 5, 1736693713, 0, NULL, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (21, 1, 2, 1736770440, 0, NULL, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (22, 1, 9, 1736770450, 0, NULL, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (23, 1, 1, 1736809200, NULL, 1736863200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (24, 1, 3, 1736809200, NULL, 1736863200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (25, 2, 3, 1736809200, NULL, 1736863200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (26, 1, 6, 1736809200, NULL, 1736863200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (27, 2, 6, 1736809200, NULL, 1736863200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (28, 1, 7, 1736809200, NULL, 1736863200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (29, 2, 7, 1736809200, NULL, 1736863200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (30, 1, 8, 1736809200, NULL, 1736863200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (31, 2, 8, 1736809200, NULL, 1736863200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (32, 1, 10, 1736863241, 0, NULL, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (33, 1, 1, 1736895600, NULL, 1736949600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (34, 1, 3, 1736895600, NULL, 1736949600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (35, 2, 3, 1736895600, NULL, 1736949600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (36, 1, 6, 1736895600, NULL, 1736949600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (37, 2, 6, 1736895600, NULL, 1736949600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (38, 1, 7, 1736895600, NULL, 1736949600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (39, 2, 7, 1736895600, NULL, 1736949600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (40, 1, 8, 1736895600, NULL, 1736949600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (41, 2, 8, 1736895600, NULL, 1736949600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (42, 1, 1, 1737068400, NULL, 1737122400, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (43, 1, 3, 1737068400, NULL, 1737122400, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (44, 2, 3, 1737068400, NULL, 1737122400, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (45, 1, 6, 1737068400, NULL, 1737122400, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (46, 2, 6, 1737068400, NULL, 1737122400, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (47, 1, 7, 1737068400, NULL, 1737122400, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (48, 2, 7, 1737068400, NULL, 1737122400, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (49, 1, 8, 1737068400, NULL, 1737122400, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (50, 2, 8, 1737068400, NULL, 1737122400, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (51, 1, 12, 1737092949, 0, NULL, 'IN_PROGRESS', NULL, NULL);
+INSERT INTO "player_task" VALUES (52, 1, 1, 1737154800, NULL, 1737208800, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (53, 1, 3, 1737154800, NULL, 1737208800, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (54, 2, 3, 1737154800, NULL, 1737208800, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (55, 1, 6, 1737154800, NULL, 1737208800, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (56, 2, 6, 1737154800, NULL, 1737208800, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (57, 1, 7, 1737154800, NULL, 1737208800, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (58, 2, 7, 1737154800, NULL, 1737208800, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (59, 1, 8, 1737154800, NULL, 1737208800, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (60, 2, 8, 1737154800, NULL, 1737208800, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (61, 1, 1, 1737241200, NULL, 1737295200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (62, 1, 3, 1737241200, NULL, 1737295200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (63, 2, 3, 1737241200, NULL, 1737295200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (64, 1, 6, 1737241200, NULL, 1737295200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (65, 2, 6, 1737241200, NULL, 1737295200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (66, 1, 7, 1737241200, NULL, 1737295200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (67, 2, 7, 1737241200, NULL, 1737295200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (68, 1, 8, 1737241200, NULL, 1737295200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (69, 2, 8, 1737241200, NULL, 1737295200, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (70, 1, 1, 1737327600, NULL, 1737381600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (71, 1, 3, 1737327600, NULL, 1737381600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (72, 2, 3, 1737327600, NULL, 1737381600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (73, 1, 6, 1737327600, NULL, 1737381600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (74, 2, 6, 1737327600, NULL, 1737381600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (75, 1, 7, 1737327600, NULL, 1737381600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (76, 2, 7, 1737327600, NULL, 1737381600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (77, 1, 8, 1737327600, NULL, 1737381600, 'available', NULL, NULL);
+INSERT INTO "player_task" VALUES (78, 2, 8, 1737327600, NULL, 1737381600, 'available', NULL, NULL);
+
+-- ----------------------------
+-- Auto increment value for player_task
+-- ----------------------------
+UPDATE "sqlite_sequence" SET seq = 78 WHERE name = 'player_task';
+
+PRAGMA foreign_keys = true;

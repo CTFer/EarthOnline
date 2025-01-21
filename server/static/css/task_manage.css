@@ -1,0 +1,60 @@
+/* 基础布局 */
+.admin-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 15px;
+}
+
+.task-manage-header {
+    margin-bottom: 15px;
+}
+
+.task-manage-content {
+    flex: 1;
+    min-height: 0; /* 防止溢出 */
+}
+
+.task-tree-panel {
+    height: 100%;
+    background: #fff;
+    padding: 15px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: relative;
+}
+
+#taskTree {
+    width: 100%;
+    height: 100%;
+}
+
+.tree-controls {
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    z-index: 100;
+    display: flex;
+    gap: 5px;
+}
+
+/* JSON 弹窗样式 */
+.layui-layer-page .layui-layer-content {
+    height: calc(100% - 110px) !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+}
+
+#taskJson {
+    width: 100% !important;
+    height: 100% !important;
+    border: none;
+    padding: 20px;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    resize: none;
+    box-sizing: border-box;
+} 

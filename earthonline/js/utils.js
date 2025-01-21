@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:48
- * @LastEditTime: 2025-01-14 22:29:41
+ * @LastEditTime: 2025-01-15 13:18:33
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -30,11 +30,37 @@ const gameUtils = {
     },
 
     // 获取任务类型信息
-    getTaskTypeInfo(typeId) {
-        return TASK_TYPE_MAP[typeId] || {
-            text: '未知类型',
-            color: '#757575',
-            icon: 'layui-icon-help'
+    getTaskTypeInfo(taskType, icon = '') {
+        const defaultIcon = 'layui-icon-flag';  // 默认图标
+        
+        const typeInfo = {
+            "DAILY": {
+                text: '日常任务',
+                color: '#4CAF50',
+                icon: icon || defaultIcon
+            },
+            "MAIN": {
+                text: '主线任务',
+                color: '#2196F3',
+                icon: icon || defaultIcon
+            },
+            'BRANCH': {
+                text: '支线任务',
+                color: '#9C27B0',
+                icon: icon || defaultIcon
+            },
+            "SPECIAL": {
+                text: '特殊任务',
+                color: '#FF9800',
+                icon: icon || defaultIcon
+            },
+
+        };
+
+        return typeInfo[taskType] || {
+            text: '未知任务',
+            color: '#607D8B',
+            icon: defaultIcon
         };
     },
 

@@ -7,7 +7,8 @@ body {
 }
 
 .admin-container {
-    max-width: 1200px;
+    padding: 80px 20px 20px;
+    max-width: 1400px;
     margin: 0 auto;
 }
 
@@ -383,4 +384,152 @@ h1, h2 {
 .layui-table-none {
     color: #8f96a3;
     background-color: #1e2128;
+}
+
+.admin-nav {
+    margin-bottom: 20px;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.admin-nav .layui-btn {
+    margin-right: 10px;
+}
+
+.panel-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.panel-header h2 {
+    margin: 0;
+}
+
+.layui-btn i {
+    margin-right: 5px;
+}
+
+/* 顶部导航样式优化 */
+.admin-header {
+    background-color: rgba(27, 39, 53, 0.95);
+    padding: 0 20px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(87, 202, 255, 0.2);
+}
+
+/* Logo区域 */
+.admin-header .logo {
+    display: flex;
+    align-items: center;
+}
+
+.admin-header .logo h1 {
+    color: #57CAFF;
+    font-size: 18px;
+    margin: 0;
+    padding: 0;
+}
+
+/* 导航菜单 */
+.admin-header .nav-menu {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 100%;
+}
+
+.admin-header .nav-menu .layui-btn {
+    height: 36px;
+    line-height: 36px;
+    padding: 0 15px;
+    border-radius: 4px;
+    background-color: rgba(87, 202, 255, 0.1);
+    color: #57CAFF;
+    border: 1px solid rgba(87, 202, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.admin-header .nav-menu .layui-btn:hover {
+    background-color: rgba(87, 202, 255, 0.2);
+    border-color: rgba(87, 202, 255, 0.4);
+    box-shadow: 0 0 10px rgba(87, 202, 255, 0.1);
+}
+
+.admin-header .nav-menu .layui-btn.layui-btn-danger {
+    background-color: rgba(255, 87, 87, 0.1);
+    color: #ff5757;
+    border-color: rgba(255, 87, 87, 0.2);
+}
+
+.admin-header .nav-menu .layui-btn.layui-btn-danger:hover {
+    background-color: rgba(255, 87, 87, 0.2);
+    border-color: rgba(255, 87, 87, 0.4);
+    box-shadow: 0 0 10px rgba(255, 87, 87, 0.1);
+}
+
+/* 主容器样式 */
+.admin-container {
+    padding: 80px 20px 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* 页脚样式 */
+.admin-footer {
+    text-align: center;
+    padding: 20px;
+    color: rgba(255, 255, 255, 0.6);
+    background-color: rgba(27, 39, 53, 0.5);
+    margin-top: 20px;
+    border-top: 1px solid rgba(87, 202, 255, 0.1);
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 768px) {
+    .admin-header {
+        padding: 10px;
+        height: auto;
+        flex-direction: column;
+    }
+
+    .admin-header .logo {
+        margin-bottom: 10px;
+    }
+
+    .admin-header .nav-menu {
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .admin-header .nav-menu .layui-btn {
+        margin: 5px;
+    }
+
+    .admin-container {
+        padding: 100px 10px 20px;
+    }
+
+    .panel {
+        margin: 10px;
+        padding: 15px;
+    }
 }

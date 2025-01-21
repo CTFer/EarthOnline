@@ -3,12 +3,20 @@ from functools import wraps
 import sqlite3
 import os
 from api import api_registry
+import json
+import hashlib  # 添加到文件顶部的导入
+from datetime import datetime
 
 # 创建蓝图
 admin_bp = Blueprint('admin', __name__)
 
 # 数据库路径
 DB_PATH = os.path.join(os.path.dirname(__file__), 'database', 'game.db')
+
+# 添加密码加密函数
+def encrypt_password(password):
+    """使用MD5加密密码"""
+    return hashlib.md5(password.encode('utf-8')).hexdigest()
 
 # 管理员认证装饰器
 def admin_required(f):
@@ -36,12 +44,35 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        # 这里简化了验证逻辑，实际应用中应该使用更安全的方式
-        if username == 'admin' and password == 'admin123':
-            session['is_admin'] = True
-            return redirect(url_for('admin.index'))
-        else:
-            flash('用户名或密码错误')
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # 获取用户信息，包括密码字段
+            cursor.execute('''
+                SELECT id, username, password, created_at 
+                FROM users 
+                WHERE username = ?
+            ''', (username,))
+            
+            user = cursor.fetchone()
+            print(f"Login attempt - User: {username}, Found user: {dict(user) if user else None}")  # 调试日志
+            
+            if user and user['password'] == encrypt_password(password):
+                session['is_admin'] = True
+                session['user_id'] = user['id']  # 保存用户ID到session
+                session['username'] = user['username']  # 保存用户名到session
+                print(f"Login successful for user: {username}")  # 调试日志
+                return redirect(url_for('admin.index'))
+            else:
+                print(f"Login failed for user: {username}")  # 调试日志
+                flash('用户名或密码错误')
+                
+        except Exception as e:
+            print(f"Login error: {str(e)}")
+            flash('登录过程中发生错误')
+        finally:
+            conn.close()
             
     return render_template('admin_login.html')
 
@@ -81,10 +112,13 @@ def add_user():
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # 对密码进行MD5加密
+        encrypted_password = encrypt_password(data['password'])
+        
         cursor.execute('''
             INSERT INTO users (username, password, created_at)
             VALUES (?, ?, datetime('now'))
-        ''', (data['username'], data['password']))  # 实际应用中应该对密码进行哈希处理
+        ''', (data['username'], encrypted_password))
         
         user_id = cursor.lastrowid
         conn.commit()
@@ -126,11 +160,13 @@ def update_user(user_id):
         cursor = conn.cursor()
         
         if data.get('password'):
+            # 如果更新包含密码，进行MD5加密
+            encrypted_password = encrypt_password(data['password'])
             cursor.execute('''
                 UPDATE users 
-                SET username = ?, password_hash = ?
+                SET username = ?, password = ?
                 WHERE id = ?
-            ''', (data['username'], data['password'], user_id))  # 实际应用中应该对密码进行哈希处理
+            ''', (data['username'], encrypted_password, user_id))
         else:
             cursor.execute('''
                 UPDATE users 
@@ -282,39 +318,56 @@ def get_tasks():
     try:
         print("开始获取任务列表...")  # 调试日志
         conn = get_db_connection()
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
-        # 获取分页参数
-        page = request.args.get('page', 1, type=int)
-        limit = request.args.get('limit', 10, type=int)
-        offset = (page - 1) * limit
-        
-        print(f"分页参数: page={page}, limit={limit}, offset={offset}")  # 调试日志
 
-        # 获取总数
-        cursor.execute('SELECT COUNT(*) FROM tasks')
-        total = cursor.fetchone()[0]
-        print(f"总任务数: {total}")  # 调试日志
+        # 获取表结构
+        cursor.execute("PRAGMA table_info(tasks)")
+        columns = [column[1] for column in cursor.fetchall()]
+        print(f"表中所有字段: {columns}")  # 调试日志
 
-        # 获取分页数据
-        query = '''
-            SELECT id, name, description, points, stamina_cost, 
-                   is_enabled, repeatable, task_type, task_rewards, 
-                   limit_time, created_at 
+        # 获取所有任务
+        query = f'''
+            SELECT {", ".join(columns)}
             FROM tasks
-            ORDER BY id DESC
-            LIMIT ? OFFSET ?
+            ORDER BY id
         '''
         print(f"执行SQL: {query}")  # 调试日志
-        cursor.execute(query, (limit, offset))
+        cursor.execute(query)
         
         # 转换为字典列表
         tasks = []
         for row in cursor.fetchall():
             task = dict(row)
-            # 确保布尔值正确转换
+            
+            # 确保所有字段都存在，设置默认值
+            for column in columns:
+                if column not in task or task[column] is None:
+                    if column in ['is_enabled', 'repeatable']:
+                        task[column] = False
+                    elif column in ['points', 'stamina_cost', 'limit_time', 'repeat_time', 
+                                  'completion_count', 'task_chain_id', 'parent_task_id']:
+                        task[column] = 0
+                    elif column == 'task_rewards':
+                        task[column] = {}
+                    elif column == 'task_status':
+                        task[column] = 'INACTIVE'
+                    else:
+                        task[column] = None
+
+            # 类型转换
             task['is_enabled'] = bool(task['is_enabled'])
             task['repeatable'] = bool(task['repeatable'])
+            
+            # 解析 task_rewards JSON 字符串
+            if task['task_rewards'] and isinstance(task['task_rewards'], str):
+                try:
+                    task['task_rewards'] = json.loads(task['task_rewards'])
+                except json.JSONDecodeError:
+                    task['task_rewards'] = {}
+            elif task['task_rewards'] is None:
+                task['task_rewards'] = {}
+            
             tasks.append(task)
         
         print(f"获取到 {len(tasks)} 条任务数据")  # 调试日志
@@ -322,10 +375,9 @@ def get_tasks():
         response_data = {
             "code": 0,
             "msg": "",
-            "count": total,
+            "count": len(tasks),
             "data": tasks
         }
-        print(f"返回数据: {response_data}")  # 调试日志
         return jsonify(response_data)
         
     except Exception as e:
@@ -349,22 +401,30 @@ def add_task():
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # 转换任务奖励为JSON字符串
+        task_rewards = json.dumps(data.get('task_rewards', {}))
+        
         cursor.execute('''
             INSERT INTO tasks (
-                name, description, points, stamina_cost, 
-                is_enabled, repeatable, task_type, task_rewards, 
-                limit_time, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                name, description, task_chain_id, parent_task_id,
+                task_type, task_status, task_scope, stamina_cost,
+                limit_time, repeat_time, is_enabled, repeatable,
+                task_rewards, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         ''', (
             data['name'],
             data['description'],
-            data['points'],
-            data['stamina_cost'],
-            data.get('is_enabled', True),
-            data.get('repeatable', False),
+            data['task_chain_id'],
+            data['parent_task_id'],
             data['task_type'],
-            data['task_rewards'],
-            data.get('limit_time', 0)
+            data['task_status'],
+            data['task_scope'],
+            data['stamina_cost'],
+            data['limit_time'],
+            data['repeat_time'],
+            data['is_enabled'],
+            data['repeatable'],
+            task_rewards
         ))
         
         task_id = cursor.lastrowid
@@ -386,11 +446,42 @@ def update_task(task_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # 确保 task_rewards 是 JSON 字符串
+        if isinstance(data.get('task_rewards'), dict):
+            data['task_rewards'] = json.dumps(data['task_rewards'])
+        
         cursor.execute('''
             UPDATE tasks 
-            SET name = ?, description = ?, exp_reward = ?, gold_reward = ?
+            SET name = ?, 
+                description = ?, 
+                task_chain_id = ?,
+                parent_task_id = ?,
+                task_type = ?,
+                task_status = ?,
+                task_scope = ?,
+                stamina_cost = ?,
+                limit_time = ?,
+                repeat_time = ?,
+                is_enabled = ?,
+                repeatable = ?,
+                task_rewards = ?
             WHERE id = ?
-        ''', (data['name'], data['description'], data['exp_reward'], data['gold_reward'], task_id))
+        ''', (
+            data['name'],
+            data['description'],
+            data['task_chain_id'],
+            data['parent_task_id'],
+            data['task_type'],
+            data['task_status'],
+            data['task_scope'],
+            data['stamina_cost'],
+            data['limit_time'],
+            data['repeat_time'],
+            data['is_enabled'],
+            data['repeatable'],
+            data['task_rewards'],
+            task_id
+        ))
         
         conn.commit()
         return jsonify({"success": True})
@@ -446,6 +537,310 @@ def get_api_docs():
 def task_manage():
     """任务管理页面"""
     return render_template('task_manage.html')
+
+# 任务管理页面路由
+@admin_bp.route('/player_tasks')
+@admin_required
+def player_task_manage():
+    """用户任务管理页面"""
+    return render_template('player_task_manage.html')
+
+# Player Task API路由
+@admin_bp.route('/api/player_tasks', methods=['GET'])
+@admin_required
+def get_player_tasks():
+    try:
+        # 获取分页参数
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 20, type=int)
+        
+        # 计算偏移量
+        offset = (page - 1) * limit
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取总数
+        cursor.execute('SELECT COUNT(*) FROM player_task')
+        total = cursor.fetchone()[0]
+        
+        # 获取分页数据
+        cursor.execute('''
+            SELECT 
+                pt.id,
+                pt.player_id,
+                pt.task_id,
+                t.name as task_name,
+                pt.starttime,
+                pt.endtime,
+                pt.points_earned,
+                pt.status,
+                pt.complete_time,
+                pt.comment
+            FROM player_task pt 
+            LEFT JOIN tasks t ON pt.task_id = t.id 
+            ORDER BY pt.id DESC 
+            LIMIT ? OFFSET ?
+        ''', (limit, offset))
+        
+        tasks = []
+        for row in cursor.fetchall():
+            tasks.append({
+                'id': row[0],
+                'player_id': row[1],
+                'task_id': row[2],
+                'task_name': row[3],
+                'starttime': row[4],
+                'endtime': row[5],
+                'points_earned': row[6],
+                'status': row[7],
+                'complete_time': row[8],
+                'comment': row[9]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'code': 0,
+            'msg': '',
+            'count': total,
+            'data': tasks
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'count': 0,
+            'data': []
+        }), 500
+
+@admin_bp.route('/api/player_tasks/<int:task_id>', methods=['GET'])
+@admin_required
+def get_player_task(task_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 明确指定字段顺序
+        cursor.execute('''
+            SELECT 
+                pt.id,
+                pt.player_id,
+                pt.task_id,
+                t.name as task_name,
+                pt.starttime,
+                pt.endtime,
+                pt.points_earned,
+                pt.status,
+                pt.complete_time,
+                pt.comment
+            FROM player_task pt 
+            LEFT JOIN tasks t ON pt.task_id = t.id 
+            WHERE pt.id = ?
+        ''', (task_id,))
+        
+        row = cursor.fetchone()
+        if row is None:
+            return jsonify({
+                'code': 404,
+                'msg': '任务不存在',
+                'data': None
+            }), 404
+            
+        # 使用字典构造确保字段顺序
+        task = {
+            'id': row[0],
+            'player_id': row[1],
+            'task_id': row[2],
+            'task_name': row[3],
+            'starttime': row[4],
+            'endtime': row[5],
+            'points_earned': row[6],
+            'status': row[7],
+            'complete_time': row[8],
+            'comment': row[9]
+        }
+        
+        conn.close()
+        return jsonify({
+            'code': 0,
+            'msg': '',
+            'data': task
+        })
+        
+    except Exception as e:
+        print("Get task error:", str(e))
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/player_tasks', methods=['POST'])
+@admin_required
+def create_player_task():
+    try:
+        data = request.get_json()
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO player_task (
+                player_id, task_id, starttime, endtime,
+                points_earned, status, complete_time, comment
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('player_id'),
+            data.get('task_id'),
+            data.get('starttime', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+            data.get('endtime'),
+            data.get('points_earned', 0),
+            data.get('status', 'available'),
+            data.get('complete_time'),
+            data.get('comment')
+        ))
+        
+        task_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'code': 0,
+            'msg': '创建成功',
+            'data': {'id': task_id}
+        }), 201
+        
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/player_tasks/<int:task_id>', methods=['PUT'])
+@admin_required
+def update_player_task(task_id):
+    try:
+        data = request.get_json()
+        print("Received update data:", data)  # 调试日志
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 明确指定更新字段的顺序
+        update_query = '''
+            UPDATE player_task
+            SET player_id = ?,
+                task_id = ?,
+                starttime = ?,
+                endtime = ?,
+                points_earned = ?,
+                status = ?,
+                complete_time = ?,
+                comment = ?
+            WHERE id = ?
+        '''
+        
+        # 确保参数顺序与SQL字段顺序一致
+        params = (
+            data.get('player_id'),
+            data.get('task_id'),
+            data.get('starttime'),
+            data.get('endtime'),
+            data.get('points_earned'),
+            data.get('status'),
+            data.get('complete_time'),
+            data.get('comment'),
+            task_id
+        )
+        
+        print("Update params:", params)  # 调试日志
+        cursor.execute(update_query, params)
+        
+        if cursor.rowcount == 0:
+            conn.close()
+            return jsonify({
+                'code': 404,
+                'msg': '未找到要更新的记录',
+                'data': None
+            }), 404
+            
+        conn.commit()
+        
+        # 获取更新后的数据，使用相同的字段顺序
+        cursor.execute('''
+            SELECT 
+                pt.id,
+                pt.player_id,
+                pt.task_id,
+                t.name as task_name,
+                pt.starttime,
+                pt.endtime,
+                pt.points_earned,
+                pt.status,
+                pt.complete_time,
+                pt.comment
+            FROM player_task pt 
+            LEFT JOIN tasks t ON pt.task_id = t.id 
+            WHERE pt.id = ?
+        ''', (task_id,))
+        
+        row = cursor.fetchone()
+        print("Updated row:", row[9])
+        updated_data = {
+            'id': row[0],
+            'player_id': row[1],
+            'task_id': row[2],
+            'task_name': row[3],
+            'starttime': row[4],
+            'endtime': row[5],
+            'points_earned': row[6],
+            'status': row[7],
+            'complete_time': row[8],
+            'comment': row[9]
+        }
+        
+        conn.close()
+        print("Updated data:", updated_data)
+        return jsonify({
+            'code': 0,
+            'msg': '更新成功',
+            'data': updated_data
+        })
+        
+    except Exception as e:
+        print("Update error:", str(e))  # 错误日志
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/player_tasks/<int:task_id>', methods=['DELETE'])
+@admin_required
+def delete_player_task(task_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('DELETE FROM player_task WHERE id=?', (task_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'code': 0,
+            'msg': '删除成功',
+            'data': None
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

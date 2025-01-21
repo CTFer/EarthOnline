@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}管理后台{% endblock %}</title>
+    
+    <!-- 公共CSS -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    {% block extra_css %}{% endblock %}
+
+    <!-- 公共JS -->
+    <script src="/static/layui/layui.js"></script>
+    <script src="/static/js/crypto-js.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <div class="admin-header">
+        <div class="logo">
+            <h1>{% block header_title %}管理后台{% endblock %}</h1>
+        </div>
+        <div class="nav-menu">
+            <a href="/admin" class="layui-btn">首页</a>
+            <a href="/admin/tasks" class="layui-btn">任务管理</a>
+            <a href="/admin/player_tasks" class="layui-btn">用户任务管理</a>
+            <button class="layui-btn layui-btn-danger" onclick="location.href='/admin/logout'">退出登录</button>
+        </div>
+    </div>
+
+    <!-- 主要内容区 -->
+    <div class="admin-container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- 页面底部 -->
+    <div class="admin-footer">
+        {% block footer %}
+        <p>© 2024 EarthOnline 管理系统</p>
+        {% endblock %}
+    </div>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html> 

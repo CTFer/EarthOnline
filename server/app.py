@@ -30,8 +30,8 @@ socketio = SocketIO(
     app,
     cors_allowed_origins="*",
     async_mode='eventlet',
-    logger=False,  # 关闭 Socket.IO 日志
-    engineio_logger=False,  # 关闭 Engine.IO 日志
+    logger=False,
+    engineio_logger=False,
     ping_timeout=5,
     ping_interval=2
 )
@@ -130,8 +130,8 @@ def get_db_connection():
         raise
 
 
-@app.route('/api/player', methods=['GET'])
-def get_player():
+@app.route('/api/player/<int:player_id>', methods=['GET'])
+def get_player(player_id):
     """获取角色信息"""
 
     try:
@@ -144,8 +144,8 @@ def get_player():
 
         cursor.execute('''
 
-            SELECT * FROM player_data where id=1
-        ''')
+            SELECT * FROM player_data where id=?
+        ''', (player_id,))
 
         # 获取列名
 
@@ -192,6 +192,38 @@ def get_player():
 
         conn.close()
 
+@app.route('/api/get_players', methods=['GET'])
+def get_players():
+    """获取所有玩家"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT player_id, player_name 
+            FROM player_data 
+            ORDER BY player_id ASC
+        ''')
+        
+        players = [dict(id=row[0], name=row[1]) for row in cursor.fetchall()]
+        
+        return jsonify({
+            "code": 0,
+            "msg": "",
+            "data": players
+        })
+        
+    except Exception as e:
+        print(f"获取玩家列表出错: {str(e)}")
+        return jsonify({
+            "code": 1,
+            "msg": f"获取玩家列表失败: {str(e)}",
+            "data": []
+        }), 500
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/api/tasks/available/<int:player_id>', methods=['GET'])
 def get_available_tasks(player_id):
@@ -212,7 +244,8 @@ def get_available_tasks(player_id):
                 t.task_rewards,
                 t.task_type,
                 t.task_status,
-                t.limit_time
+                t.limit_time,
+                t.icon
             FROM tasks t
             WHERE t.is_enabled = 1 
             AND (t.task_scope = 0 OR t.task_scope = ?)
@@ -264,11 +297,12 @@ def get_current_tasks(player_id):
                 pt.points_earned,
                 pt.status,
                 t.task_type,
-                pt.endtime
+                pt.endtime,
+                t.icon
             FROM player_task pt
             JOIN tasks t ON pt.task_id = t.id
             WHERE pt.player_id = ? 
-            AND pt.endtime > ?
+            AND (pt.endtime > ? or pt.endtime is null)
             ORDER BY pt.starttime DESC
         ''', (player_id, current_timestamp))
 
@@ -284,7 +318,8 @@ def get_current_tasks(player_id):
                 'points_earned': row[6],
                 'status': row[7],
                 'task_type': row[8],
-                'endtime': row[9]
+                'endtime': row[9],
+                'icon': row[10]
             })
 
         return jsonify(tasks)
@@ -309,10 +344,8 @@ def accept_task(task_id):
 
     conn = None
     try:
-        # 打印请求数据以便调试
         print("Request Data:", request.get_json())
         
-        # 获取请求数据
         data = request.get_json()
         if not data or 'player_id' not in data:
             print("Missing player_id in request:", data)
@@ -324,22 +357,66 @@ def accept_task(task_id):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 检查任务是否存在且可接受
+        # 检查任务信息和前置任务
         cursor.execute('''
-            SELECT task_status, limit_time 
-            FROM tasks 
-            WHERE id = ?
+            SELECT t.task_status, t.limit_time, t.parent_task_id, t.name,
+                   pt.name as parent_name
+            FROM tasks t
+            LEFT JOIN tasks pt ON t.parent_task_id = pt.id
+            WHERE t.id = ?
         ''', (task_id,))
 
         task = cursor.fetchone()
         if not task:
             return jsonify({'error': 'Task not found'}), 404
 
-        if task[0] != 'AVAILABLE':
+        task_status, limit_time, parent_task_id, task_name, parent_name = task
+
+        if task_status != 'AVAILABLE':
             return jsonify({'error': 'Task is not available'}), 400
 
+        # 如果有前置任务，检查前置任务完成状态
+        if parent_task_id:
+            cursor.execute('''
+                SELECT status 
+                FROM player_task 
+                WHERE task_id = ? AND player_id = ?
+                ORDER BY starttime DESC 
+                LIMIT 1
+            ''', (parent_task_id, player_id))
+            
+            parent_task_status = cursor.fetchone()
+            
+            if not parent_task_status:
+                return jsonify({
+                    'error': f'需要先完成前置任务: {parent_name}',
+                    'code': 'PREREQUISITE_NOT_STARTED'
+                }), 400
+            
+            if parent_task_status[0] != 'COMPLETED':
+                return jsonify({
+                    'error': f'需要先完成前置任务: {parent_name}',
+                    'code': 'PREREQUISITE_NOT_COMPLETED'
+                }), 400
+
+        # 检查玩家是否已接受此任务
+        cursor.execute('''
+            SELECT status 
+            FROM player_task 
+            WHERE task_id = ? AND player_id = ? AND status != 'ABANDONED'
+            ORDER BY starttime DESC 
+            LIMIT 1
+        ''', (task_id, player_id))
+        
+        existing_task = cursor.fetchone()
+        if existing_task:
+            return jsonify({
+                'error': f'已接受任务: {task_name}',
+                'code': 'TASK_ALREADY_ACCEPTED'
+            }), 400
+
         # 计算结束时间
-        endtime = current_timestamp + task[1] if task[1] else None
+        endtime = current_timestamp + limit_time if limit_time else None
 
         # 将任务添加到player_task表
         cursor.execute('''
@@ -369,11 +446,11 @@ def accept_task(task_id):
 
         conn.commit()
         
-        # 添加CORS头部到响应
         response = jsonify({
             'message': 'Task accepted successfully',
             'starttime': current_timestamp,
-            'endtime': endtime
+            'endtime': endtime,
+            'task_name': task_name
         })
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
@@ -900,25 +977,21 @@ def send_static(path):
     # 在应用启动时调用
 if __name__ == '__main__':
     start_scheduler()
+    print("Server started")
     try:
-        print("Starting server with eventlet...")
-        # 修改 socketio.run() 的参数
+        # 使用 eventlet 启动服务器
         socketio.run(
             app,
-            host='192.168.1.5',
+            host='192.168.5.18',  # 监听所有网络接口
             port=5000,
             debug=True,
-            use_reloader=False,  # 禁用重载器以避免冲突
+            use_reloader=True,
             log_output=True
         )
     except Exception as e:
-        print(f"Error starting server: {e}")
+        print(f"Error starting server: {str(e)}")
+        # 如果 eventlet 启动失败，回退到开发服务器
         print("Falling back to development server...")
-        # 回退选项
-        app.run(
-            host='127.0.0.1',
-            port=5000,
-            debug=True
-        )
+        app.run(debug=True)
 
 

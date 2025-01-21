@@ -5,11 +5,19 @@
     <link rel="stylesheet" href="/static/layui/css/layui.css">
     <link rel="stylesheet" href="/static/css/admin.css">
     <script src="/static/js/crypto-js.min.js"></script>
+    <script src="/static/layui/layui.js"></script>
+    <script src="/static/js/taskForm.js"></script>
 </head>
 <body>
     <div class="admin-container">
         <h1>游戏管理后台</h1>
         
+        {% extends "admin_base.html" %}
+
+        {% block title %}管理{% endblock %}
+        
+        {% block header_title %}管理{% endblock %}
+        {% block content %}
         <!-- 用户管理面板 -->
         <div class="panel">
             <h2>用户管理</h2>
@@ -57,7 +65,10 @@
                     <a href="/admin/tasks" class="layui-btn layui-btn-normal">
                         <i class="layui-icon layui-icon-list"></i> 任务管理界面
                     </a>
-                    <button class="layui-btn" onclick="showAddTaskForm()">
+                    <a href="/admin/player_tasks" class="layui-btn layui-btn-warm">
+                        <i class="layui-icon layui-icon-user"></i> 用户任务管理
+                    </a>
+                    <button class="layui-btn" onclick="window.showTaskFormDialog()">
                         <i class="layui-icon layui-icon-add-1"></i> 快速添加
                     </button>
                 </div>
@@ -93,11 +104,9 @@
                 </div>
             </div>
         </div>
-
-        <button class="layui-btn layui-btn-danger" onclick="location.href='/admin/logout'">退出登录</button>
     </div>
 
-    <!-- 用户表单模板优化 -->
+    <!-- 用户表单模板 -->
     <div id="userForm" class="popup-form">
         <form class="layui-form">
             <div class="layui-form-item">
@@ -117,7 +126,7 @@
         </form>
     </div>
 
-    <!-- 技能表单模板优化 -->
+    <!-- 技能表单模板 -->
     <div id="skillForm" class="popup-form">
         <form class="layui-form">
             <div class="layui-form-item">
@@ -144,41 +153,28 @@
         </form>
     </div>
 
-    <!-- 任务表单模板优化 -->
-    <div id="taskForm" class="popup-form">
-        <form class="layui-form">
-            <div class="layui-form-item">
-                <label class="layui-form-label">任务名称</label>
-                <div class="layui-input-block">
-                    <input type="text" name="name" required lay-verify="required" 
-                           placeholder="请输入任务名称" class="layui-input">
-                </div>
-            </div>
-            <div class="layui-form-item">
-                <label class="layui-form-label">描述</label>
-                <div class="layui-input-block">
-                    <textarea name="description" placeholder="请输入任务描述" 
-                              class="layui-textarea"></textarea>
-                </div>
-            </div>
-            <div class="layui-form-item">
-                <label class="layui-form-label">经验值</label>
-                <div class="layui-input-block">
-                    <input type="number" name="exp_reward" required lay-verify="required|number" 
-                           placeholder="请输入经验值奖励" class="layui-input">
-                </div>
-            </div>
-            <div class="layui-form-item">
-                <label class="layui-form-label">金币</label>
-                <div class="layui-input-block">
-                    <input type="number" name="gold_reward" required lay-verify="required|number" 
-                           placeholder="请输入金币奖励" class="layui-input">
-                </div>
-            </div>
-        </form>
-    </div>
-
-    <script src="/static/layui/layui.js"></script>
     <script src="/static/js/admin.js"></script>
+
+    <script>
+    // 确保 layui 正确初始化
+    window.onload = function() {
+        console.log('Window loaded');
+        console.log('layui:', layui);
+        console.log('showTaskFormDialog:', window.showTaskFormDialog);
+    };
+
+    layui.config({
+        version: true
+    }).use(['layer', 'form'], function(){
+        console.log('Layui modules loaded');
+        var layer = layui.layer,
+            form = layui.form;
+        
+        console.log('layer:', layer);
+        console.log('form:', form);
+        console.log('showTaskFormDialog available:', typeof window.showTaskFormDialog);
+    });
+    </script>
+    {% endblock %}
 </body>
 </html>

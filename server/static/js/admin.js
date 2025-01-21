@@ -282,45 +282,6 @@ layui.use(['layer', 'form', 'element'], function(){
         });
     };
 
-    // 显示添加任务表单
-    window.showAddTaskForm = function() {
-        layer.open({
-            type: 1,
-            title: '添加任务',
-            content: $('#taskForm'),
-            area: ['500px', '500px'],
-            btn: ['确定', '取消'],
-            yes: function(index) {
-                const formData = {
-                    name: $('input[name="name"]').val(),
-                    description: $('textarea[name="description"]').val(),
-                    exp_reward: parseInt($('input[name="exp_reward"]').val()),
-                    gold_reward: parseInt($('input[name="gold_reward"]').val())
-                };
-                
-                fetch('/admin/api/tasks', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(formData)
-                })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.error) {
-                        throw new Error(result.error);
-                    }
-                    layer.close(index);
-                    layer.msg('添加成功');
-                    loadTasks();
-                })
-                .catch(error => {
-                    layer.msg('添加失败: ' + error.message);
-                });
-            }
-        });
-    };
-
     // 编辑用户
     window.editUser = function(id) {
         fetch(`/admin/api/users/${id}`)
