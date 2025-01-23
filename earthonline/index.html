@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="css/swiper-bundle.min.css">
     <link rel="stylesheet" href="layui/css/layui.css">
     <!-- 修改 CSS 引用，添加随机参数 -->
-    <link rel="stylesheet" href="css/index.min.css?v=1.0.0" id="mainStyle">
+    <link rel="stylesheet" href="css/index.min.css?v=1.0.1" id="mainStyle">
 
     
     <!-- Live2D依赖项 -->
@@ -45,6 +45,19 @@
                     <!-- 角色信息选项卡 -->
                     <div class="layui-tab-item layui-show">
                         <div class="character-stats">
+                            <!-- 角色基本信息 -->
+                            <div class="character-info">
+                                <div class="info-row">
+                                    <span class="info-label">昵称</span>
+                                    <span class="info-value" id="playerName">加载中...</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">积分</span>
+                                    <span class="info-value" id="playerPoints">0</span>
+                                </div>
+                            </div>
+                            
+                            <!-- 角色属性 -->
                             <div class="stat-group">
                                 <div class="stat-item">
                                     <span>生命值</span>
@@ -172,7 +185,7 @@
     <script src="js/live2d-config.js"></script>
     <script src="js/config.js"></script>
     <script src="js/utils.js"></script>
-    <script src="js/game.js?v=1.0.0" id="mainJs"></script>
+    <script src="js/game.js?v=1.0.1" id="mainJs"></script>
     <script>
         // 生成随机版本号
         document.getElementById('mainStyle').href = 'css/index.min.css?v=' + Math.random();

@@ -36,6 +36,27 @@
                 <tbody></tbody>
             </table>
         </div>
+        <!-- 玩家管理面板 -->
+        <div class="panel">
+            <h2>玩家管理</h2>
+            <div class="control-panel">
+                <button class="layui-btn" onclick="showAddPlayerForm()">添加玩家</button>
+            </div>
+            <table class="layui-table" id="playerTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>玩家名</th>
+                        <th>等级</th>
+                        <th>经验</th>
+                        <th>积分</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
         
         <!-- 技能管理面板 -->
         <div class="panel">
@@ -121,6 +142,32 @@
                 <div class="layui-input-block">
                     <input type="password" name="password" required lay-verify="required" 
                            placeholder="请输入密码" class="layui-input">
+                </div>
+            </div>
+        </form>
+    </div>
+    <!-- 玩家表单模板 -->
+    <div id="playerForm" class="popup-form">
+        <form class="layui-form">
+            <div class="layui-form-item">
+                <label class="layui-form-label">玩家名</label>
+                <div class="layui-input-block">
+                    <input type="text" name="player_name" required lay-verify="required" 
+                           placeholder="请输入玩家名" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">积分</label>
+                <div class="layui-input-block">
+                    <input type="number" name="points" value="0" required lay-verify="required" 
+                           placeholder="请输入积分" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">等级</label>
+                <div class="layui-input-block">
+                    <input type="number" name="level" required lay-verify="required" 
+                           placeholder="请输入等级" class="layui-input">
                 </div>
             </div>
         </form>

@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:31
- * @LastEditTime: 2025-01-12 22:31:19
+ * @LastEditTime: 2025-01-22 11:09:50
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -36,7 +36,8 @@ const TASK_TYPE_MAP = {
     }
 }; 
 
-// 任务状态配置
+// 任务状态配置 任务表中的任务有AVAILABLE IN_PROGRESS COMPLETED ABANDONED CHECKED UNAVAILABLE等状态
+// 用户任务表中的任务有IN_PROGRESS进行中 COMPLETED已完成 ABANDONED已放弃等状态
 const TASK_STATUS_MAP = {
     'AVAILABLE': {  // 可接受
         text: '可接受',

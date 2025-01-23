@@ -133,63 +133,45 @@ def get_db_connection():
 @app.route('/api/player/<int:player_id>', methods=['GET'])
 def get_player(player_id):
     """获取角色信息"""
-
     try:
-
         conn = get_db_connection()
-
         cursor = conn.cursor()
-
-        # 从player_data表获取角色信息
-
-        cursor.execute('''
-
-            SELECT * FROM player_data where id=?
-        ''', (player_id,))
-
-        # 获取列名
-
+        cursor.execute('SELECT * FROM player_data where id=?', (player_id,))
         columns = [description[0] for description in cursor.description]
-
-        # 获取结果并转换为字典
         character = cursor.fetchone()
 
         if character:
             player_data = dict(zip(columns, character))
-
             return jsonify({
-
-                'id': player_data['id'],
-
-                'player_id': player_data['player_id'],
-
-                'stamina': player_data['stamina'],
-
-                'strength': player_data['strength'],
-
-                'intelligence': player_data['intelligence'],
-
-                'player_name': player_data['player_name'],
-
-                'create_time': player_data['create_time'],
-
-                'level': player_data['level'],
-
-                'experience': player_data['experience']
-
+                'code': 0,
+                'msg': '获取角色信息成功',
+                'data': {
+                    'id': player_data['id'],
+                    'player_id': player_data['player_id'],
+                    'stamina': player_data['stamina'],
+                    'strength': player_data['strength'],
+                    'intelligence': player_data['intelligence'],
+                    'player_name': player_data['player_name'],
+                    'create_time': player_data['create_time'],
+                    'level': player_data['level'],
+                    'experience': player_data['experience']
+                }
             })
         else:
-
-            return jsonify({'error': 'Character not found'}), 404
+            return jsonify({
+                'code': 1,
+                'msg': '角色不存在',
+                'data': None
+            }), 404
 
     except sqlite3.Error as e:
-
-        print("Database error:", str(e))  # 调试输出
-
-        return jsonify({'error': str(e)}), 500
-
+        print("Database error:", str(e))
+        return jsonify({
+            'code': 2,
+            'msg': f'数据库错误: {str(e)}',
+            'data': None
+        }), 500
     finally:
-
         conn.close()
 
 @app.route('/api/get_players', methods=['GET'])
@@ -210,7 +192,7 @@ def get_players():
         
         return jsonify({
             "code": 0,
-            "msg": "",
+            "msg": "获取玩家列表成功",
             "data": players
         })
         
@@ -219,7 +201,7 @@ def get_players():
         return jsonify({
             "code": 1,
             "msg": f"获取玩家列表失败: {str(e)}",
-            "data": []
+            "data": None
         }), 500
     finally:
         if conn:
@@ -231,28 +213,15 @@ def get_available_tasks(player_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-
-        # 从tasks表获取可用任务，区分每日任务和普通任务
-        # 添加player_id限制：task_scope=0表示所有玩家可见，或task_scope等于指定玩家ID
         cursor.execute('''
             SELECT 
-                t.id,
-                t.name,
-                t.description,
-                t.points,
-                t.stamina_cost,
-                t.task_rewards,
-                t.task_type,
-                t.task_status,
-                t.limit_time,
-                t.icon
+                t.id, t.name, t.description, t.points, t.stamina_cost,
+                t.task_rewards, t.task_type, t.task_status, t.limit_time, t.icon
             FROM tasks t
             WHERE t.is_enabled = 1 
             AND (t.task_scope = 0 OR t.task_scope = ?)
             AND t.id NOT IN (
-                SELECT task_id 
-                FROM player_task 
-                WHERE player_id = ? 
+                SELECT task_id FROM player_task WHERE player_id = ?
             )
         ''', (player_id, player_id))
 
@@ -264,11 +233,19 @@ def get_available_tasks(player_id):
             task_dict = dict(zip(columns, row))
             tasks.append(task_dict)
 
-        return jsonify(tasks)
+        return jsonify({
+            'code': 0,
+            'msg': '获取可用任务成功',
+            'data': tasks
+        })
 
     except sqlite3.Error as e:
         print(f"Database error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'code': 1,
+            'msg': f'获取任务失败: {str(e)}',
+            'data': None
+        }), 500
     finally:
         conn.close()
 
@@ -322,11 +299,19 @@ def get_current_tasks(player_id):
                 'icon': row[10]
             })
 
-        return jsonify(tasks)
+        return jsonify({
+            'code': 0,
+            'msg': '获取当前任务成功',
+            'data': tasks
+        })
 
     except sqlite3.Error as e:
         print(f"Database error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'code': 1,
+            'msg': f'获取当前任务失败: {str(e)}',
+            'data': None
+        }), 500
     finally:
         conn.close()
 
@@ -349,7 +334,11 @@ def accept_task(task_id):
         data = request.get_json()
         if not data or 'player_id' not in data:
             print("Missing player_id in request:", data)
-            return jsonify({'error': 'Missing player_id'}), 400
+            return jsonify({
+                'code': 1,
+                'msg': '缺少玩家ID',
+                'data': None
+            }), 400
             
         player_id = data['player_id']
         current_timestamp = int(datetime.now().timestamp())
@@ -389,13 +378,13 @@ def accept_task(task_id):
             
             if not parent_task_status:
                 return jsonify({
-                    'error': f'需要先完成前置任务: {parent_name}',
+                    'msg': f'需要先完成前置任务: {parent_name}',
                     'code': 'PREREQUISITE_NOT_STARTED'
                 }), 400
             
             if parent_task_status[0] != 'COMPLETED':
                 return jsonify({
-                    'error': f'需要先完成前置任务: {parent_name}',
+                    'msg': f'需要先完成前置任务: {parent_name}',
                     'code': 'PREREQUISITE_NOT_COMPLETED'
                 }), 400
 
@@ -411,7 +400,7 @@ def accept_task(task_id):
         existing_task = cursor.fetchone()
         if existing_task:
             return jsonify({
-                'error': f'已接受任务: {task_name}',
+                'msg': f'已接受任务: {task_name}',
                 'code': 'TASK_ALREADY_ACCEPTED'
             }), 400
 
@@ -447,10 +436,13 @@ def accept_task(task_id):
         conn.commit()
         
         response = jsonify({
-            'message': 'Task accepted successfully',
-            'starttime': current_timestamp,
-            'endtime': endtime,
-            'task_name': task_name
+            'code': 0,
+            'msg': '任务接受成功',
+            'data': {
+                'starttime': current_timestamp,
+                'endtime': endtime,
+                'task_name': task_name
+            }
         })
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
@@ -459,27 +451,28 @@ def accept_task(task_id):
         if conn:
             conn.rollback()
         print(f"Error accepting task: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'code': 2,
+            'msg': f'接受任务失败: {str(e)}',
+            'data': None
+        }), 500
     finally:
         if conn:
             conn.close()
 
 
-@app.route('/api/tasks/<int:task_id>/abandon', methods=['POST', 'OPTIONS'])
+@app.route('/api/tasks/<int:task_id>/abandon', methods=['POST'])
 def abandon_task(task_id):
     """放弃任务"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-        response.headers.add('Access-Control-Allow-Methods', 'POST')
-        return response
-
     conn = None
     try:
         data = request.get_json()
         if not data or 'player_id' not in data:
-            return jsonify({'error': 'Missing player_id'}), 400
+            return jsonify({
+                'code': 1,
+                'msg': '缺少玩家ID',
+                'data': None
+            }), 400
 
         player_id = data['player_id']
         
@@ -488,17 +481,25 @@ def abandon_task(task_id):
 
         # 检查任务状态
         cursor.execute('''
-            SELECT task_status 
+            SELECT task_status, name 
             FROM tasks 
             WHERE id = ?
         ''', (task_id,))
 
         task = cursor.fetchone()
         if not task:
-            return jsonify({'error': 'Task not found'}), 404
+            return jsonify({
+                'code': 2,
+                'msg': '任务不存在',
+                'data': None
+            }), 404
 
         if task[0] != 'IN_PROGRESS':
-            return jsonify({'error': 'Task is not in progress'}), 400
+            return jsonify({
+                'code': 3,
+                'msg': '任务不在进行中状态',
+                'data': None
+            }), 400
 
         # 更新任务状态
         cursor.execute('''
@@ -509,35 +510,37 @@ def abandon_task(task_id):
 
         conn.commit()
         
-        response = jsonify({'message': 'Task abandoned successfully'})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
+        return jsonify({
+            'code': 0,
+            'msg': f'已放弃任务: {task[1]}',
+            'data': None
+        })
 
     except Exception as e:
         if conn:
             conn.rollback()
-        print(f"Error abandoning task: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'code': 4,
+            'msg': f'放弃任务失败: {str(e)}',
+            'data': None
+        }), 500
     finally:
         if conn:
             conn.close()
 
 
-@app.route('/api/tasks/<int:task_id>/complete', methods=['POST', 'OPTIONS'])
+@app.route('/api/tasks/<int:task_id>/complete', methods=['POST'])
 def complete_task(task_id):
     """完成任务"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-        response.headers.add('Access-Control-Allow-Methods', 'POST')
-        return response
-
     conn = None
     try:
         data = request.get_json()
         if not data or 'player_id' not in data:
-            return jsonify({'error': 'Missing player_id'}), 400
+            return jsonify({
+                'code': 1,
+                'msg': '缺少玩家ID',
+                'data': None
+            }), 400
 
         player_id = data['player_id']
         
@@ -546,17 +549,25 @@ def complete_task(task_id):
 
         # 检查任务状态
         cursor.execute('''
-            SELECT task_status, task_rewards
+            SELECT task_status, task_rewards, name, points
             FROM tasks 
             WHERE id = ?
         ''', (task_id,))
 
         task = cursor.fetchone()
         if not task:
-            return jsonify({'error': 'Task not found'}), 404
+            return jsonify({
+                'code': 2,
+                'msg': '任务不存在',
+                'data': None
+            }), 404
 
         if task[0] != 'IN_PROGRESS':
-            return jsonify({'error': 'Task is not in progress'}), 400
+            return jsonify({
+                'code': 3,
+                'msg': '任务不在进行中状态',
+                'data': None
+            }), 400
 
         # 更新任务状态
         cursor.execute('''
@@ -567,18 +578,24 @@ def complete_task(task_id):
 
         conn.commit()
         
-        response = jsonify({
-            'message': 'Task completed successfully',
-            'rewards': task[1]
+        return jsonify({
+            'code': 0,
+            'msg': f'任务完成: {task[2]}',
+            'data': {
+                'rewards': task[1],
+                'points': task[3],
+                'task_name': task[2]
+            }
         })
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
 
     except Exception as e:
         if conn:
             conn.rollback()
-        print(f"Error completing task: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'code': 4,
+            'msg': f'完成任务失败: {str(e)}',
+            'data': None
+        }), 500
     finally:
         if conn:
             conn.close()
@@ -824,7 +841,7 @@ def assign_daily_tasks():
                     cursor.execute('''
                         INSERT INTO player_task 
                         (player_id, task_id, starttime, endtime, status) 
-                        VALUES (?, ?, ?, ?, 'available')
+                        VALUES (?, ?, ?, ?, 'IN_PROGRESS')
                     ''', (player_id, task_id, start_timestamp, end_timestamp))
 
         conn.commit()

@@ -15,75 +15,17 @@
     BRANCH: { name: "支线任务", color: "#9C27B0" },
     SPECIAL: { name: "特殊任务", color: "#FF9800" },
   };
-
-  // 使用新的函数名
-  window.showTaskFormDialog = function (mode = "add", taskData = null) {
-    console.log(`showTaskFormDialog called in ${mode} mode with data:`, taskData);
-
-    layui.use(["layer", "form"], function () {
-      var layer = layui.layer,
-        form = layui.form;
-
-      layer.open({
-        type: 1,
-        title: mode === "add" ? "添加任务" : "编辑任务",
-        area: ["800px", "700px"],
-        content: getTaskFormContent(),
-        shadeClose: true,
-        success: function (layero, index) {
-          console.log("Dialog opened successfully");
-
-          // 获取任务范围容器
-          const taskScopeContainer = layero.find("#taskScopeRadios")[0];
-
-          // 加载玩家列表
-          loadPlayerList(taskScopeContainer);
-
-          // 如果是编辑模式，填充表单数据
-          if (mode === "edit" && taskData) {
-            console.log("Filling form with data:", taskData);
-            form.val("taskForm", {
-              name: taskData.name,
-              task_chain_id: taskData.task_chain_id || "0",
-              parent_task_id: taskData.parent_task_id || "0",
-              task_type: taskData.task_type,
-              task_status: taskData.task_status,
-              description: taskData.description,
-              task_scope: taskData.task_scope,
-              stamina_cost: taskData.stamina_cost,
-              limit_time: taskData.limit_time,
-              repeat_time: taskData.repeat_time,
-              is_enabled: taskData.is_enabled,
-              repeatable: taskData.repeatable,
-              "points_rewards[0].number": taskData.task_rewards?.points_rewards?.[0]?.number || 0,
-              "points_rewards[1].number": taskData.task_rewards?.points_rewards?.[1]?.number || 0,
-              "card_rewards[0].id": taskData.task_rewards?.card_rewards?.[0]?.id || 0,
-              "card_rewards[0].number": taskData.task_rewards?.card_rewards?.[0]?.number || 0,
-              "medal_rewards[0].id": taskData.task_rewards?.medal_rewards?.[0]?.id || 0,
-              "medal_rewards[0].number": taskData.task_rewards?.medal_rewards?.[0]?.number || 0,
-            });
-          }
-
-          form.render(null, "taskForm");
-
-          // 修改表单提交监听
-          form.on("submit(taskSubmit)", function (data) {
-            console.log("Form submitted with data:", data.field);
-            // 直接传递 data.field 对象
-            handleTaskSubmit(data.field, mode, taskData?.id);
-            layer.close(index);
-            return false;
-          });
-        },
-      });
-    });
-  };
-
   // 获取表单内容
   function getTaskFormContent() {
     return `
-        <div class="task-form-scroll">
+        <div class="task-form-scroll" id="taskForm">
             <form class="layui-form" lay-filter="taskForm">
+                <div class="layui-form-item">
+                <label class="layui-form-label">任务ID</label>
+                <div class="layui-input-block">
+                    <input type="text" name="id" class="layui-input" value="" readonly style="background: #f8f8f8; color: #666;">
+                </div>
+                </div>
                 <div class="layui-form-item">
                     <label class="layui-form-label">任务名称</label>
                     <div class="layui-input-block">
@@ -411,6 +353,70 @@
     `;
   }
 
+  // 使用新的函数名
+  window.showTaskFormDialog = function (mode = "add", taskData = null) {
+    console.log(`showTaskFormDialog called in ${mode} mode with data:`, taskData);
+
+    layui.use(["layer", "form"], function () {
+      var layer = layui.layer,
+        form = layui.form;
+
+      layer.open({
+        type: 1,
+        title: mode === "add" ? "添加任务" : "编辑任务",
+        area: ["800px", "700px"],
+        content: getTaskFormContent(),
+        shadeClose: true,
+        success: function (layero, index) {
+          console.log("Dialog opened successfully");
+
+          // 获取任务范围容器
+          const taskScopeContainer = layero.find("#taskScopeRadios")[0];
+
+          // 加载玩家列表
+          loadPlayerList(taskScopeContainer);
+
+          // 如果是编辑模式，填充表单数据
+          if (mode === "edit" && taskData) {
+            console.log("Filling form with data:", taskData);
+            form.val("taskForm", {
+              id: taskData.id,
+              name: taskData.name,
+              task_chain_id: taskData.task_chain_id || "0",
+              parent_task_id: taskData.parent_task_id || "0",
+              task_type: taskData.task_type,
+              task_status: taskData.task_status,
+              description: taskData.description,
+              task_scope: taskData.task_scope,
+              stamina_cost: taskData.stamina_cost,
+              limit_time: taskData.limit_time,
+              repeat_time: taskData.repeat_time,
+              is_enabled: taskData.is_enabled,
+              repeatable: taskData.repeatable,
+              "points_rewards[0].number": taskData.task_rewards?.points_rewards?.[0]?.number || 0,
+              "points_rewards[1].number": taskData.task_rewards?.points_rewards?.[1]?.number || 0,
+              "card_rewards[0].id": taskData.task_rewards?.card_rewards?.[0]?.id || 0,
+              "card_rewards[0].number": taskData.task_rewards?.card_rewards?.[0]?.number || 0,
+              "medal_rewards[0].id": taskData.task_rewards?.medal_rewards?.[0]?.id || 0,
+              "medal_rewards[0].number": taskData.task_rewards?.medal_rewards?.[0]?.number || 0,
+            });
+          }
+
+          form.render(null, "taskForm");
+
+          // 修改表单提交监听
+          form.on("submit(taskSubmit)", function (data) {
+            console.log("Form submitted with data:", data.field);
+            // 直接传递 data.field 对象
+            handleTaskSubmit(data.field, mode, taskData?.id);
+            layer.close(index);
+            return false;
+          });
+        },
+      });
+    });
+  };
+
   // 修改处理提交的函数
   function handleTaskSubmit(formData, mode, taskId = null) {
     console.log("handleTaskSubmit called with:", { formData, mode, taskId });
@@ -423,31 +429,31 @@
         parent_task_id: parseInt(formData.parent_task_id) || 0,
         task_type: formData.task_type,
         task_status: parseInt(formData.task_status),
-        description: formData.description || '',
+        description: formData.description || "",
         task_scope: parseInt(formData.task_scope),
         stamina_cost: parseInt(formData.stamina_cost) || 0,
         limit_time: parseInt(formData.limit_time) || 0,
         repeat_time: parseInt(formData.repeat_time) || 1,
-        is_enabled: formData.is_enabled === 'on',
-        repeatable: formData.repeatable === 'on',
+        is_enabled: formData.is_enabled === "on",
+        repeatable: formData.repeatable === "on",
         task_rewards: {
           points_rewards: [
-            { type: 'exp', number: parseInt(formData['points_rewards[0].number']) || 0 },
-            { type: 'points', number: parseInt(formData['points_rewards[1].number']) || 0 }
+            { type: "exp", number: parseInt(formData["points_rewards[0].number"]) || 0 },
+            { type: "points", number: parseInt(formData["points_rewards[1].number"]) || 0 },
           ],
           card_rewards: [
             {
-              id: parseInt(formData['card_rewards[0].id']) || 0,
-              number: parseInt(formData['card_rewards[0].number']) || 0
-            }
+              id: parseInt(formData["card_rewards[0].id"]) || 0,
+              number: parseInt(formData["card_rewards[0].number"]) || 0,
+            },
           ],
           medal_rewards: [
             {
-              id: parseInt(formData['medal_rewards[0].id']) || 0,
-              number: parseInt(formData['medal_rewards[0].number']) || 0
-            }
-          ]
-        }
+              id: parseInt(formData["medal_rewards[0].id"]) || 0,
+              number: parseInt(formData["medal_rewards[0].number"]) || 0,
+            },
+          ],
+        },
       };
 
       console.log("Processed task data:", taskDataObj);

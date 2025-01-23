@@ -102,7 +102,7 @@ function updateJsonDisplay() {
   document.getElementById("taskJson").value = JSON.stringify(taskData, null, 2);
 }
 
-// 处理任务数据为树形结构
+// 修改处理任务数据为树形结构的函数
 function processTaskData(tasks) {
   if (!Array.isArray(tasks)) {
     return {
@@ -112,55 +112,68 @@ function processTaskData(tasks) {
     };
   }
 
-  function buildTaskTree(tasks, parentId = 0) {
-    return tasks
-      .filter((task) => task.parent_task_id === parentId)
-      .map((task) => ({
-        name: task.name || "未命名任务",
-        value: task.id,
-        task_type: task.task_type, // 确保任务类型被包含
-        stamina_cost: task.stamina_cost,
-        children: buildTaskTree(tasks, task.id),
-      }));
-  }
+  // 创建任务节点映射
+  const taskMap = new Map();
+  tasks.forEach((task) => {
+    taskMap.set(task.id, {
+      name: task.name || "未命名任务",
+      value: task.id,
+      task_type: task.task_type,
+      stamina_cost: task.stamina_cost,
+      task_chain_id: task.task_chain_id,
+      parent_task_id: task.parent_task_id,
+      children: [],
+    });
+  });
 
-  // 构建根节点
+  // 构建树结构
+  const chains = new Map(); // 用于存储不同任务链的根节点
+
+  taskMap.forEach((node, taskId) => {
+    if (node.parent_task_id) {
+      const parentNode = taskMap.get(node.parent_task_id);
+      if (parentNode) {
+        // 如果父节点存在，直接添加为子节点
+        parentNode.children.push(node);
+      } else {
+        // 如果父节点不存在，作为任务链的根节点
+        const chainId = node.task_chain_id || 0;
+        if (!chains.has(chainId)) {
+          chains.set(chainId, []);
+        }
+        chains.get(chainId).push(node);
+      }
+    } else {
+      // 没有父节点的任务作为任务链的根节点
+      const chainId = node.task_chain_id || 0;
+      if (!chains.has(chainId)) {
+        chains.set(chainId, []);
+      }
+      chains.get(chainId).push(node);
+    }
+  });
+
+  // 构建最终的树结构
   return {
     name: "任务系统",
     isGroup: true,
-    children: Object.entries(
-      tasks.reduce((acc, task) => {
-        const chainId = task.task_chain_id || 0;
-        if (!acc[chainId]) acc[chainId] = [];
-        acc[chainId].push(task);
-        return acc;
-      }, {})
-    )
-      .filter(([chainId]) => chainId !== "0")
-      .map(([chainId, chainTasks]) => ({
-        name: `任务链 ${chainId}`,
-        value: `chain_${chainId}`,
-        isGroup: true,
-        children: buildTaskTree(chainTasks, 0),
-      }))
-      .filter((chain) => chain.children.length > 0),
+    children: Array.from(chains.entries()).map(([chainId, nodes]) => ({
+      name: `任务链 ${chainId}`,
+      value: `chain_${chainId}`,
+      isGroup: true,
+      children: nodes,
+    })),
   };
 }
 
 // 获取任务类型对应的颜色
 function getTaskTypeColor(type) {
-  const colors = {
-    DAILY: "#4CAF50",
-    MAIN: "#2196F3",
-    BRANCH: "#9C27B0",
-    SPECIAL: "#FF9800",
-  };
-  return colors[type] || "#607D8B";
+  return TASK_TYPES[type]?.color || "#607D8B"; // 使用可选链操作符，默认为灰色
 }
 
 let currentZoom = 1;
 
-// 修改 initTaskTree 函数
+// 修改 initTaskTree 函数，添加 renderItem 配置
 function initTaskTree(data) {
   if (!treeChart) {
     treeChart = echarts.init(document.getElementById("taskTree"));
@@ -171,33 +184,34 @@ function initTaskTree(data) {
       {
         type: "tree",
         data: [data],
-
-        // 布局配置
         orient: "TB",
         layout: "orthogonal",
-
         left: "20%",
         right: "20%",
-        top: "20%",
+        top: "10%",
         bottom: "10%",
 
         symbol: "rect",
         symbolSize: [120, 40],
+
+        // 保持原有的配置
+        lineStyle: {
+          color: "#78909c",
+          width: 1,
+          curveness: 0.1,
+        },
 
         label: {
           position: "inside",
           formatter: function (params) {
             // 根据节点类型设置颜色
             let color;
-            if (params.data.name === "任务系统") {
-              color = "#2c3e50"; // 根节点颜色
-            } else if (params.data.value && params.data.value.toString().startsWith("chain_")) {
-              const hasMainTask = params.data.children?.some((child) => child.task_type === "MAIN");
-              color = hasMainTask ? "#1a237e" : "#455a64";
-            } else if (params.data.task_type && TASK_TYPES[params.data.task_type]) {
+            if (params.data.task_type && TASK_TYPES[params.data.task_type]) {
               color = TASK_TYPES[params.data.task_type].color;
+            } else if (params.data.isGroup) {
+              color = params.data.name === "任务系统" ? "#2c3e50" : "#455a64";
             } else {
-              color = "#95a5a6"; // 默认颜色
+              color = "#95a5a6";
             }
 
             // 设置节点样式
@@ -205,10 +219,12 @@ function initTaskTree(data) {
               color: color,
               borderColor: "#fff",
               borderWidth: 1,
+              shadowColor: "rgba(0, 0, 0, 0.3)",
+              shadowBlur: 5,
             };
 
             // 返回节点文本
-            let text = params.data.name || "";
+            let text = params.data.name;
             if (!params.data.isGroup && params.data.stamina_cost) {
               text += `\n体力: ${params.data.stamina_cost}`;
             }
@@ -218,16 +234,19 @@ function initTaskTree(data) {
           fontSize: 12,
           lineHeight: 16,
         },
+
         // 开启拖拽和缩放
         roam: "move", // 只允许移动，缩放通过自定义控制
         expandAndCollapse: false,
         // 连线样式
         lineStyle: {
           color: "#78909c",
-          width: 1,
-        },
+          width: 2,
+        }, // 优化节点间距
+        nodeGap: 36,
+        layerPadding: 150,
 
-        initialTreeDepth: -1,
+        initialTreeDepth: -1, //-1表示展开所有节点
         animationDuration: 550,
         animationDurationUpdate: 750,
 
@@ -239,7 +258,7 @@ function initTaskTree(data) {
 
   treeChart.setOption(option);
 
-  // 设置初始缩放
+  // 保持原有的初始缩放设置
   setTimeout(() => {
     treeChart.setOption({
       series: [
@@ -308,36 +327,36 @@ function initTaskTree(data) {
 
 // 重置缩放和位置
 function resetTreeZoom() {
-    if (!treeChart) return;
-    
-    // 获取当前完整配置
-    const currentOption = treeChart.getOption();
-    
-    // 只更新缩放和位置相关的配置，保持其他配置不变
-    currentOption.series[0].zoom = 0.8;
-    currentOption.series[0].center = ['50%', '50%'];
-    
-    // 应用更新后的配置
-    treeChart.setOption(currentOption, {
-        replaceMerge: ['series']
-    });
+  if (!treeChart) return;
+
+  // 获取当前完整配置
+  const currentOption = treeChart.getOption();
+
+  // 只更新缩放和位置相关的配置，保持其他配置不变
+  currentOption.series[0].zoom = 0.8;
+  currentOption.series[0].center = ["50%", "50%"];
+
+  // 应用更新后的配置
+  treeChart.setOption(currentOption, {
+    replaceMerge: ["series"],
+  });
 }
 
 // 修改缩放范围
 function zoomTree(scale) {
-    if (!treeChart) return;
-  
-    currentZoom *= scale;
-    // 扩大缩放范围
-    currentZoom = Math.min(Math.max(0.2, currentZoom), 2.5);
-  
-    treeChart.setOption({
-      series: [
-        {
-          zoom: currentZoom,
-        },
-      ],
-    });
+  if (!treeChart) return;
+
+  currentZoom *= scale;
+  // 扩大缩放范围
+  currentZoom = Math.min(Math.max(0.2, currentZoom), 2.5);
+
+  treeChart.setOption({
+    series: [
+      {
+        zoom: currentZoom,
+      },
+    ],
+  });
 }
 
 // 修改任务编辑表单函数
@@ -479,55 +498,3 @@ layui.use(["form", "jquery"], function () {
     console.log("选择的任务范围:", data.value);
   });
 });
-
-// 添加展开/收起所有节点的功能
-function toggleAllNodes(expand = true) {
-  if (!treeChart) return;
-
-  treeChart.setOption({
-    series: [
-      {
-        data: [processTaskData(taskData.data)],
-        initialTreeDepth: expand ? -1 : 2,
-      },
-    ],
-  });
-}
-
-// 添加节点展开/收起的辅助函数
-function collapseNode(node, targetId) {
-  if (node.value === targetId && node.children) {
-    node.collapsed = !node.collapsed;
-    return true;
-  }
-  if (node.children) {
-    for (let child of node.children) {
-      if (collapseNode(child, targetId)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-// 可选：添加展开/收起所有节点的辅助函数
-function expandAll() {
-  const option = treeChart.getOption();
-  expandAllNodes(option.series[0].data[0], true);
-  treeChart.setOption(option);
-}
-
-function collapseAll() {
-  const option = treeChart.getOption();
-  expandAllNodes(option.series[0].data[0], false);
-  treeChart.setOption(option);
-}
-
-function expandAllNodes(node, expand) {
-  if (node.children) {
-    node.collapsed = !expand;
-    for (let child of node.children) {
-      expandAllNodes(child, expand);
-    }
-  }
-}

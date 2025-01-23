@@ -24,7 +24,7 @@
 ::-webkit-scrollbar-thumb {
   background: rgba(138, 162, 193, 0.3);
   border-radius: 3px;
-  
+
   &:hover {
     background: rgba(138, 162, 193, 0.5);
   }
@@ -187,7 +187,6 @@ body {
         padding: 2px 8px;
         border-radius: 4px;
         background: rgba(255, 255, 255, 0.1);
-
       }
     }
   }
@@ -645,45 +644,6 @@ body {
   font-size: 14px;
 }
 
-// Swiper自定义样式
-.swiper {
-  &-container {
-    width: 100%;
-    height: 100%;
-  }
-
-  &-slide {
-    width: 300px;
-    height: auto;
-  }
-
-  &-button-prev,
-  &-button-next {
-    color: @primary-color;
-
-    &:hover {
-      color: lighten(@primary-color, 10%);
-    }
-
-    &.swiper-button-disabled {
-      opacity: 0.35;
-      cursor: not-allowed;
-    }
-  }
-
-  &-pagination {
-    &-bullet {
-      background: @text-color-secondary;
-      opacity: 0.5;
-
-      &-active {
-        background: @primary-color;
-        opacity: 1;
-      }
-    }
-  }
-}
-
 // 右侧任务面板
 .task-panel {
   .panel-title {
@@ -708,12 +668,10 @@ body {
 
   // 任务列表滚动区域
   #taskList {
-
     overflow-y: scroll;
     // padding: 0 20px;
     height: calc(100vh - 120px);
     // 自定义滚动条样式
-
   }
 
   // 任务卡片基础样式
@@ -775,7 +733,6 @@ body {
       padding: 2px 8px;
       border-radius: 4px;
       background: rgba(255, 255, 255, 0.1);
-
     }
 
     .task-name {
@@ -960,65 +917,17 @@ body {
 
       &.layui-this {
         color: @primary-color;
-        &::after{
+        &::after {
           border: none;
           border-radius: 0;
           border-bottom: 2px solid @primary-color;
         }
       }
-
     }
   }
 
   .layui-tab-content {
     padding: 20px;
-  }
-}
-
-// 进行中的任务列表
-#activeTaskList {
-  .swiper-wrapper {
-    display: flex;
-    gap: 15px;
-    padding: 20px;
-  }
-
-  .active-task-card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: @border-radius-base;
-    padding: 15px;
-    width: 280px;
-    flex-shrink: 0;
-    position: relative;
-    transition: all @transition-duration;
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(@primary-color, 0.3);
-      transform: translateY(-2px);
-    }
-
-    .task-header {
-      .flex-between();
-      margin-bottom: 10px;
-    }
-
-    .task-type {
-      font-size: 12px;
-      padding: 2px 8px;
-      border-radius: @border-radius-sm;
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .task-progress-bar {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      height: 3px;
-      background: @primary-color;
-      transition: width @transition-duration;
-    }
   }
 }
 
@@ -1194,11 +1103,9 @@ body {
   overflow: hidden;
 
   .swiper {
+    width: 100%;
     height: 100%;
-    padding: 0;
   }
-
-
 
   // 自定义导航按钮样式
   .swiper-button-prev,
@@ -1208,7 +1115,29 @@ body {
       font-size: 20px;
     }
   }
-
+  .swiper-scrollbar {
+    background: rgba(0, 0, 0, 0.1);
+    height: 4px ;
+    border-radius: 4px;
+  }
+  .swiper-scrollbar:hover{
+    height: 8px ;
+    &.swiper-scrollbar-drag{
+      background: #ffc447;
+      height: 8px ;
+    }
+  }
+  .swiper-scrollbar-drag {
+    background: linear-gradient(90deg, #ffc447, #ffd47a);
+    border-radius: 4px;
+    height: 100%;
+    transition: background-color 0.3s ease;
+  }
+  
+  .swiper-scrollbar-drag:active{
+    background: #ffc447;
+    height: 16px ;
+  }
   // 自定义分页器样式
   .swiper-pagination {
     .swiper-pagination-bullet {
@@ -1245,4 +1174,46 @@ body {
     cursor: not-allowed;
     background: #ccc !important;
   }
+}
+
+// 角色信息面板样式
+.character-info {
+    padding: 15px;
+    margin-bottom: 15px;
+    background: rgba(13, 27, 45, 0.95);  // 使用与主题一致的背景色
+    border: 1px solid #1e3148;  // 添加边框
+    border-radius: 4px;
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        padding: 5px 0;
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-label {
+            color: #8aa2c1;  // 使用主题的次要文字颜色
+            font-size: 14px;
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: 500;
+            color: #fff;  // 使用主题的主要文字颜色
+        }
+    }
+}
+
+// 积分显示特殊样式
+#playerPoints {
+    color: #ffc447;  // 使用主题的强调色
+    font-weight: bold;
+    background: linear-gradient(90deg, #ffc447, rgba(255, 196, 71, 0.2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
 }

@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-08 14:41:57
- * @LastEditTime: 2025-01-21 15:47:20
+ * @LastEditTime: 2025-01-21 20:22:18
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -22,6 +22,7 @@ class TaskManager {
         this.playerId = localStorage.getItem('playerId') || '1';
         this.loading = false;
         this.initWebSocket();
+        this.loadPlayerInfo(); // 在构造函数中调用加载角色信息
     }
 
     // 初始化WebSocket
@@ -246,41 +247,24 @@ class TaskManager {
         
         try {
             const response = await fetch(`${SERVER}/api/tasks/available/${this.playerId}`);
-            let tasks = await response.json();
+            const result = await response.json();
             
-            // 如果没有任务数据，添加测试任务
-            if (!tasks || !tasks.length) {
-                tasks = [{
-                    id: 'test-1',
-                    name: '每日锻炼',
-                    description: '完成30分钟的体能训练，提升身体素质。每天坚持锻炼不仅能增强体魄，还能获得额外的经验奖励。',
-                    task_type: 'DAILY',
-                    points: 500,
-                    stamina_cost: 30,
-                    endtime: Math.floor(Date.now() / 1000) + 86400 // 24小时后过期
-                }, {
-                    id: 'test-2',
-                    name: '拯救村庄',
-                    description: '解决村庄面临的危机，帮助村民重建家园。这是一个艰巨的任务，需要智慧和勇气的考验。完成后将获得丰厚奖励和村民的感激。',
-                    task_type: 'MAIN',
-                    points: 2000,
-                    stamina_cost: 100,
-                    endtime: Math.floor(Date.now() / 1000) + 604800 // 7天后过期
-                }];
+            if (result.code === 0) {
+                const tasks = result.data;
+                taskList.innerHTML = '';
+                
+                if (!tasks || tasks.length === 0) {
+                    taskList.innerHTML = '<div class="empty-tip">暂无可用任务</div>';
+                    return;
+                }
+
+                tasks.forEach(task => {
+                    const taskCard = this.createTaskCard(task);
+                    taskList.appendChild(taskCard);
+                });
+            } else {
+                this.showError('taskList', result.msg);
             }
-
-            const taskList = document.getElementById('taskList');
-            if (!taskList) {
-                console.error('Task list container not found');
-                return;
-            }
-
-            taskList.innerHTML = '';
-            tasks.forEach(task => {
-                const taskCard = this.createTaskCard(task);
-                taskList.appendChild(taskCard);
-            });
-
         } catch (error) {
             console.error('加载任务失败:', error);
             this.showError('taskList', '加载任务失败，请稍后重试');
@@ -341,51 +325,56 @@ class TaskManager {
     async loadCurrentTasks() {
         try {
             const response = await fetch(`${SERVER}/api/tasks/current/${this.playerId}`);
-            let currentTasks = await response.json();
+            const result = await response.json();
 
-            // 如果没有进行中的任务，添加测试任务
-            if (!currentTasks || !currentTasks.length) {
-                currentTasks = [{
-                    id: 'test-3',
-                    name: '探索神秘遗迹',
-                    description: '在荒野中寻找并调查一处古代遗迹，记录发现的文物和历史痕迹。这个任务需要细心观察和耐心探索，每一个细节都可能藏有重要线索。',
-                    task_type: 'EXPLORE',
-                    points: 1000,
-                    points_earned: 450,
-                    stamina_cost: 50,
-                    endtime: Math.floor(Date.now() / 1000) + 7200, // 2小时后过期
-                    starttime: Math.floor(Date.now() / 1000) - 3600, // 1小时前开始
-                    progress: 45
-                }];
+            if (result.code === 0) {
+                let currentTasks = result.data;
+
+                // 如果没有进行中的任务，添加测试任务
+                if (!currentTasks || !currentTasks.length) {
+                    currentTasks = [{
+                        id: 'test-3',
+                        name: '探索神秘遗迹',
+                        description: '在荒野中寻找并调查一处古代遗迹，记录发现的文物和历史痕迹。',
+                        task_type: 'EXPLORE',
+                        points: 1000,
+                        points_earned: 450,
+                        stamina_cost: 50,
+                        endtime: Math.floor(Date.now() / 1000) + 7200,
+                        starttime: Math.floor(Date.now() / 1000) - 3600,
+                        progress: 45
+                    }];
+                }
+
+                this.renderCurrentTasks(currentTasks);
+            } else {
+                console.error('加载进行中任务失败:', result.msg);
+                this.showError('active-tasks-wrapper', result.msg);
             }
-
-            const container = document.querySelector('.active-tasks-swiper .swiper-wrapper');
-            if (!container) {
-                console.error('Active tasks container not found');
-                return;
-            }
-
-            container.innerHTML = '';
-            currentTasks.forEach(task => {
-                const slide = document.createElement('div');
-                slide.className = 'swiper-slide';
-                slide.innerHTML = this.createCurrentTaskCard(task);
-                container.appendChild(slide);
-            });
-
-            // 重新初始化 Swiper
-            this.initSwiper();
-
         } catch (error) {
             console.error('加载进行中任务失败:', error);
             this.showError('active-tasks-wrapper', '加载任务失败');
         }
     }
 
-    // 渲染进行中的任务列表
+    // 修改渲染进行中的任务列表
     renderCurrentTasks(tasks) {
         const container = document.querySelector('.swiper-wrapper');
         if (!container) return;
+
+        // 确保分页器容器存在
+        const swiperContainer = container.closest('.active-tasks-swiper');
+        if (swiperContainer) {
+            // 检查并添加分页器元素
+            if (!swiperContainer.querySelector('.swiper-pagination')) {
+                swiperContainer.insertAdjacentHTML('beforeend', '<div class="swiper-pagination"></div>');
+            }
+
+            // 检查并添加滚动条
+            if (!swiperContainer.querySelector('.swiper-scrollbar')) {
+                swiperContainer.insertAdjacentHTML('beforeend', '<div class="swiper-scrollbar"></div>');
+            }
+        }
 
         if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
             container.innerHTML = `
@@ -397,25 +386,14 @@ class TaskManager {
             return;
         }
 
-        // 每个slide最多显示2个任务
-        const taskGroups = [];
-        for (let i = 0; i < tasks.length; i += 2) {
-            taskGroups.push(tasks.slice(i, Math.min(i + 2, tasks.length)));
-        }
-
-        // 确保至少有两个slide以启用循环
-        let slidesHtml = taskGroups.map(group => `
-            <div class="swiper-slide task-panel">
-                <div class="active-tasks-row">
-                    ${group.map(task => this.createCurrentTaskCard(task)).join('')}
+        // 每个任务渲染到独立的slide中
+        const slidesHtml = tasks.map(task => `
+            <div class="swiper-slide">
+                <div class="task-panel">
+                    ${this.createCurrentTaskCard(task)}
                 </div>
             </div>
         `).join('');
-
-        // 如果只有一个slide，复制一份以启用循环
-        if (taskGroups.length === 1) {
-            slidesHtml += slidesHtml;
-        }
 
         container.innerHTML = slidesHtml;
         this.initSwiper();
@@ -480,56 +458,36 @@ class TaskManager {
         const swiperContainer = document.querySelector('.active-tasks-swiper');
         if (!swiperContainer) return;
 
-        // 获取实际的slide数量
-        const slideCount = swiperContainer.querySelectorAll('.swiper-slide').length;
-
         this.activeTasksSwiper = new Swiper('.active-tasks-swiper', {
-            slidesPerView: 2,
-            spaceBetween: 10,
-            loop: slideCount > 1, // 只有多于一个slide时启用循环
-            watchOverflow: true, // 当只有一个slide时，禁用所有效果
-            observer: true, // 监视DOM变化
-            observeParents: true,
+            slidesPerView: 3,
+            spaceBetween: 30,
+            direction: 'horizontal',
+
+            loop: false,
+            
+            // 添加分页器
+            // pagination: {
+            //     el: '.swiper-pagination',
+            //     clickable: true, // 允许点击分页器切换
+            //     dynamicBullets: true, // 动态分页器
+            //     dynamicMainBullets: 3 // 主要显示的分页点数量
+            // },
+
+
+
             mousewheel: {
                 forceToAxis: true,
+                invert: false,
                 sensitivity: 1
             },
-            pagination: {
-                el: '.swiper-pagination',
-                clickable: true,
-                dynamicBullets: true,
-                renderBullet: function (index, className) {
-                    return `<span class="${className}"></span>`;
-                },
-            },
-
-            // autoplay: slideCount > 1 ? {
-            //     delay: 5000,
-            //     disableOnInteraction: false,
-            //     pauseOnMouseEnter: true
-            // } : false,
-            on: {
-                init: function() {
-                    // 更新分页器状态
-                    this.pagination.render();
-                    this.pagination.update();
-                },
-                slideChange: function() {
-                    // 确保分页器同步
-                    this.pagination.render();
-                    this.pagination.update();
-                }
+            
+            scrollbar: {
+                el: '.swiper-scrollbar',
+                draggable: true,
+                hide: false,
+                snapOnRelease: true
             }
         });
-
-        // 确保分页器和导航按钮的显示状态正确
-        if (slideCount <= 1) {
-            const pagination = swiperContainer.querySelector('.swiper-pagination');
-            const navigation = swiperContainer.querySelectorAll('.swiper-button-next, .swiper-button-prev');
-            
-            if (pagination) pagination.style.display = 'none';
-            navigation.forEach(nav => nav.style.display = 'none');
-        }
     }
 
     // 接受任务
@@ -549,31 +507,25 @@ class TaskManager {
                 })
             });
             
-            const data = await response.json();
-            console.log('API响应状态:', response.status);
-            console.log('API响应数据:', data);
+            const result = await response.json();
+            console.log('API响应:', result);
 
-            if (response.ok) {
-                layer.msg(`成功接受任务: ${data.task_name}`, {icon: 1});
+            if (result.code === 0) {
+                layer.msg(`成功接受任务: ${result.data.task_name}`, {icon: 1});
                 await this.refreshTasks();
             } else {
-                // 根据错误代码显示不同的提示信息
-                let errorMsg = data.error;
                 let icon = 2;
-                
-                switch(data.code) {
-                    case 'PREREQUISITE_NOT_STARTED':
-                    case 'PREREQUISITE_NOT_COMPLETED':
-                        icon = 0; // 使用信息图标
+                switch(result.code) {
+                    case 1: // 参数错误
+                        icon = 0;
                         break;
-                    case 'TASK_ALREADY_ACCEPTED':
-                        icon = 4; // 使用锁定图标
+                    case 2: // 前置任务未完成
+                        icon = 4;
                         break;
                     default:
-                        errorMsg = '接受任务失败: ' + (data.error || '未知错误');
+                        icon = 2;
                 }
-                
-                layer.msg(errorMsg, {icon: icon});
+                layer.msg(result.msg, {icon: icon});
             }
         } catch (error) {
             console.error('接受任务失败:', error);
@@ -600,18 +552,17 @@ class TaskManager {
                     })
                 });
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Task abandoned:', data); // 调试日志
-                    layer.msg('已放弃任务', {icon: 1});
+                const result = await response.json();
+                
+                if (result.code === 0) {
+                    layer.msg(result.msg, {icon: 1});
                     await this.refreshTasks();
                 } else {
-                    const data = await response.json();
-                    throw new Error(data.error || '放弃任务失败');
+                    layer.msg(result.msg, {icon: 2});
                 }
             } catch (error) {
                 console.error('放弃任务失败:', error);
-                layer.msg('放弃任务失败', {icon: 2});
+                layer.msg('放弃任务失败，请检查网络连接', {icon: 2});
             }
         });
     }
@@ -630,18 +581,17 @@ class TaskManager {
                 })
             });
             
-            if (response.ok) {
-                const data = await response.json();
-                console.log('Task completed:', data); // 调试日志
-                layer.msg(`任务完成！获得 ${data.rewards || 0} 奖励`, {icon: 1});
+            const result = await response.json();
+            
+            if (result.code === 0) {
+                layer.msg(`${result.msg}，获得 ${result.data.points} 点经验`, {icon: 1});
                 await this.refreshTasks();
             } else {
-                const data = await response.json();
-                throw new Error(data.error || '完成任务失败');
+                layer.msg(result.msg, {icon: 2});
             }
         } catch (error) {
             console.error('完成任务失败:', error);
-            layer.msg('完成任务失败', {icon: 2});
+            layer.msg('完成任务失败，请检查网络连接', {icon: 2});
         }
     }
 
@@ -724,58 +674,6 @@ class TaskManager {
         }
     }
 
-    // 插入测试用任务卡片
-    insertTestTasks() {
-        // 插入可用任务测试卡片
-        const taskList = document.getElementById('taskList');
-        if (taskList) {
-            const dailyTask = this.createTaskCard({
-                id: 'test-1',
-                name: '每日锻炼',
-                description: '完成30分钟的体能训练，提升身体素质。',
-                task_type: 'DAILY',
-                points: 500,
-                stamina_cost: 30,
-                endtime: 1735686000
-            });
-            
-            const mainTask = this.createTaskCard({
-                id: 'test-2',
-                name: '拯救村庄',
-                description: '解决村庄面临的危机，帮助村民重建家园。',
-                task_type: 'MAIN',
-                points: 2000,
-                stamina_cost: 100,
-                endtime: 1735686000
-            });
-
-            taskList.insertBefore(mainTask, taskList.firstChild);
-            taskList.insertBefore(dailyTask, taskList.firstChild);
-        }
-
-        // 插入进行中任务测试卡片
-        const swiperWrapper = document.querySelector('.active-tasks-swiper .swiper-wrapper');
-        if (swiperWrapper) {
-            const slide = document.createElement('div');
-            slide.className = 'swiper-slide';
-            slide.innerHTML = this.createCurrentTaskCard({
-                id: 'test-3',
-                name: '探索神秘遗迹',
-                description: '在荒野中寻找并调查一处古代遗迹，记录发现的文物和历史痕迹。',
-                task_type: 'EXPLORE',
-                points: 1000,
-                points_earned: 450,
-                stamina_cost: 50,
-                endtime: 1735686000,
-                starttime: 1735686000 - 3600,
-                progress: 45
-            });
-            swiperWrapper.insertBefore(slide, swiperWrapper.firstChild);
-            
-            // 重新初始化 Swiper
-            this.initSwiper();
-        }
-    }
 
     // 初始化应用
     async initializeApplication() {
@@ -925,6 +823,48 @@ class TaskManager {
         `;
         
         return slide;
+    }
+
+    // 添加加载角色信息的方法
+    async loadPlayerInfo() {
+        try {
+            const response = await fetch(`${SERVER}/api/player/${this.playerId}`);
+            const result = await response.json();
+            
+            if (result.code === 0) {
+                const playerData = result.data;
+                
+                // 更新角色信息显示
+                document.getElementById('playerName').textContent = playerData.player_name;
+                document.getElementById('playerPoints').textContent = playerData.experience;
+                
+                // 更新等级和经验条
+                const levelElement = document.querySelector('.level');
+                const expElement = document.querySelector('.exp');
+                if (levelElement) {
+                    levelElement.textContent = `${playerData.level}/100`;
+                }
+                if (expElement) {
+                    expElement.textContent = `${playerData.experience}/99999`;
+                }
+                
+                // 更新经验条
+                const expBarInner = document.querySelector('.exp-bar-inner');
+                if (expBarInner) {
+                    const expPercentage = (playerData.experience / 99999) * 100;
+                    expBarInner.style.width = `${Math.min(100, expPercentage)}%`;
+                }
+                
+            } else {
+                console.error('加载角色信息失败:', result.msg);
+                document.getElementById('playerName').textContent = '加载失败';
+                document.getElementById('playerPoints').textContent = '0';
+            }
+        } catch (error) {
+            console.error('加载角色信息失败:', error);
+            document.getElementById('playerName').textContent = '加载失败';
+            document.getElementById('playerPoints').textContent = '0';
+        }
     }
 }
 
