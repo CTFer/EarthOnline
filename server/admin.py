@@ -6,6 +6,7 @@ from api import api_registry
 import json
 import hashlib  # 添加到文件顶部的导入
 from datetime import datetime
+import time
 
 # 创建蓝图
 admin_bp = Blueprint('admin', __name__)
@@ -154,6 +155,27 @@ def update_player(player_id):
     finally:
         conn.close()
 
+@admin_bp.route('/api/players/<int:player_id>', methods=['DELETE'])
+@admin_required
+def delete_player(player_id):
+    """删除玩家"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 删除玩家相关的任务
+        cursor.execute('DELETE FROM player_task WHERE player_id = ?', (player_id,))
+
+        # 删除玩家
+        cursor.execute('DELETE FROM player_data WHERE player_id = ?', (player_id,))
+
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Error in delete_player: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
 @admin_bp.route('/api/players/<int:player_id>', methods=['GET'])
 @admin_required
@@ -176,6 +198,30 @@ def get_player(player_id):
     finally:
         conn.close()
 
+@admin_bp.route('/api/addplayer', methods=['POST'])
+@admin_required
+def add_player():
+    """添加新玩家"""
+    try:
+        data = request.get_json()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        print(data)
+
+        cursor.execute('''
+            INSERT INTO player_data (player_name,english_name,level,points,create_time)
+            VALUES (?, ?, ?, ?,datetime('now'))
+        ''', (data['player_name'],data['english_name'],data['level'],data['points']))
+
+        player_id = cursor.lastrowid
+        conn.commit()
+
+        return jsonify({"id": player_id}), 201
+    except Exception as e:
+        print(f"Error in add_user: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
 
 # API路由
 
@@ -288,8 +334,6 @@ def delete_user(user_id):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 删除用户相关的任务
-        cursor.execute('DELETE FROM tasks WHERE user_id = ?', (user_id,))
 
         # 删除用户
         cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
@@ -418,75 +462,58 @@ def delete_skill(skill_id):
 @admin_bp.route('/api/tasks', methods=['GET'])
 @admin_required
 def get_tasks():
-    """获取所有任务"""
-    conn = None
+    """获取任务列表，支持分页"""
     try:
-        print("开始获取任务列表...")  # 调试日志
+        # 获取分页参数
+        page = request.args.get('page', type=int)
+        limit = request.args.get('limit', type=int)
+        
         conn = get_db_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        # 获取表结构
-        cursor.execute("PRAGMA table_info(tasks)")
-        columns = [column[1] for column in cursor.fetchall()]
-        print(f"表中所有字段: {columns}")  # 调试日志
+        # 获取总记录数
+        cursor.execute("SELECT COUNT(*) as total FROM tasks")
+        total = cursor.fetchone()['total']
 
-        # 获取所有任务
-        query = f'''
-            SELECT {", ".join(columns)}
+        # 构建基础查询
+        base_query = '''
+            SELECT id, name, description, task_type, task_status, 
+                   task_chain_id, parent_task_id, task_scope, stamina_cost,
+                   limit_time, repeat_time, is_enabled, repeatable, task_rewards
             FROM tasks
-            ORDER BY id
         '''
-        print(f"执行SQL: {query}")  # 调试日志
-        cursor.execute(query)
 
-        # 转换为字典列表
+        # 根据是否有分页参数决定查询方式
+        if page is not None and limit is not None:
+            offset = (page - 1) * limit
+            query = base_query + ' LIMIT ? OFFSET ?'
+            cursor.execute(query, (limit, offset))
+        else:
+            cursor.execute(base_query)
+
         tasks = []
         for row in cursor.fetchall():
             task = dict(row)
-
-            # 确保所有字段都存在，设置默认值
-            for column in columns:
-                if column not in task or task[column] is None:
-                    if column in ['is_enabled', 'repeatable']:
-                        task[column] = False
-                    elif column in ['points', 'stamina_cost', 'limit_time', 'repeat_time',
-                                    'completion_count', 'task_chain_id', 'parent_task_id']:
-                        task[column] = 0
-                    elif column == 'task_rewards':
-                        task[column] = {}
-                    elif column == 'task_status':
-                        task[column] = 'INACTIVE'
-                    else:
-                        task[column] = None
-
-            # 类型转换
-            task['is_enabled'] = bool(task['is_enabled'])
-            task['repeatable'] = bool(task['repeatable'])
-
-            # 解析 task_rewards JSON 字符串
+            # 处理task_rewards JSON字符串
             if task['task_rewards'] and isinstance(task['task_rewards'], str):
                 try:
                     task['task_rewards'] = json.loads(task['task_rewards'])
                 except json.JSONDecodeError:
                     task['task_rewards'] = {}
-            elif task['task_rewards'] is None:
-                task['task_rewards'] = {}
-
+            
             tasks.append(task)
-
-        print(f"获取到 {len(tasks)} 条任务数据")  # 调试日志
 
         response_data = {
             "code": 0,
             "msg": "",
-            "count": len(tasks),
+            "count": total,
             "data": tasks
         }
         return jsonify(response_data)
 
     except Exception as e:
-        print(f"获取任务列表出错: {str(e)}")  # 错误日志
+        print(f"获取任务列表出错: {str(e)}")
         return jsonify({
             "code": 1,
             "msg": f"获取任务列表失败: {str(e)}",
@@ -496,6 +523,7 @@ def get_tasks():
     finally:
         if conn:
             conn.close()
+
 @admin_bp.route('/api/tasks/<int:task_id>', methods=['GET'])
 @admin_required
 def get_task(task_id):
@@ -572,6 +600,13 @@ def get_task(task_id):
         if conn:
             conn.close()
 
+# 添加任务状态常量
+TASK_STATUS = {
+    'LOCKED': '未解锁',
+    'AVAIL': '可接受',
+    'ACCEPT': '已接受',
+    'COMPLETED': '已完成'
+}
 
 @admin_bp.route('/api/tasks', methods=['POST'])
 @admin_required
@@ -579,44 +614,106 @@ def add_task():
     """添加新任务"""
     try:
         data = request.get_json()
+        print(f"Received task data: {data}")  # 调试日志
+        
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 转换任务奖励为JSON字符串
-        task_rewards = json.dumps(data.get('task_rewards', {}))
+        # 处理任务奖励数据
+        task_rewards = {
+            'points_rewards': [],
+            'card_rewards': [],
+            'medal_rewards': [],
+            'real_rewards': []
+        }
+
+        # 处理数值奖励（经验值和积分）
+        if 'points_rewards' in data.get('task_rewards', {}):
+            task_rewards['points_rewards'] = [
+                {
+                    'type': reward.get('type', 'exp'),
+                    'number': int(reward.get('number', 0))
+                }
+                for reward in data['task_rewards']['points_rewards']
+                if reward.get('number') is not None
+            ]
+
+        # 处理卡片奖励
+        if 'card_rewards' in data.get('task_rewards', {}):
+            task_rewards['card_rewards'] = [
+                {
+                    'id': int(reward.get('id', 0)),
+                    'number': int(reward.get('number', 0))
+                }
+                for reward in data['task_rewards']['card_rewards']
+                if reward.get('id') is not None and reward.get('number') is not None
+            ]
+
+        # 处理成就奖励
+        if 'medal_rewards' in data.get('task_rewards', {}):
+            task_rewards['medal_rewards'] = [
+                {
+                    'id': int(reward.get('id', 0)),
+                    'number': 1  # 成就奖励默认数量为1
+                }
+                for reward in data['task_rewards']['medal_rewards']
+                if reward.get('id') is not None
+            ]
+
+        # 处理实物奖励
+        if 'real_rewards' in data.get('task_rewards', {}):
+            task_rewards['real_rewards'] = [
+                {
+                    'name': reward.get('name', ''),
+                    'number': int(reward.get('number', 0))
+                }
+                for reward in data['task_rewards']['real_rewards']
+                if reward.get('name') and reward.get('number') is not None
+            ]
 
         cursor.execute('''
             INSERT INTO tasks (
                 name, description, task_chain_id, parent_task_id,
                 task_type, task_status, task_scope, stamina_cost,
                 limit_time, repeat_time, is_enabled, repeatable,
-                task_rewards, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                need_check, task_rewards, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         ''', (
             data['name'],
-            data['description'],
-            data['task_chain_id'],
-            data['parent_task_id'],
+            data.get('description', ''),
+            int(data.get('task_chain_id', 0)),
+            int(data.get('parent_task_id', 0)),
             data['task_type'],
-            data['task_status'],
-            data['task_scope'],
-            data['stamina_cost'],
-            data['limit_time'],
-            data['repeat_time'],
-            data['is_enabled'],
-            data['repeatable'],
-            task_rewards
+            data.get('task_status', 'LOCKED'),  # 默认状态为未解锁
+            int(data.get('task_scope', 0)),
+            int(data.get('stamina_cost', 0)),
+            int(data.get('limit_time', 0)),
+            int(data.get('repeat_time', 1)),
+            int(data.get('is_enabled', 0)),
+            int(data.get('repeatable', 0)),
+            int(data.get('need_check', 0)),
+            json.dumps(task_rewards)
         ))
 
         task_id = cursor.lastrowid
         conn.commit()
 
-        return jsonify({"id": task_id}), 201
+        return jsonify({
+            "code": 0,
+            "msg": "添加任务成功",
+            "data": {"id": task_id}
+        })
+
     except Exception as e:
-        print(f"Error in add_task: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        print(f"添加任务出错: {str(e)}")  # 错误日志
+        return jsonify({
+            "code": 500,
+            "msg": f"添加任务失败: {str(e)}",
+            "data": None
+        }), 500
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 @admin_bp.route('/api/tasks/<int:task_id>', methods=['PUT'])
@@ -625,12 +722,56 @@ def update_task(task_id):
     """更新任务"""
     try:
         data = request.get_json()
+        print(f"Updating task {task_id} with data: {data}")  # 调试日志
+        
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 确保 task_rewards 是 JSON 字符串
-        if isinstance(data.get('task_rewards'), dict):
-            data['task_rewards'] = json.dumps(data['task_rewards'])
+        # 处理任务奖励数据（与添加任务相同的逻辑）
+        task_rewards = {
+            'points_rewards': [],
+            'card_rewards': [],
+            'medal_rewards': [],
+            'real_rewards': []
+        }
+
+        # 处理各类奖励（与添加任务相同的逻辑）
+        if 'task_rewards' in data:
+            if 'points_rewards' in data['task_rewards']:
+                task_rewards['points_rewards'] = [
+                    {
+                        'type': reward.get('type', 'exp'),
+                        'number': int(reward.get('number', 0))
+                    }
+                    for reward in data['task_rewards']['points_rewards']
+                ]
+
+            if 'card_rewards' in data['task_rewards']:
+                task_rewards['card_rewards'] = [
+                    {
+                        'id': int(reward.get('id', 0)),
+                        'number': int(reward.get('number', 0))
+                    }
+                    for reward in data['task_rewards']['card_rewards']
+                ]
+
+            if 'medal_rewards' in data['task_rewards']:
+                task_rewards['medal_rewards'] = [
+                    {
+                        'id': int(reward.get('id', 0)),
+                        'number': 1  # 成就奖励默认数量为1
+                    }
+                    for reward in data['task_rewards']['medal_rewards']
+                ]
+
+            if 'real_rewards' in data['task_rewards']:
+                task_rewards['real_rewards'] = [
+                    {
+                        'name': reward.get('name', ''),
+                        'number': int(reward.get('number', 0))
+                    }
+                    for reward in data['task_rewards']['real_rewards']
+                ]
 
         cursor.execute('''
             UPDATE tasks 
@@ -646,32 +787,49 @@ def update_task(task_id):
                 repeat_time = ?,
                 is_enabled = ?,
                 repeatable = ?,
+                need_check = ?,
                 task_rewards = ?
             WHERE id = ?
         ''', (
             data['name'],
-            data['description'],
-            data['task_chain_id'],
-            data['parent_task_id'],
+            data.get('description', ''),
+            int(data.get('task_chain_id', 0)),
+            int(data.get('parent_task_id', 0)),
             data['task_type'],
-            data['task_status'],
-            data['task_scope'],
-            data['stamina_cost'],
-            data['limit_time'],
-            data['repeat_time'],
-            data['is_enabled'],
-            data['repeatable'],
-            data['task_rewards'],
+            data.get('task_status', 'LOCKED'),  # 保持一致的默认状态
+            int(data.get('task_scope', 0)),
+            int(data.get('stamina_cost', 0)),
+            int(data.get('limit_time', 0)),
+            int(data.get('repeat_time', 1)),
+            int(data.get('is_enabled', 0)),
+            int(data.get('repeatable', 0)),
+            int(data.get('need_check', 0)),
+            json.dumps(task_rewards),
             task_id
         ))
 
         conn.commit()
-        return jsonify({"success": True})
+
+        # 获取更新后的任务数据
+        cursor.execute('SELECT * FROM tasks WHERE id = ?', (task_id,))
+        updated_task = cursor.fetchone()
+
+        return jsonify({
+            "code": 0,
+            "msg": "更新任务成功",
+            "data": dict(updated_task) if updated_task else None
+        })
+
     except Exception as e:
-        print(f"Error in update_task: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        print(f"更新任务出错: {str(e)}")  # 错误日志
+        return jsonify({
+            "code": 500,
+            "msg": f"更新任务失败: {str(e)}",
+            "data": None
+        }), 500
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 @admin_bp.route('/api/tasks/<int:task_id>', methods=['DELETE'])
@@ -1037,6 +1195,249 @@ def delete_player_task(task_id):
             'data': None
         }), 500
 
+# 勋章管理API路由
+@admin_bp.route('/api/medals', methods=['GET'])
+@admin_required
+def get_medals():
+    try:
+        # 获取分页参数
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 20, type=int)
+
+        # 计算偏移量
+        offset = (page - 1) * limit
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 获取总数
+        cursor.execute('SELECT COUNT(*) FROM medals')
+        total = cursor.fetchone()[0]
+
+        # 获取分页数据
+        cursor.execute('''
+            SELECT 
+                id,
+                name,
+                description,
+                addtime,
+                icon,
+                conditions
+            FROM medals 
+            ORDER BY id DESC 
+            LIMIT ? OFFSET ?
+        ''', (limit, offset))
+
+        medals = []
+        for row in cursor.fetchall():
+            medals.append({
+                'id': row[0],
+                'name': row[1],
+                'description': row[2],
+                'addtime': row[3],
+                'icon': row[4],
+                'conditions': row[5]
+            })
+
+        conn.close()
+
+        return jsonify({
+            'code': 0,
+            'msg': '',
+            'count': total,
+            'data': medals
+        })
+
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'count': 0,
+            'data': []
+        }), 500
+
+@admin_bp.route('/api/medals/<int:medal_id>', methods=['GET'])
+@admin_required
+def get_medal(medal_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT 
+                id,
+                name,
+                description,
+                addtime,
+                icon,
+                conditions
+            FROM medals 
+            WHERE id = ?
+        ''', (medal_id,))
+
+        row = cursor.fetchone()
+        if row is None:
+            return jsonify({
+                'code': 404,
+                'msg': '勋章不存在',
+                'data': None
+            }), 404
+
+        medal = {
+            'id': row[0],
+            'name': row[1],
+            'description': row[2],
+            'addtime': row[3],
+            'icon': row[4],
+            'conditions': row[5]
+        }
+
+        conn.close()
+        return jsonify({
+            'code': 0,
+            'msg': '',
+            'data': medal
+        })
+
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/medals', methods=['POST'])
+@admin_required
+def create_medal():
+    try:
+        data = request.get_json()
+        current_time = int(time.time())
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            INSERT INTO medals (
+                name, description, addtime, icon, conditions
+            ) VALUES (?, ?, ?, ?, ?)
+        ''', (
+            data.get('name'),
+            data.get('description'),
+            current_time,
+            data.get('icon'),
+            data.get('conditions')
+        ))
+
+        medal_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'code': 0,
+            'msg': '创建成功',
+            'data': {'id': medal_id}
+        }), 201
+
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/medals/<int:medal_id>', methods=['PUT'])
+@admin_required
+def update_medal(medal_id):
+    try:
+        data = request.get_json()
+        print(f"Received medal update data: {data}")  # 添加调试信息
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 先获取当前数据
+        cursor.execute('SELECT * FROM medals WHERE id = ?', (medal_id,))
+        current_medal = cursor.fetchone()
+        print(f"Current medal data: {dict(current_medal) if current_medal else None}")  # 添加调试信息
+
+        update_data = {
+            'name': data.get('name'),
+            'description': data.get('description'),
+            'icon': data.get('icon'),
+            'conditions': data.get('conditions')
+        }
+        print(f"Update data to be applied: {update_data}")  # 添加调试信息
+
+        cursor.execute('''
+            UPDATE medals
+            SET name = ?,
+                description = ?,
+                icon = ?,
+                conditions = ?
+            WHERE id = ?
+        ''', (
+            update_data['name'],
+            update_data['description'],
+            update_data['icon'],
+            update_data['conditions'],
+            medal_id
+        ))
+
+        if cursor.rowcount == 0:
+            print(f"No rows updated for medal_id: {medal_id}")  # 添加调试信息
+            conn.close()
+            return jsonify({
+                'code': 404,
+                'msg': '未找到要更新的勋章',
+                'data': None
+            }), 404
+
+        conn.commit()
+        
+        # 获取更新后的数据
+        cursor.execute('SELECT * FROM medals WHERE id = ?', (medal_id,))
+        updated_medal = cursor.fetchone()
+        print(f"Updated medal data: {dict(updated_medal)}")  # 添加调试信息
+        
+        conn.close()
+
+        return jsonify({
+            'code': 0,
+            'msg': '更新成功',
+            'data': dict(updated_medal) if updated_medal else None
+        })
+
+    except Exception as e:
+        print(f"Error updating medal: {str(e)}")  # 添加调试信息
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/medals/<int:medal_id>', methods=['DELETE'])
+@admin_required
+def delete_medal(medal_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('DELETE FROM medals WHERE id = ?', (medal_id,))
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'code': 0,
+            'msg': '删除成功',
+            'data': None
+        })
+
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

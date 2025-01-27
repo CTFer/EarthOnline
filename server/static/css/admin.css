@@ -484,6 +484,11 @@ h1, h2 {
     border-color: rgba(255, 87, 87, 0.4);
     box-shadow: 0 0 10px rgba(255, 87, 87, 0.1);
 }
+.admin-header .admin-name {
+    color: #FFB800;
+    font-size: 14px;
+}
+
 
 /* 主容器样式 */
 .admin-container {

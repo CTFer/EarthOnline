@@ -15,6 +15,15 @@
     BRANCH: { name: "支线任务", color: "#9C27B0" },
     SPECIAL: { name: "特殊任务", color: "#FF9800" },
   };
+
+  // 修改任务状态常量
+  const TASK_STATUS = {
+    LOCKED: { name: "未解锁", color: "#9e9e9e" },
+    AVAIL: { name: "可接受", color: "#2196F3" },
+    ACCEPT: { name: "已接受", color: "#FF9800" },
+    COMPLETED: { name: "已完成", color: "#4CAF50" }
+  };
+
   // 获取表单内容
   function getTaskFormContent() {
     return `
@@ -23,7 +32,7 @@
                 <div class="layui-form-item">
                 <label class="layui-form-label">任务ID</label>
                 <div class="layui-input-block">
-                    <input type="text" name="id" class="layui-input" value="" readonly style="background: #f8f8f8; color: #666;">
+                    <input type="text" name="id" class="layui-input" value="" readonly style="background: transparent; color: #fff;border:none">
                 </div>
                 </div>
                 <div class="layui-form-item">
@@ -85,42 +94,42 @@
                 <div class="layui-form-item">
                     <label class="layui-form-label">任务状态</label>
                     <div class="layui-input-block" id="taskStatusRadios">
-                        <input type="radio" name="task_status" value="0" lay-skin="none" checked>
+                        <input type="radio" name="task_status" value="LOCKED" lay-skin="none" checked>
                         <div lay-radio class="lay-skin-taskcard">
                             <div class="lay-skin-taskcard-detail">
-                                <div class="lay-skin-taskcard-header">未开始</div>
+                                <div class="lay-skin-taskcard-header">未解锁</div>
                                 <div class="lay-skin-taskcard-description" style="color: #9e9e9e">
-                                    任务尚未开始
+                                    未解锁
                                 </div>
                             </div>
                         </div>
                         
-                        <input type="radio" name="task_status" value="1" lay-skin="none">
+                        <input type="radio" name="task_status" value="AVAIL" lay-skin="none">
                         <div lay-radio class="lay-skin-taskcard">
                             <div class="lay-skin-taskcard-detail">
-                                <div class="lay-skin-taskcard-header">进行中</div>
+                                <div class="lay-skin-taskcard-header">可接受</div>
                                 <div class="lay-skin-taskcard-description" style="color: #2196F3">
-                                    任务正在进行
+                                    可接受
                                 </div>
                             </div>
                         </div>
                         
-                        <input type="radio" name="task_status" value="2" lay-skin="none">
+                        <input type="radio" name="task_status" value="ACCEPT" lay-skin="none">
+                        <div lay-radio class="lay-skin-taskcard">
+                            <div class="lay-skin-taskcard-detail">
+                                <div class="lay-skin-taskcard-header">已接受</div>
+                                <div class="lay-skin-taskcard-description" style="color: #FF9800">
+                                    已接受
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <input type="radio" name="task_status" value="COMPLETED" lay-skin="none">
                         <div lay-radio class="lay-skin-taskcard">
                             <div class="lay-skin-taskcard-detail">
                                 <div class="lay-skin-taskcard-header">已完成</div>
                                 <div class="lay-skin-taskcard-description" style="color: #4CAF50">
-                                    任务已完成
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <input type="radio" name="task_status" value="3" lay-skin="none">
-                        <div lay-radio class="lay-skin-taskcard">
-                            <div class="lay-skin-taskcard-detail">
-                                <div class="lay-skin-taskcard-header">已失败</div>
-                                <div class="lay-skin-taskcard-description" style="color: #f44336">
-                                    任务失败或已过期
+                                    已完成
                                 </div>
                             </div>
                         </div>
@@ -209,43 +218,100 @@
                 </div>
                 
                 <div class="layui-form-item">
-                    <label class="layui-form-label">积分奖励</label>
+                    <label class="layui-form-label">需要确认</label>
                     <div class="layui-input-block">
-                        <div class="layui-input-inline" style="width: 120px;">
-                            <input type="number" name="points_rewards[0].number" 
-                                   placeholder="经验值" class="layui-input" value="100">
+                        <input type="checkbox" name="need_check" lay-skin="switch" lay-text="是|否">
+                    </div>
+                </div>
+
+                <!-- 数值奖励 -->
+                <div class="layui-form-item" id="pointsRewardsContainer">
+                    <label class="layui-form-label">数值奖励</label>
+                    <div class="layui-input-block">
+                        <div class="rewards-list">
+                            <div class="reward-item">
+                                <div class="layui-input-inline" style="width: 120px;">
+                                    <select name="points_rewards[0].type">
+                                        <option value="exp">经验值</option>
+                                        <option value="points">积分</option>
+                                    </select>
+                                </div>
+                                <div class="layui-input-inline" style="width: 120px;">
+                                    <input type="number" name="points_rewards[0].number" 
+                                           placeholder="数量" class="layui-input">
+                                </div>
+                            </div>
                         </div>
-                        <div class="layui-input-inline" style="width: 120px;">
-                            <input type="number" name="points_rewards[1].number" 
-                                   placeholder="积分" class="layui-input" value="10">
+                        <div class="layui-btn layui-btn-xs" onclick="addRewardItem('points')">
+                            <i class="layui-icon">&#xe654;</i> 添加数值奖励
                         </div>
                     </div>
                 </div>
 
-                <div class="layui-form-item">
+                <!-- 卡片奖励 -->
+                <div class="layui-form-item" id="cardRewardsContainer">
                     <label class="layui-form-label">卡片奖励</label>
                     <div class="layui-input-block">
-                        <div class="layui-input-inline" style="width: 120px;">
-                            <input type="number" name="card_rewards[0].id" 
-                                   placeholder="卡片ID" class="layui-input">
+                        <div class="rewards-list">
+                            <div class="reward-item">
+                                <div class="layui-input-inline" style="width: 120px;">
+                                    <input type="number" name="card_rewards[0].id" 
+                                           placeholder="卡片ID" class="layui-input">
+                                </div>
+                                <div class="layui-input-inline" style="width: 120px;">
+                                    <input type="number" name="card_rewards[0].number" 
+                                           placeholder="数量" class="layui-input">
+                                </div>
+                            </div>
                         </div>
-                        <div class="layui-input-inline" style="width: 120px;">
-                            <input type="number" name="card_rewards[0].number" 
-                                   placeholder="数量" class="layui-input">
+                        <div class="layui-btn layui-btn-xs" onclick="addRewardItem('card')">
+                            <i class="layui-icon">&#xe654;</i> 添加卡片奖励
                         </div>
                     </div>
                 </div>
 
-                <div class="layui-form-item">
+                <!-- 成就奖励 -->
+                <div class="layui-form-item" id="medalRewardsContainer">
                     <label class="layui-form-label">成就奖励</label>
                     <div class="layui-input-block">
-                        <div class="layui-input-inline" style="width: 120px;">
-                            <input type="number" name="medal_rewards[0].id" 
-                                   placeholder="成就ID" class="layui-input">
+                        <div class="rewards-list">
+                            <div class="reward-item">
+                                <div class="layui-input-inline" style="width: 120px;">
+                                    <input type="number" name="medal_rewards[0].id" 
+                                           placeholder="成就ID" class="layui-input">
+                                </div>
+                                <div class="layui-btn layui-btn-xs layui-btn-normal" onclick="showMedalList(this)">
+                                    <i class="layui-icon">&#xe615;</i> 选择勋章
+                                </div>
+                                <div class="layui-btn layui-btn-xs layui-btn-danger" onclick="removeRewardItem(this)">
+                                    <i class="layui-icon">&#xe640;</i>
+                                </div>
+                            </div>
                         </div>
-                        <div class="layui-input-inline" style="width: 120px;">
-                            <input type="number" name="medal_rewards[0].number" 
-                                   placeholder="经验值" class="layui-input">
+                        <div class="layui-btn layui-btn-xs" onclick="addRewardItem('medal')">
+                            <i class="layui-icon">&#xe654;</i> 添加成就奖励
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 实物奖励 -->
+                <div class="layui-form-item" id="realRewardsContainer">
+                    <label class="layui-form-label">实物奖励</label>
+                    <div class="layui-input-block">
+                        <div class="rewards-list">
+                            <div class="reward-item">
+                                <div class="layui-input-inline" style="width: 120px;">
+                                    <input type="text" name="real_rewards[0].name" 
+                                           placeholder="奖品名称" class="layui-input">
+                                </div>
+                                <div class="layui-input-inline" style="width: 120px;">
+                                    <input type="number" name="real_rewards[0].number" 
+                                           placeholder="数量" class="layui-input">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="layui-btn layui-btn-xs" onclick="addRewardItem('real')">
+                            <i class="layui-icon">&#xe654;</i> 添加实物奖励
                         </div>
                     </div>
                 </div>
@@ -349,6 +415,19 @@
                 display: flex;
                 justify-content: center;
             }
+
+            .rewards-list {
+                margin-bottom: 10px;
+            }
+            .reward-item {
+                display: flex;
+                align-items: center;
+                margin-bottom: 10px;
+                gap: 10px;
+            }
+            .reward-item .layui-btn-danger {
+                margin-left: 10px;
+            }
         </style>
     `;
   }
@@ -428,7 +507,7 @@
         task_chain_id: parseInt(formData.task_chain_id) || 0,
         parent_task_id: parseInt(formData.parent_task_id) || 0,
         task_type: formData.task_type,
-        task_status: parseInt(formData.task_status),
+        task_status: formData.task_status,
         description: formData.description || "",
         task_scope: parseInt(formData.task_scope),
         stamina_cost: parseInt(formData.stamina_cost) || 0,
@@ -451,6 +530,12 @@
             {
               id: parseInt(formData["medal_rewards[0].id"]) || 0,
               number: parseInt(formData["medal_rewards[0].number"]) || 0,
+            },
+          ],
+          real_rewards: [
+            {
+              name: formData["real_rewards[0].name"] || "",
+              number: parseInt(formData["real_rewards[0].number"]) || 0,
             },
           ],
         },
@@ -528,6 +613,212 @@
         console.error("加载玩家列表错误:", error);
       });
   }
+
+  // 将 addRewardItem 函数定义为全局函数
+  window.addRewardItem = function(type) {
+    const container = document.querySelector(`#${type}RewardsContainer .rewards-list`);
+    const items = container.querySelectorAll('.reward-item');
+    const index = items.length;
+
+    let newItemHtml = '';
+    switch(type) {
+        case 'points':
+            newItemHtml = `
+                <div class="reward-item">
+                    <div class="layui-input-inline" style="width: 120px;">
+                        <select name="points_rewards[${index}].type">
+                            <option value="exp">经验值</option>
+                            <option value="points">积分</option>
+                        </select>
+                    </div>
+                    <div class="layui-input-inline" style="width: 120px;">
+                        <input type="number" name="points_rewards[${index}].number" 
+                               placeholder="数量" class="layui-input">
+                    </div>
+                    <div class="layui-btn layui-btn-xs layui-btn-danger" onclick="removeRewardItem(this)">
+                        <i class="layui-icon">&#xe640;</i>
+                    </div>
+                </div>`;
+            break;
+        case 'card':
+            newItemHtml = `
+                <div class="reward-item">
+                    <div class="layui-input-inline" style="width: 120px;">
+                        <input type="number" name="card_rewards[${index}].id" 
+                               placeholder="卡片ID" class="layui-input">
+                    </div>
+                    <div class="layui-input-inline" style="width: 120px;">
+                        <input type="number" name="card_rewards[${index}].number" 
+                               placeholder="数量" class="layui-input">
+                    </div>
+                    <div class="layui-btn layui-btn-xs layui-btn-danger" onclick="removeRewardItem(this)">
+                        <i class="layui-icon">&#xe640;</i>
+                    </div>
+                </div>`;
+            break;
+        case 'medal':
+            newItemHtml = `
+                <div class="reward-item">
+                    <div class="layui-input-inline" style="width: 120px;">
+                        <input type="number" name="medal_rewards[${index}].id" 
+                               placeholder="成就ID" class="layui-input">
+                    </div>
+                    <div class="layui-btn layui-btn-xs layui-btn-normal" onclick="showMedalList(this)">
+                        <i class="layui-icon">&#xe615;</i> 选择勋章
+                    </div>
+                    <div class="layui-btn layui-btn-xs layui-btn-danger" onclick="removeRewardItem(this)">
+                        <i class="layui-icon">&#xe640;</i>
+                    </div>
+                </div>`;
+            break;
+        case 'real':
+            newItemHtml = `
+                <div class="reward-item">
+                    <div class="layui-input-inline" style="width: 120px;">
+                        <input type="text" name="real_rewards[${index}].name" 
+                               placeholder="奖品名称" class="layui-input">
+                    </div>
+                    <div class="layui-input-inline" style="width: 120px;">
+                        <input type="number" name="real_rewards[${index}].number" 
+                               placeholder="数量" class="layui-input">
+                    </div>
+                    <div class="layui-btn layui-btn-xs layui-btn-danger" onclick="removeRewardItem(this)">
+                        <i class="layui-icon">&#xe640;</i>
+                    </div>
+                </div>`;
+            break;
+    }
+
+    container.insertAdjacentHTML('beforeend', newItemHtml);
+    
+    // 重新渲染表单元素
+    layui.use(['form'], function(){
+        var form = layui.form;
+        form.render();
+    });
+  };
+
+  // 添加删除奖励项的全局函数
+  window.removeRewardItem = function(btn) {
+    const rewardItem = btn.closest('.reward-item');
+    if (rewardItem) {
+        rewardItem.remove();
+    }
+  };
+
+  // 修改 showMedalList 函数，存储弹窗索引
+  window.showMedalList = function(btn) {
+    layui.use(['layer', 'jquery'], function(){
+        var layer = layui.layer;
+        var $ = layui.jquery;
+
+        fetch('/admin/api/medals')
+            .then(response => response.json())
+            .then(result => {
+                if (result.code === 0) {
+                    let content = `
+                        <div class="medal-list-container" style="padding: 15px;">
+                            <table class="layui-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>勋章名称</th>
+                                        <th>描述</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    result.data.forEach(medal => {
+                        content += `
+                            <tr>
+                                <td>${medal.id}</td>
+                                <td>${medal.name}</td>
+                                <td>${medal.description}</td>
+                                <td>
+                                    <button class="layui-btn layui-btn-xs" 
+                                            onclick="selectMedal(${medal.id}, this)">
+                                        选择
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+
+                    content += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                    // 打开弹窗并存储索引
+                    const medalListIndex = layer.open({
+                        type: 1,
+                        title: '选择勋章',
+                        area: ['800px', '600px'],
+                        content: content,
+                        success: function(layero, index) {
+                            const inputElement = $(btn).siblings('.layui-input-inline').find('input')[0];
+                            // 同时存储输入框引用和弹窗索引
+                            layero.find('.layui-table').data('targetInput', inputElement);
+                            layero.find('.layui-table').data('layerIndex', index);
+                        }
+                    });
+                } else {
+                    layer.msg('获取勋章列表失败：' + result.msg);
+                }
+            })
+            .catch(error => {
+                console.error('获取勋章列表错误:', error);
+                layer.msg('获取勋章列表失败');
+            });
+    });
+  };
+
+  // 修改 selectMedal 函数，只关闭当前弹窗
+  window.selectMedal = function(medalId, btn) {
+    layui.use(['layer', 'jquery'], function(){
+        var layer = layui.layer;
+        var $ = layui.jquery;
+
+        const $table = $(btn).closest('.layui-table');
+        const targetInput = $table.data('targetInput');
+        const layerIndex = $table.data('layerIndex');
+
+        if (targetInput) {
+            targetInput.value = medalId;
+            // 只关闭当前勋章选择弹窗
+            layer.close(layerIndex);
+            layer.msg('已选择勋章');
+        } else {
+            layer.msg('操作失败：未找到目标输入框');
+        }
+    });
+  };
+
+  // 添加样式
+  const style = `
+    <style>
+        .medal-list-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .medal-list-container .layui-table {
+            margin: 0;
+        }
+        .reward-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .reward-item .layui-btn {
+            margin-right: 5px;
+        }
+    </style>
+  `;
+  document.head.insertAdjacentHTML('beforeend', style);
 
   console.log("TaskForm.js loaded, showTaskFormDialog:", typeof window.showTaskFormDialog);
 })(window);

@@ -17,7 +17,7 @@ import json
 import uuid
 
 app = Flask(__name__, static_folder='static')
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app)
 
 # 数据库路径
 DB_PATH = os.path.join(os.path.dirname(__file__), 'database', 'game.db')
@@ -150,7 +150,6 @@ def get_player(player_id):
                     'player_id': player_data['player_id'],
                     'stamina': player_data['stamina'],
                     'strength': player_data['strength'],
-                    'intelligence': player_data['intelligence'],
                     'player_name': player_data['player_name'],
                     'create_time': player_data['create_time'],
                     'level': player_data['level'],
@@ -834,10 +833,10 @@ def assign_daily_tasks():
                 cursor.execute('''
                     SELECT id FROM player_task 
                     WHERE player_id = ? AND task_id = ? 
-                    AND starttime = ?
-                ''', (player_id, task_id, start_timestamp))
+                    AND starttime >= ? AND starttime < ?
+                ''', (player_id, task_id, start_timestamp, end_timestamp))
 
-                if not cursor.fetchone():  # 如果玩家还没有这个任务
+                if not cursor.fetchone():  # 如果玩家在今天还没有这个任务
                     cursor.execute('''
                         INSERT INTO player_task 
                         (player_id, task_id, starttime, endtime, status) 
@@ -856,6 +855,13 @@ def assign_daily_tasks():
             conn.close()
 
 
+def check_daily_tasks():
+    """在程序启动时检查今日任务分配情况"""
+    current_hour = datetime.now().hour
+    if current_hour >= 7:  # 如果当前时间已过早上7点
+        assign_daily_tasks()  # 执行一次任务分配检查
+
+
 def run_scheduler():
     """运行调度器"""
     schedule.every().day.at("07:00").do(assign_daily_tasks)
@@ -868,8 +874,9 @@ def run_scheduler():
 
 
 def start_scheduler():
+    check_daily_tasks()  # 启动时检查今日任务
     scheduler_thread = threading.Thread(target=run_scheduler)
-    scheduler_thread.daemon = True  # 设置为守护线程
+    scheduler_thread.daemon = True
     scheduler_thread.start()
 
 
@@ -951,9 +958,9 @@ def get_logs():
     if method_filter:
         filtered_logs = [
             log for log in filtered_logs if log['method'] == method_filter]
-    if path_filter:
-        filtered_logs = [
-            log for log in filtered_logs if path_filter in log['path']]
+        if path_filter:
+            filtered_logs = [
+                log for log in filtered_logs if path_filter in log['path']]
 
     return jsonify(filtered_logs)
 
@@ -999,7 +1006,8 @@ if __name__ == '__main__':
         # 使用 eventlet 启动服务器
         socketio.run(
             app,
-            host='192.168.5.18',  # 监听所有网络接口
+            # host='192.168.5.18',  # 监听所有网络接口
+            host='192.168.1.4',  # 监听所有网络接口
             port=5000,
             debug=True,
             use_reloader=True,

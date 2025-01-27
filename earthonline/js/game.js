@@ -1,16 +1,16 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-08 14:41:57
- * @LastEditTime: 2025-01-21 20:22:18
+ * @LastEditTime: 2025-01-26 21:10:16
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
 
 // 后端服务器地址配置
-const SERVER = 'http://192.168.5.18:5000/';
+const SERVER = 'http://192.168.1.4:5000/';
 
 // WebSocket连接
-const socket = io('http://192.168.5.18:5000/');
+const socket = io('http://192.168.1.4:5000/');
 
 // 在文件开头声明全局变量
 let taskManager;
