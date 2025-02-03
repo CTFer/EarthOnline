@@ -1,0 +1,169 @@
+// 移动端断点
+@mobile-breakpoint: 768px;
+@small-mobile-breakpoint: 480px;
+
+// 移动端适配样式
+@media screen and (max-width: @mobile-breakpoint) {
+    // 容器适配
+    .admin-container {
+        padding: 10px;
+        margin-top: 60px;
+    }
+
+    // 面板适配
+    .panel {
+        margin-bottom: 15px;
+        padding: 10px;
+
+        .panel-header {
+            flex-direction: column;
+            gap: 10px;
+
+            h2 {
+                font-size: 16px;
+                margin-bottom: 10px;
+            }
+
+            .panel-actions {
+                flex-wrap: wrap;
+                justify-content: flex-start;
+                gap: 8px;
+            }
+        }
+    }
+
+    // 表格适配
+    .layui-table {
+        font-size: 12px;
+
+        th, td {
+            padding: 8px 5px;
+        }
+
+        // 允许表格横向滚动
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    // 表单适配
+    .layui-form {
+        .layui-form-item {
+            margin-bottom: 10px;
+
+            .layui-form-label {
+                width: 80px;
+                padding: 8px 5px;
+            }
+
+            .layui-input-block {
+                margin-left: 90px;
+            }
+
+            .layui-input,
+            .layui-textarea {
+                height: 32px;
+                line-height: 32px;
+            }
+        }
+    }
+
+    // 弹窗适配
+    .layui-layer {
+        width: 95% !important;
+        max-width: none !important;
+    }
+
+    // 按钮组适配
+    .control-panel {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 10px;
+
+        .layui-btn {
+            margin: 0;
+            padding: 0 12px;
+            height: 32px;
+            line-height: 32px;
+            font-size: 12px;
+        }
+    }
+
+    // NFC设备状态适配
+    .nfc-device-status {
+        flex-direction: column;
+        gap: 8px;
+
+        .status-item {
+            width: 100%;
+            margin: 0;
+            
+            .label {
+                display: inline-block;
+                width: 80px;
+            }
+        }
+    }
+
+    // 选项卡适配
+    .layui-tab {
+        .layui-tab-title {
+            li {
+                padding: 0 10px;
+                font-size: 12px;
+            }
+        }
+    }
+}
+
+// 小屏幕手机适配
+@media screen and (max-width: @small-mobile-breakpoint) {
+    .admin-container {
+        padding: 5px;
+    }
+
+    .panel {
+        padding: 8px;
+    }
+
+    .layui-form-item {
+        .layui-form-label {
+            width: 70px;
+            padding: 6px 4px;
+        }
+
+        .layui-input-block {
+            margin-left: 80px;
+        }
+    }
+
+    // 操作按钮最小化
+    .layui-btn-xs {
+        height: 24px;
+        line-height: 24px;
+        padding: 0 8px;
+        font-size: 11px;
+    }
+}
+
+// 打印样式优化
+@media print {
+    .admin-container {
+        padding: 0;
+        margin: 0;
+    }
+
+    .control-panel,
+    .layui-btn,
+    .panel-actions {
+        display: none;
+    }
+
+    .panel {
+        page-break-inside: avoid;
+        border: none;
+        box-shadow: none;
+    }
+} 

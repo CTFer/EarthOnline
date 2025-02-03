@@ -1,0 +1,88 @@
+<!--
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-02 16:36:21
+ * @LastEditTime: 2025-02-02 23:08:57
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2025 迷舍
+-->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}{% endblock %} - 团总的地球Online</title>
+    <meta charset="UTF-8">
+    <!-- 添加缓存控制 meta 标签 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    {% block head %}
+    <!-- 公共样式和脚本 -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <link rel="stylesheet" href="/static/css/client/base.css">
+    <script src="/static/layui/layui.js"></script>
+    <script src="/static/js/socket.io.js"></script>
+    {% endblock %}
+</head>
+
+<body class="game-body">
+    <!-- 顶部导航栏 -->
+    <div class="nav-container">
+        <div class="nav-logo">团总的地球Online</div>
+        <ul class="nav-menu">
+            <li><a href="/" class="nav-item"><i class="layui-icon layui-icon-home"></i>首页</a></li>
+            <li><a href="/shop" class="nav-item"><i class="layui-icon layui-icon-cart"></i>商店</a></li>
+            <li><a href="/admin/tasks" class="nav-item"><i class="layui-icon layui-icon-flag"></i>任务</a></li>
+            <li><a href="/rank" class="nav-item"><i class="layui-icon layui-icon-chart"></i>排行榜</a></li>
+        </ul>
+        <div class="nav-user">
+            <img src="/static/images/avatar/default.png" class="nav-avatar">
+            <span id="playerName">玩家</span>
+            <div class="user-menu">
+                <a href="/profile">个人信息</a>
+                <a href="/settings">设置</a>
+                <a href="javascript:;" onclick="logout()">退出</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- 底部版权 -->
+    <div class="footer">
+        <p>© 2025 团总的地球Online - GPL 3.0</p>
+    </div>
+
+    {% block scripts %}
+    <script>
+        // 初始化 layui
+        layui.use(['element', 'layer'], function(){
+            var element = layui.element;
+            var layer = layui.layer;
+            
+            // 从 localStorage 获取玩家信息
+            const playerName = localStorage.getItem('playerName');
+            if (playerName) {
+                document.getElementById('playerName').textContent = playerName;
+            }
+        });
+
+        // 退出登录
+        function logout() {
+            layer.confirm('确定要退出吗？', {
+                btn: ['确定','取消']
+            }, function(){
+                // 清除本地存储
+                localStorage.clear();
+                // 跳转到登录页
+                window.location.href = '/login';
+            });
+        }
+    </script>
+    {% endblock %}
+</body>
+</html> 

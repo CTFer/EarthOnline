@@ -1,16 +1,16 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-08 14:41:57
- * @LastEditTime: 2025-01-29 16:36:18
+ * @LastEditTime: 2025-02-02 16:39:05
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
 
 // 后端服务器地址配置
-const SERVER = 'http://192.168.5.18:5000/';
+const SERVER = 'http://192.168.1.5:5000/';
 
 // WebSocket连接
-const socket = io('http://192.168.5.18:5000/');
+const socket = io(SERVER);
 
 // 在文件开头声明全局变量
 let taskManager;
@@ -19,7 +19,7 @@ let taskManager;
 class TaskManager {
     constructor() {
         this.activeTasksSwiper = null;
-        this.playerId = localStorage.getItem('playerId') || '1';
+        this.playerId = localStorage.getItem('playerId') || localStorage.setItem('playerId', '1');// 如果本地没有playerId，则设置为1
         this.loading = false;
         this.initWebSocket();
         this.loadPlayerInfo(); // 在构造函数中调用加载角色信息
@@ -46,6 +46,12 @@ class TaskManager {
             
             // 显式加入房间
             socket.emit('join', { room: room });
+
+            // 订阅标签更新
+            socket.on('tags_update', (data) => {
+                console.log('[WebSocket] Received tags update:', data);
+                this.updateWordCloud();
+            });
         });
 
         socket.on('disconnect', () => {
@@ -86,21 +92,61 @@ class TaskManager {
             return;
         }
 
-        // 统一使用showNotification显示消息
-        this.showNotification(data);
-
-        // 处理特殊逻辑
+        // 处理特殊类型
         switch(data.type) {
             case 'IDENTITY':
                 this.playerId = data.player_id;
                 localStorage.setItem('playerId', data.player_id);
-                this.refreshTasks();
+                this.loadPlayerInfo(); // 重新加载玩家信息
+                this.refreshTasks();   // 刷新任务列表
                 break;
+            
             case 'NEW_TASK':
             case 'COMPLETE':
+            case 'CHECK':
+                // 刷新任务列表
                 this.refreshTasks();
+                // 播放相应的音效
+                this.playTaskSound(data.type);
+                break;
+            
+            case 'ALREADY_COMPLETE':
+            case 'REJECT':
+            case 'CHECKING':
+                // 这些状态只需要显示通知，不需要刷新任务
+                break;
+            
+            case 'ERROR':
+                // 错误状态可以播放错误音效
+                this.playErrorSound();
                 break;
         }
+
+        // 显示通知
+        this.showNotification(data);
+    }
+
+    // 播放任务相关音效
+    playTaskSound(type) {
+        const audio = new Audio();
+        switch(type) {
+            case 'NEW_TASK':
+                audio.src = '/static/sounds/new_task.mp3';
+                break;
+            case 'COMPLETE':
+                audio.src = '/static/sounds/complete.mp3';
+                break;
+            case 'CHECK':
+                audio.src = '/static/sounds/check.mp3';
+                break;
+        }
+        audio.play().catch(e => console.log('音效播放失败:', e));
+    }
+
+    // 播放错误音效
+    playErrorSound() {
+        const audio = new Audio('/static/sounds/error.mp3');
+        audio.play().catch(e => console.log('音效播放失败:', e));
     }
 
     // 显示通知
@@ -243,7 +289,16 @@ class TaskManager {
         
         this.loading = true;
         const taskList = document.getElementById('taskList');
-        taskList.innerHTML = '<div class="loading-state">加载中...</div>';
+        taskList.innerHTML = `
+            <div class="swiper task-list-swiper">
+                <div class="swiper-wrapper">
+                    <div class="swiper-slide">
+                        <div class="loading-state">加载中...</div>
+                    </div>
+                </div>
+                <div class="swiper-scrollbar"></div>
+            </div>
+        `;
         
         try {
             const response = await fetch(`${SERVER}/api/tasks/available/${this.playerId}`);
@@ -251,17 +306,20 @@ class TaskManager {
             
             if (result.code === 0) {
                 const tasks = result.data;
-                taskList.innerHTML = '';
+                const swiperWrapper = taskList.querySelector('.swiper-wrapper');
                 
                 if (!tasks || tasks.length === 0) {
-                    taskList.innerHTML = '<div class="empty-tip">暂无可用任务</div>';
-                    return;
+                    swiperWrapper.innerHTML = `
+                        <div class="swiper-slide">
+                            <div class="empty-tip">暂无可用任务</div>
+                        </div>
+                    `;
+                } else {
+                    swiperWrapper.innerHTML = tasks.map(task => this.createTaskCard(task)).join('');
                 }
-
-                tasks.forEach(task => {
-                    const taskCard = this.createTaskCard(task);
-                    taskList.appendChild(taskCard);
-                });
+                
+                // 初始化任务列表的 Swiper
+                this.initTaskListSwiper();
             } else {
                 this.showError('taskList', result.msg);
             }
@@ -275,50 +333,178 @@ class TaskManager {
 
     // 创建任务卡片
     createTaskCard(task) {
-        const taskCard = document.createElement('div');
-        taskCard.className = 'task-card';
-        taskCard.dataset.endtime = task.endtime;
-        
         const taskTypeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
+        let rewards = { points: 0, exp: 0, cards: [], medals: [] };
         
-        taskCard.innerHTML = `
-            <div class="task-header" style="background-color: ${taskTypeInfo.color}">
-                <div class="task-icon">
-                    <i class="layui-icon ${taskTypeInfo.icon}"></i>
-                </div>
-                <div class="task-info">
-                    <h3 class="task-name">${task.name}</h3>
-                    <span class="task-type">${taskTypeInfo.text}</span>
-                </div>
-            </div>
-            <div class="task-content">
-                <div class="task-details">
-                    <p class="task-description">${task.description}</p>
-                    <div class="task-time">
-                        <i class="layui-icon layui-icon-time"></i>
-                        ${task.endtime ? gameUtils.formatDate(task.endtime) : '永久'}
-                    </div>
-                </div>
-                <div class="task-footer">
-                    <div class="task-rewards">
-                        <div class="reward-item">
-                            <i class="layui-icon layui-icon-diamond"></i>
-                            <span>+${task.points}</span>
+        // 解析任务奖励
+        try {
+            if (task.task_rewards) {
+                const rewardsData = typeof task.task_rewards === 'string' ? 
+                    JSON.parse(task.task_rewards) : task.task_rewards;
+                
+                if (rewardsData.points_rewards?.length) {
+                    rewards.exp = rewardsData.points_rewards[0]?.number || 0;
+                    rewards.points = rewardsData.points_rewards[1]?.number || 0;
+                }
+                rewards.cards = rewardsData.card_rewards || [];
+                rewards.medals = rewardsData.medal_rewards || [];
+            }
+        } catch (error) {
+            console.error('解析任务奖励失败:', error);
+        }
+        
+        return `
+            <div class="swiper-slide">
+                <div class="task-card" onclick="taskManager.showTaskDetails(${JSON.stringify({
+                    ...task,
+                    typeInfo: taskTypeInfo,
+                    rewards: rewards
+                }).replace(/"/g, '&quot;')})">
+                    <div class="task-header" style="background-color: ${taskTypeInfo.color}20">
+                        <div class="task-icon">
+                            <i class="layui-icon ${taskTypeInfo.icon}"></i>
                         </div>
-                        <div class="reward-item">
-                            <i class="layui-icon layui-icon-fire"></i>
-                            <span>-${task.stamina_cost}</span>
+                        <div class="task-info">
+                            <h3 class="task-name">${task.name}</h3>
+                            <span class="task-type">${taskTypeInfo.text}</span>
                         </div>
                     </div>
-                    <button class="accept-btn" onclick="taskManager.acceptTask(${task.id})">
-                        <i class="layui-icon layui-icon-ok"></i>
-                        接受
-                    </button>
+                    <div class="task-content">
+                        <div class="task-details">
+                            <p class="task-description">${task.description}</p>
+                            <div class="task-time">
+                                <i class="layui-icon layui-icon-time"></i>
+                                ${task.limit_time ? `限时${Math.floor(task.limit_time/3600)}小时` : '永久'}
+                            </div>
+                        </div>
+                        <div class="task-footer">
+                            <div class="task-rewards">
+                                ${rewards.exp > 0 ? `
+                                    <div class="reward-item">
+                                        <i class="layui-icon layui-icon-star"></i>
+                                        <span>+${rewards.exp}</span>
+                                    </div>
+                                ` : ''}
+                                ${rewards.points > 0 ? `
+                                    <div class="reward-item">
+                                        <i class="layui-icon layui-icon-diamond"></i>
+                                        <span>+${rewards.points}</span>
+                                    </div>
+                                ` : ''}
+                                <div class="reward-item">
+                                    <i class="layui-icon layui-icon-fire"></i>
+                                    <span>-${task.stamina_cost}</span>
+                                </div>
+                            </div>
+                            <button class="accept-btn" onclick="event.stopPropagation(); taskManager.acceptTask(${task.id})">
+                                <i class="layui-icon layui-icon-ok"></i>
+                                接受
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
+    }
+
+    // 显示任务详情
+    showTaskDetails(taskData) {
+        const { typeInfo, rewards } = taskData;
         
-        return taskCard;
+        layui.use('layer', function() {
+            const layer = layui.layer;
+            
+            layer.open({
+                type: 1,
+                title: false,
+                closeBtn: 1,
+                shadeClose: true,
+                skin: 'task-detail-layer',
+                area: ['600px', 'auto'],
+                content: `
+                    <div class="task-detail-popup">
+                        <div class="task-detail-header" style="background-color: ${typeInfo.color}20">
+                            <div class="task-type-badge" style="background: ${typeInfo.color}20; color: ${typeInfo.color}">
+                                <i class="layui-icon ${typeInfo.icon}"></i>
+                                <span>${typeInfo.text}</span>
+                            </div>
+                            <h2 class="task-name">${taskData.name}</h2>
+                        </div>
+                        <div class="task-detail-content">
+                            <div class="detail-section">
+                                <h3>任务描述</h3>
+                                <p>${taskData.description}</p>
+                            </div>
+                            
+                            <div class="detail-section">
+                                <h3>任务信息</h3>
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <span class="label">任务范围</span>
+                                        <span class="value">${taskData.task_scope || '无限制'}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="label">体力消耗</span>
+                                        <span class="value">${taskData.stamina_cost}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="label">时间限制</span>
+                                        <span class="value">${taskData.limit_time ? `${Math.floor(taskData.limit_time/3600)}小时` : '无限制'}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="label">可重复次数</span>
+                                        <span class="value">${taskData.repeat_time || (taskData.repeatable ? '无限' : '1')}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="detail-section">
+                                <h3>任务奖励</h3>
+                                <div class="rewards-grid">
+                                    ${rewards.exp > 0 ? `
+                                        <div class="reward-detail">
+                                            <i class="layui-icon layui-icon-star"></i>
+                                            <span>${rewards.exp} 经验</span>
+                                        </div>
+                                    ` : ''}
+                                    ${rewards.points > 0 ? `
+                                        <div class="reward-detail">
+                                            <i class="layui-icon layui-icon-diamond"></i>
+                                            <span>${rewards.points} 积分</span>
+                                        </div>
+                                    ` : ''}
+                                    ${rewards.cards.length > 0 ? `
+                                        <div class="reward-detail">
+                                            <i class="layui-icon layui-icon-picture"></i>
+                                            <span>${rewards.cards.length}张卡片</span>
+                                        </div>
+                                    ` : ''}
+                                    ${rewards.medals.length > 0 ? `
+                                        <div class="reward-detail">
+                                            <i class="layui-icon layui-icon-medal"></i>
+                                            <span>${rewards.medals.length}枚勋章</span>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            
+                            ${taskData.parent_task_id ? `
+                                <div class="detail-section">
+                                    <h3>前置任务</h3>
+                                    <p>需要完成任务ID: ${taskData.parent_task_id}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="task-detail-footer">
+                            <button class="accept-task-btn" onclick="taskManager.acceptTask(${taskData.id}); layer.closeAll();">
+                                <i class="layui-icon layui-icon-ok"></i>
+                                接受任务
+                            </button>
+                        </div>
+                    </div>
+                `
+            });
+        });
     }
 
     // 加载当前任务（仅在页面首次加载时调用）
@@ -866,6 +1052,126 @@ class TaskManager {
             document.getElementById('playerPoints').textContent = '0';
         }
     }
+
+    // 添加任务列表 Swiper 初始化方法
+    initTaskListSwiper() {
+        if (this.taskListSwiper) {
+            this.taskListSwiper.destroy(true, true);
+        }
+
+        this.taskListSwiper = new Swiper('.task-list-swiper', {
+            direction: 'vertical',
+            slidesPerView: 'auto',
+            freeMode: true,
+            mousewheel: true,
+            scrollbar: {
+                el: '.swiper-scrollbar',
+                draggable: true,
+                hide: false
+            },
+            height: 500, // 设置固定高度
+            spaceBetween: 15
+        });
+    }
+
+    // 初始化文字云
+    initWordCloud() {
+        const wordCloudChart = echarts.init(document.getElementById('wordCloudContainer'));
+        
+        // 模拟数据
+        const testData = [
+            // 头衔（较大字体，金色）
+            { name: '地球守护者', value: 100, textStyle: { color: '#ffd700', fontSize: 32 } },
+            { name: '环保先锋', value: 90, textStyle: { color: '#ffd700', fontSize: 28 } },
+            
+            // 荣誉（中等字体，银色）
+            { name: '垃圾分类达人', value: 80, textStyle: { color: '#c0c0c0' } },
+            { name: '节能减排标兵', value: 75, textStyle: { color: '#c0c0c0' } },
+            { name: '生态保护使者', value: 70, textStyle: { color: '#c0c0c0' } },
+            
+            // 个人标签（较小字体，青色系）
+            { name: '热心环保', value: 60, textStyle: { color: '#8aa2c1' } },
+            { name: '绿色出行', value: 55, textStyle: { color: '#8aa2c1' } },
+            { name: '低碳生活', value: 50, textStyle: { color: '#8aa2c1' } },
+            { name: '植树达人', value: 45, textStyle: { color: '#8aa2c1' } },
+            { name: '节水卫士', value: 40, textStyle: { color: '#8aa2c1' } },
+            { name: '环保志愿者', value: 35, textStyle: { color: '#8aa2c1' } },
+            { name: '可再生能源支持者', value: 30, textStyle: { color: '#8aa2c1' } }
+        ];
+
+        const option = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                show: true,
+                formatter: function(params) {
+                    return params.data.name;
+                }
+            },
+            series: [{
+                type: 'wordCloud',
+                shape: 'circle',
+                left: 'center',
+                top: 'center',
+                width: '90%',
+                height: '90%',
+                right: null,
+                bottom: null,
+                sizeRange: [12, 32],
+                rotationRange: [-45, 45],
+                rotationStep: 45,
+                gridSize: 8,
+                drawOutOfBound: false,
+                layoutAnimation: true,
+                textStyle: {
+                    fontFamily: 'Microsoft YaHei',
+                    fontWeight: 'bold',
+                    color: function () {
+                        return 'rgb(' + [
+                            Math.round(Math.random() * 160) + 60,
+                            Math.round(Math.random() * 160) + 60,
+                            Math.round(Math.random() * 160) + 60
+                        ].join(',') + ')';
+                    }
+                },
+                emphasis: {
+                    textStyle: {
+                        shadowBlur: 10,
+                        shadowColor: 'rgba(255, 196, 71, 0.5)'
+                    }
+                },
+                data: testData
+            }]
+        };
+
+        wordCloudChart.setOption(option);
+
+        // 响应窗口大小变化
+        window.addEventListener('resize', function() {
+            wordCloudChart.resize();
+        });
+
+        // 将图表实例存储在全局变量中，以便后续更新
+        window.wordCloudChart = wordCloudChart;
+    }
+
+    // 更新文字云数据
+    async updateWordCloud() {
+        try {
+            // TODO: 替换为实际的API调用
+            const response = await fetch('/api/player/tags');
+            const data = await response.json();
+            
+            if (window.wordCloudChart && data.success) {
+                window.wordCloudChart.setOption({
+                    series: [{
+                        data: data.tags
+                    }]
+                });
+            }
+        } catch (error) {
+            console.error('更新文字云失败:', error);
+        }
+    }
 }
 
 // 修改页面初始化代码
@@ -879,6 +1185,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         taskManager.loadTasks(),
         taskManager.loadCurrentTasks()
     ]);
+
+    // 初始化文字云
+    taskManager.initWordCloud();
 });
 
 // 页面卸载前清理

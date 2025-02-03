@@ -922,7 +922,7 @@ def get_player_tasks():
                 t.name as task_name,
                 pt.starttime,
                 pt.endtime,
-                pt.points_earned,
+
                 pt.status,
                 pt.complete_time,
                 pt.comment
@@ -941,10 +941,10 @@ def get_player_tasks():
                 'task_name': row[3],
                 'starttime': row[4],
                 'endtime': row[5],
-                'points_earned': row[6],
-                'status': row[7],
-                'complete_time': row[8],
-                'comment': row[9]
+
+                'status': row[6],
+                'complete_time': row[7],
+                'comment': row[8]
             })
 
         conn.close()
@@ -981,7 +981,7 @@ def get_player_task(task_id):
                 t.name as task_name,
                 pt.starttime,
                 pt.endtime,
-                pt.points_earned,
+
                 pt.status,
                 pt.complete_time,
                 pt.comment
@@ -1006,10 +1006,10 @@ def get_player_task(task_id):
             'task_name': row[3],
             'starttime': row[4],
             'endtime': row[5],
-            'points_earned': row[6],
-            'status': row[7],
-            'complete_time': row[8],
-            'comment': row[9]
+
+            'status': row[6],
+            'complete_time': row[7],
+            'comment': row[8]
         }
 
         conn.close()
@@ -1040,14 +1040,13 @@ def create_player_task():
         cursor.execute('''
             INSERT INTO player_task (
                 player_id, task_id, starttime, endtime,
-                points_earned, status, complete_time, comment
+                status, complete_time, comment
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('player_id'),
             data.get('task_id'),
             data.get('starttime', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
             data.get('endtime'),
-            data.get('points_earned', 0),
             data.get('status', 'available'),
             data.get('complete_time'),
             data.get('comment')
@@ -1088,7 +1087,6 @@ def update_player_task(task_id):
                 task_id = ?,
                 starttime = ?,
                 endtime = ?,
-                points_earned = ?,
                 status = ?,
                 complete_time = ?,
                 comment = ?
@@ -1101,7 +1099,6 @@ def update_player_task(task_id):
             data.get('task_id'),
             data.get('starttime'),
             data.get('endtime'),
-            data.get('points_earned'),
             data.get('status'),
             data.get('complete_time'),
             data.get('comment'),
@@ -1130,7 +1127,6 @@ def update_player_task(task_id):
                 t.name as task_name,
                 pt.starttime,
                 pt.endtime,
-                pt.points_earned,
                 pt.status,
                 pt.complete_time,
                 pt.comment
@@ -1148,10 +1144,9 @@ def update_player_task(task_id):
             'task_name': row[3],
             'starttime': row[4],
             'endtime': row[5],
-            'points_earned': row[6],
-            'status': row[7],
-            'complete_time': row[8],
-            'comment': row[9]
+            'status': row[6],
+            'complete_time': row[7],
+            'comment': row[8]
         }
 
         conn.close()
@@ -1432,6 +1427,407 @@ def delete_medal(medal_id):
             'data': None
         })
 
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+# NFC卡管理相关路由
+@admin_bp.route('/api/nfc/cards', methods=['GET'])
+@admin_required
+def get_nfc_cards():
+    try:
+        print("开始获取NFC卡片列表")
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT 
+                card_id,
+                type,
+                id,
+                value,
+                addtime,
+                status,
+                description,
+                device
+            FROM NFC_card
+            ORDER BY addtime DESC
+        ''')
+        
+        cards = []
+        for row in cursor.fetchall():
+            card = {
+                'card_id': row[0],
+                'type': row[1],
+                'id': row[2],
+                'value': row[3],
+                'addtime': row[4],
+                'status': row[5],
+                'description': row[6],
+                'device': row[7]
+            }
+            print(f"获取到卡片数据: {card}")
+            cards.append(card)
+            
+        conn.close()
+        print(f"成功获取 {len(cards)} 张卡片")
+        return jsonify({
+            'code': 0,
+            'msg': '',
+            'data': cards
+        })
+        
+    except Exception as e:
+        print(f"获取NFC卡片列表失败: {str(e)}")
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/nfc/cards', methods=['POST'])
+@admin_required
+def create_nfc_card():
+    try:
+        data = request.get_json()
+        print(f"接收到的NFC卡片创建数据: {data}")
+        current_time = int(time.time())
+        
+        # 验证必填字段
+        required_fields = ['type', 'id', 'value']
+        for field in required_fields:
+            if field not in data:
+                print(f"缺少必填字段: {field}")
+                return jsonify({
+                    'code': 400,
+                    'msg': f'缺少必填字段: {field}',
+                    'data': None
+                }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取最大的 card_id
+        cursor.execute('SELECT MAX(card_id) FROM NFC_card')
+        result = cursor.fetchone()
+        next_card_id = 1 if result[0] is None else result[0] + 1
+        print(f"生成的新card_id: {next_card_id}")
+        
+        # 准备插入数据
+        insert_data = {
+            'card_id': next_card_id,
+            'type': data['type'],
+            'id': data['id'],
+            'value': data['value'],
+            'addtime': current_time,
+            'status': 'UNLINK',
+            'description': data.get('description', ''),  # 确保获取description字段
+            'device': data.get('device', '')
+        }
+        print(f"准备插入的数据: {insert_data}")
+        
+        cursor.execute('''
+            INSERT INTO NFC_card (
+                card_id, type, id, value, addtime, 
+                status, description, device
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            insert_data['card_id'],
+            insert_data['type'],
+            insert_data['id'],
+            insert_data['value'],
+            insert_data['addtime'],
+            insert_data['status'],
+            insert_data['description'],
+            insert_data['device']
+        ))
+        
+        conn.commit()
+        
+        # 验证插入是否成功
+        cursor.execute('SELECT * FROM NFC_card WHERE card_id = ?', (next_card_id,))
+        inserted_data = cursor.fetchone()
+        print(f"插入后的数据验证: {dict(inserted_data) if inserted_data else None}")
+        
+        conn.close()
+        
+        return jsonify({
+            'code': 0,
+            'msg': '创建成功',
+            'data': {'card_id': next_card_id}
+        }), 201
+        
+    except Exception as e:
+        print(f"创建NFC卡片失败: {str(e)}")
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/nfc/cards/<int:card_id>', methods=['PUT'])
+@admin_required
+def update_nfc_card(card_id):
+    try:
+        data = request.get_json()
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        update_fields = []
+        params = []
+        
+        # 构建更新字段
+        if 'status' in data:
+            update_fields.append('status = ?')
+            params.append(data['status'])
+        if 'description' in data:
+            update_fields.append('description = ?')
+            params.append(data['description'])
+        if 'device' in data:
+            update_fields.append('device = ?')
+            params.append(data['device'])
+            
+        if not update_fields:
+            return jsonify({
+                'code': 400,
+                'msg': '没有要更新的字段',
+                'data': None
+            }), 400
+            
+        params.append(card_id)
+        
+        cursor.execute(f'''
+            UPDATE NFC_card 
+            SET {', '.join(update_fields)}
+            WHERE card_id = ?
+        ''', params)
+        
+        if cursor.rowcount == 0:
+            return jsonify({
+                'code': 404,
+                'msg': '卡片不存在',
+                'data': None
+            }), 404
+            
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'code': 0,
+            'msg': '更新成功',
+            'data': None
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/nfc/cards/<int:card_id>', methods=['DELETE'])
+@admin_required
+def delete_nfc_card(card_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('DELETE FROM NFC_card WHERE card_id = ?', (card_id,))
+        
+        if cursor.rowcount == 0:
+            return jsonify({
+                'code': 404,
+                'msg': '卡片不存在',
+                'data': None
+            }), 404
+            
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'code': 0,
+            'msg': '删除成功',
+            'data': None
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+# NFC设备状态相关路由
+@admin_bp.route('/api/nfc/device/status', methods=['GET'])
+@admin_required
+def get_nfc_device_status():
+    """获取NFC设备状态"""
+    try:
+        from nfc import get_device_status
+        status = get_device_status()
+        
+        return jsonify({
+            'code': 0,
+            'msg': '获取设备状态成功',
+            'data': {
+                'connected': status.get('connected', False),
+                'card_present': status.get('card_present', False),
+                'device_info': status.get('device_info', {})
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/nfc/write', methods=['POST'])
+@admin_required
+def write_nfc_card():
+    """写入NFC卡片"""
+    try:
+        data = request.get_json()
+        from nfc import write_card
+        
+        # 检查设备状态
+        from nfc import get_device_status
+        status = get_device_status()
+        
+        if not status.get('connected'):
+            return jsonify({
+                'code': 400,
+                'msg': '设备未连接',
+                'data': None
+            }), 400
+            
+        if not status.get('card_present'):
+            return jsonify({
+                'code': 400,
+                'msg': '未检测到卡片',
+                'data': None
+            }), 400
+            
+        # 写入卡片
+        result = write_card(data)
+        
+        if result.get('success'):
+            # 更新卡片状态为BAN
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                UPDATE NFC_card 
+                SET status = 'BAN'
+                WHERE card_id = ?
+            ''', (data['card_id'],))
+            
+            conn.commit()
+            conn.close()
+            
+            return jsonify({
+                'code': 0,
+                'msg': '写入成功',
+                'data': None
+            })
+        else:
+            return jsonify({
+                'code': 400,
+                'msg': result.get('error', '写入失败'),
+                'data': None
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/nfc/read', methods=['GET'])
+@admin_required
+def read_nfc_card():
+    """读取NFC卡片"""
+    try:
+        from nfc import read_card
+        
+        # 检查设备状态
+        from nfc import get_device_status
+        status = get_device_status()
+        
+        if not status.get('connected'):
+            return jsonify({
+                'code': 400,
+                'msg': '设备未连接',
+                'data': None
+            }), 400
+            
+        if not status.get('card_present'):
+            return jsonify({
+                'code': 400,
+                'msg': '未检测到卡片',
+                'data': None
+            }), 400
+            
+        # 读取卡片
+        result = read_card()
+        
+        if result.get('success'):
+            return jsonify({
+                'code': 0,
+                'msg': '读取成功',
+                'data': result.get('data')
+            })
+        else:
+            return jsonify({
+                'code': 400,
+                'msg': result.get('error', '读取失败'),
+                'data': None
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        }), 500
+
+@admin_bp.route('/api/game_cards', methods=['GET'])
+@admin_required
+def get_game_cards():
+    """获取所有道具卡"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, name, description, en_name, created_at
+            FROM game_card
+            ORDER BY id ASC
+        ''')
+        
+        cards = []
+        for row in cursor.fetchall():
+            cards.append({
+                'id': row['id'],
+                'name': row['name'],
+                'description': row['description'],
+                'en_name': row['en_name'],
+                'created_at': row['created_at']
+            })
+            
+        conn.close()
+        return jsonify({
+            'code': 0,
+            'msg': '',
+            'data': cards
+        })
+        
     except Exception as e:
         return jsonify({
             'code': 500,

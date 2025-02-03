@@ -4,9 +4,10 @@
     <title>游戏管理后台</title>
     <link rel="stylesheet" href="/static/layui/css/layui.css" />
     <link rel="stylesheet" href="/static/css/admin.css" />
+    <link rel="stylesheet" href="/static/css/mobile.min.css" />
     <script src="/static/js/crypto-js.min.js"></script>
     <script src="/static/layui/layui.js"></script>
-    <script src="/static/js/taskForm.js"></script>
+    <script src="/static/js/admin/taskForm.js"></script>
   </head>
   <body>
     <div class="admin-container">
@@ -52,7 +53,62 @@
           <tbody></tbody>
         </table>
       </div>
+      <!-- NFC卡片管理面板 -->
+      <div class="panel">
+        <h2>NFC卡片管理</h2>
+        <div class="control-panel">
+          <button class="layui-btn" onclick="showAddNFCCardForm()">添加NFC卡片</button>
+          <button class="layui-btn layui-btn-normal" onclick="showWriteNFCForm()">写入NFC卡片</button>
+        </div>
+        <!-- NFC设备状态 -->
+        <div class="nfc-device-status">
+          <div class="status-item">
+            <span class="label">设备状态：</span>
+            <span id="deviceStatus" class="status">未连接</span>
+          </div>
+          <div class="status-item">
+            <span class="label">卡片状态：</span>
+            <span id="cardStatus" class="status">未检测到卡片</span>
+          </div>
+        </div>
+        <table class="layui-table" id="nfcCardTable" lay-filter="nfcCardTable"></table>
+      </div>
+      <!-- 任务管理面板 -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2>任务管理</h2>
+          <div class="panel-actions">
+            <a href="/admin/tasks" class="layui-btn layui-btn-normal"> <i class="layui-icon layui-icon-list"></i> 任务管理界面 </a>
+            <a href="/admin/player_tasks" class="layui-btn layui-btn-warm"> <i class="layui-icon layui-icon-user"></i> 用户任务管理 </a>
+            <button class="layui-btn" onclick="window.showTaskFormDialog()"><i class="layui-icon layui-icon-add-1"></i> 快速添加</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <table class="layui-table" id="taskTable"></table>
+        </div>
+      </div>
 
+      <!-- 勋章管理面板 -->
+      <div class="panel">
+        <h2>勋章管理</h2>
+        <div class="control-panel">
+          <button class="layui-btn" onclick="showAddMedalForm()">添加勋章</button>
+        </div>
+        <table class="layui-table" id="medalTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>勋章名称</th>
+              <th>描述</th>
+              <th>创建时间</th>
+              <th>图标</th>
+              <th>获取条件</th>
+              <th style="width: 110px">操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
       <!-- 技能管理面板 -->
       <div class="panel">
         <h2>技能管理</h2>
@@ -73,54 +129,6 @@
         </table>
       </div>
 
-      <!-- 任务管理面板 -->
-      <div class="panel">
-        <div class="panel-header">
-          <h2>任务管理</h2>
-          <div class="panel-actions">
-            <a href="/admin/tasks" class="layui-btn layui-btn-normal"> <i class="layui-icon layui-icon-list"></i> 任务管理界面 </a>
-            <a href="/admin/player_tasks" class="layui-btn layui-btn-warm"> <i class="layui-icon layui-icon-user"></i> 用户任务管理 </a>
-            <button class="layui-btn" onclick="window.showTaskFormDialog()"><i class="layui-icon layui-icon-add-1"></i> 快速添加</button>
-          </div>
-        </div>
-        <div class="panel-body">
-          <table class="layui-table" id="taskTable">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>任务名称</th>
-                <th>描述</th>
-                <th>类型</th>
-                <th>状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- 勋章管理面板 -->
-      <div class="panel">
-        <h2>勋章管理</h2>
-        <div class="control-panel">
-          <button class="layui-btn" onclick="showAddMedalForm()">添加勋章</button>
-        </div>
-        <table class="layui-table" id="medalTable">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>勋章名称</th>
-              <th>描述</th>
-              <th>创建时间</th>
-              <th>图标</th>
-              <th>获取条件</th>
-              <th style="width: 110px;">操作</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
       <!-- API文档面板 -->
       <div class="panel">
         <h2>API文档</h2>
@@ -238,7 +246,86 @@
       </form>
     </div>
 
-    <script src="/static/js/admin.js"></script>
+    <!-- NFC卡片表单模板 -->
+    <div id="nfcCardForm" class="popup-form" style="display: none">
+      <form class="layui-form">
+        <div class="layui-form-item">
+          <label class="layui-form-label">卡片类型</label>
+          <div class="layui-input-block">
+            <select name="nfc_form_type" lay-filter="nfcType" required>
+              <option value="">请选择卡片类型</option>
+              <option value="ID">身份卡</option>
+              <option value="TASK">任务卡</option>
+              <option value="MEDAL">成就卡</option>
+              <option value="POINTS">积分卡</option>
+              <option value="CARD">道具卡</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="layui-form-item" id="taskSelectContainer" style="display: none">
+          <label class="layui-form-label">选择任务</label>
+          <div class="layui-input-block">
+            <select name="taskId" lay-filter="taskSelect">
+              <option value="">请选择任务</option>
+            </select>
+          </div>
+        </div>
+        <div class="layui-form-item" id="medalSelectContainer" style="display: none">
+          <label class="layui-form-label">选择成就</label>
+          <div class="layui-input-block">
+              <select name="medalId" lay-filter="medalSelect">
+                  <option value="">请选择成就</option>
+              </select>
+          </div>
+      </div>
+      
+      <div class="layui-form-item" id="cardSelectContainer" style="display: none">
+          <label class="layui-form-label">选择道具卡</label>
+          <div class="layui-input-block">
+              <select name="gameCardId" lay-filter="gameCardSelect">
+                  <option value="">请选择道具卡</option>
+              </select>
+          </div>
+      </div>
+        <div class="layui-form-item">
+          <label class="layui-form-label">卡片ID</label>
+          <div class="layui-input-block">
+            <input type="number" name="card_id" required lay-verify="required" placeholder="请输入卡片ID" class="layui-input" />
+          </div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">关联ID</label>
+          <div class="layui-input-block">
+            <input type="number" name="nfc_form_id" required lay-verify="required" placeholder="请输入关联ID" class="layui-input" />
+          </div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">数值</label>
+          <div class="layui-input-block">
+            <input type="number" name="nfc_form_value" required lay-verify="required" placeholder="请输入数值" class="layui-input" />
+          </div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">描述</label>
+          <div class="layui-input-block">
+            <textarea name="nfc_form_description" placeholder="请输入描述" class="layui-textarea"></textarea>
+          </div>
+        </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">设备标识</label>
+          <div class="layui-input-block">
+            <input type="text" name="nfc_form_device" placeholder="请输入设备标识" class="layui-input" />
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <script src="/static/js/admin/admin.js"></script>
 
     <script>
       // 确保 layui 正确初始化

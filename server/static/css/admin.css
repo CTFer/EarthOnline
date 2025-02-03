@@ -23,7 +23,9 @@ body {
 h1, h2 {
     color: #57CAFF;
 }
-
+.layui-table .layui-badge{
+    line-height: 9px;
+}
 .layui-table {
     background: #1e2128;
     color: #b0b6c2;
@@ -33,7 +35,9 @@ h1, h2 {
     background: rgba(87, 202, 255, 0.1);
     color: #57CAFF;
 }
-
+.layui-table-view{
+    border: none;
+}
 .control-panel {
     margin-bottom: 20px;
 }
@@ -537,4 +541,36 @@ h1, h2 {
         margin: 10px;
         padding: 15px;
     }
+}
+
+.nfc-device-status {
+    margin: 15px 0;
+    padding: 10px;
+    /* background: #f8f8f8; */
+    /* border: 1px solid #e6e6e6; */
+    border-radius: 4px;
+}
+
+.status-item {
+    display: inline-block;
+    margin-right: 20px;
+}
+
+.status-item .label {
+    font-weight: bold;
+}
+
+.status-item .status {
+    padding: 2px 8px;
+    border-radius: 3px;
+}
+
+.status-success {
+    color: #009688;
+    background: #f0f9eb;
+}
+
+.status-error {
+    color: #f56c6c;
+    background: #fef0f0;
 }

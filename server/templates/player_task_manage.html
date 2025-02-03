@@ -1,263 +1,278 @@
-{% extends "admin_base.html" %}
-
-{% block title %}用户任务管理{% endblock %}
-
-{% block header_title %}用户任务管理{% endblock %}
-
-{% block content %}
+{% extends "admin_base.html" %} {% block title %}用户任务管理{% endblock %} {% block header_title %}用户任务管理{% endblock %} {% block content %}
 <div class="layui-fluid">
-    <div class="layui-card">
-        <div class="layui-card-header">
-            <span>用户任务列表</span>
-        </div>
-        <div class="layui-card-body">
-            <table class="layui-hide" id="player-task-table" lay-filter="player-task-table"></table>
-            
-            <script type="text/html" id="tableToolbar">
-                <div class="layui-btn-container">
-                    <button class="layui-btn layui-btn-sm" lay-event="refresh">
-                        <i class="layui-icon">&#xe669;</i>刷新
-                    </button>
-                    <button class="layui-btn layui-btn-sm layui-btn-normal" lay-event="debug">
-                        <i class="layui-icon">&#xe857;</i>调试信息
-                    </button>
-                </div>
-            </script>
-            
-            <script type="text/html" id="tableBar">
-                <div class="layui-btn-group">
-                    <button class="layui-btn layui-btn-sm" lay-event="edit">
-                        <i class="layui-icon">&#xe642;</i>
-                    </button>
-                    <button class="layui-btn layui-btn-sm layui-btn-danger" lay-event="delete">
-                        <i class="layui-icon">&#xe640;</i>
-                    </button>
-                </div>
-            </script>
-        </div>
+  <div class="layui-card">
+    <div class="layui-card-header">
+      <span>用户任务列表</span>
     </div>
+    <div class="layui-card-body">
+      <table class="layui-hide" id="player-task-table" lay-filter="player-task-table"></table>
+
+      <script type="text/html" id="tableToolbar">
+        <div class="layui-btn-container">
+          <button class="layui-btn layui-btn-sm" lay-event="refresh"><i class="layui-icon">&#xe669;</i>刷新</button>
+          <button class="layui-btn layui-btn-sm layui-btn-normal" lay-event="debug"><i class="layui-icon">&#xe857;</i>调试信息</button>
+        </div>
+      </script>
+
+      <script type="text/html" id="tableBar">
+        <div class="layui-btn-group">
+          <button class="layui-btn layui-btn-sm" lay-event="edit">
+            <i class="layui-icon">&#xe642;</i>
+          </button>
+          <button class="layui-btn layui-btn-sm layui-btn-danger" lay-event="delete">
+            <i class="layui-icon">&#xe640;</i>
+          </button>
+        </div>
+      </script>
+    </div>
+  </div>
 </div>
-{% endblock %}
-
-{% block extra_css %}
+{% endblock %} {% block extra_css %}
 <style>
-/* 表格区域样式优化 */
-.layui-card {
+  /* 表格区域样式优化 */
+  .layui-card {
     margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,.08);
-}
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  }
 
-.layui-card-body {
+  .layui-card-body {
     background-color: #fff;
     padding: 20px;
     overflow-x: auto;
-}
+  }
 
-/* 表格宽度调整 */
-.layui-table-view {
+  /* 表格宽度调整 */
+  .layui-table-view {
     margin: 0;
     width: 100% !important;
-}
+  }
 
-/* 调整列宽 */
-.layui-table-cell {
+  /* 调整列宽 */
+  .layui-table-cell {
     padding: 8px 15px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
+  }
 
-/* 表格内容区域高度 */
-.layui-table-body {
+  /* 表格内容区域高度 */
+  .layui-table-body {
     max-height: calc(100vh - 300px);
     min-height: 200px;
-}
+  }
 
-/* 列宽度设置 */
-.layui-table th[data-field="task_name"] {
+  /* 列宽度设置 */
+  .layui-table th[data-field="task_name"] {
     min-width: 150px !important;
-}
+  }
 
-.layui-table th[data-field="starttime"],
-.layui-table th[data-field="endtime"],
-.layui-table th[data-field="complete_time"] {
+  .layui-table th[data-field="starttime"],
+  .layui-table th[data-field="endtime"],
+  .layui-table th[data-field="complete_time"] {
     min-width: 160px !important;
-}
+  }
 
-.layui-table th[data-field="points_earned"],
-.layui-table th[data-field="status"] {
+  .layui-table th[data-field="status"] {
     width: 100px !important;
-}
+  }
 
-.layui-table th[data-field="comment"] {
+  .layui-table th[data-field="comment"] {
     min-width: 200px !important;
-}
+  }
 
-/* 状态标签样式 */
-.layui-badge {
+  /* 状态标签样式 */
+  .layui-badge {
     padding: 5px 10px;
     font-size: 12px;
     border-radius: 2px;
     font-weight: normal;
-}
+  }
 
-.layui-badge.layui-bg-blue {
-    background-color: #1E9FFF !important;
-}
+  .layui-badge.layui-bg-blue {
+    background-color: #1e9fff !important;
+  }
 
-.layui-badge.layui-bg-orange {
-    background-color: #FFB800 !important;
-}
+  .layui-badge.layui-bg-orange {
+    background-color: #ffb800 !important;
+  }
 
-.layui-badge.layui-bg-green {
+  .layui-badge.layui-bg-green {
     background-color: #009688 !important;
-}
+  }
 
-/* 表单样式优化 */
-.layui-form {
+  /* 表单样式优化 */
+  .layui-form {
     padding: 25px !important;
-}
+  }
 
-.layui-form-item {
+  .layui-form-item {
     margin-bottom: 20px;
-}
+  }
 
-/* 响应式优化 */
-@media screen and (max-width: 768px) {
+  /* 响应式优化 */
+  @media screen and (max-width: 768px) {
     .layui-card {
-        margin: 10px;
+      margin: 10px;
     }
-    
-    .layui-card-body {
-        padding: 15px;
-    }
-    
-    .layui-btn-sm {
-        height: 28px;
-        line-height: 28px;
-        padding: 0 8px;
-    }
-}
-</style>
-{% endblock %}
 
-{% block extra_scripts %}
+    .layui-card-body {
+      padding: 15px;
+    }
+
+    .layui-btn-sm {
+      height: 28px;
+      line-height: 28px;
+      padding: 0 8px;
+    }
+  }
+</style>
+{% endblock %} {% block extra_scripts %}
 <script>
-layui.use(['table', 'form', 'layer', 'laydate', 'jquery'], function(){
+  layui.use(["table", "form", "layer", "laydate", "jquery"], function () {
     var table = layui.table,
-        form = layui.form,
-        layer = layui.layer,
-        laydate = layui.laydate,
-        $ = layui.jquery;
-    
-    console.log('Layui modules loaded:', {table, form, layer, laydate});
-    
+      form = layui.form,
+      layer = layui.layer,
+      laydate = layui.laydate,
+      $ = layui.jquery;
+
+    console.log("Layui modules loaded:", { table, form, layer, laydate });
+
     // 添加时间戳转换函数
     function dateToTimestamp(dateStr) {
-        if (!dateStr) return null;
-        var date = new Date(dateStr);
-        return Math.floor(date.getTime() / 1000);
+      if (!dateStr) return null;
+      var date = new Date(dateStr);
+      return Math.floor(date.getTime() / 1000);
     }
-    
+
     // 时间戳转日期字符串函数
     function formatTimestamp(timestamp) {
-        if (!timestamp) return '';
-        var date = new Date(timestamp * 1000);
-        return date.getFullYear() + '-' +
-            String(date.getMonth() + 1).padStart(2, '0') + '-' +
-            String(date.getDate()).padStart(2, '0') + ' ' +
-            String(date.getHours()).padStart(2, '0') + ':' +
-            String(date.getMinutes()).padStart(2, '0') + ':' +
-            String(date.getSeconds()).padStart(2, '0');
+      if (!timestamp) return "";
+      var date = new Date(timestamp * 1000);
+      return (
+        date.getFullYear() +
+        "-" +
+        String(date.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(date.getDate()).padStart(2, "0") +
+        " " +
+        String(date.getHours()).padStart(2, "0") +
+        ":" +
+        String(date.getMinutes()).padStart(2, "0") +
+        ":" +
+        String(date.getSeconds()).padStart(2, "0")
+      );
     }
-    
+
     // 初始化表格
     var tableIns = table.render({
-        elem: '#player-task-table',
-        url: '/admin/api/player_tasks',
-        toolbar: '#tableToolbar',
-        defaultToolbar: ['filter', 'exports', 'print'],
-        height: 'full-200',  // 自适应高度，减去页面其他区域高度
-        cellMinWidth: 40,    // 设置列的最小宽度
-        size: 'lg',         // 使用大尺寸表格
+      elem: "#player-task-table",
+      url: "/admin/api/player_tasks",
+      toolbar: "#tableToolbar",
+      defaultToolbar: ["filter", "exports", "print"],
+      height: "full-200", // 自适应高度，减去页面其他区域高度
+      cellMinWidth: 40, // 设置列的最小宽度
+      size: "lg", // 使用大尺寸表格
 
-        cols: [[
-            {field: 'id', title: 'ID', sort: true, width: 80, fixed: 'left'},
-            {field: 'player_id', title: '玩家ID', width: 100},
-            {field: 'task_id', title: '任务ID', width: 100},
-            {field: 'task_name', title: '任务名称', minWidth: 150},
-            {field: 'starttime', title: '开始时间', sort: true, minWidth: 160, templet: function(d){
-                return formatTimestamp(d.starttime);
-            }},
-            {field: 'endtime', title: '结束时间', sort: true, minWidth: 160, templet: function(d){
-                return formatTimestamp(d.endtime);
-            }},
-            {field: 'points_earned', title: '获得积分', width: 100},
-            {field: 'status', title: '状态', width: 100, templet: function(d){
-                var statusMap = {
-                    'available': '<span class="layui-badge layui-bg-blue">可用</span>',
-                    'IN_PROGRESS': '<span class="layui-badge layui-bg-orange">进行中</span>',
-                    'COMPLETED': '<span class="layui-badge layui-bg-green">已完成</span>'
-                };
-                return statusMap[d.status] || d.status;
-            }},
-            {field: 'complete_time', title: '完成时间', minWidth: 160, templet: function(d){
-                return formatTimestamp(d.complete_time);
-            }},
-            {field: 'comment', title: '备注', minWidth: 200},
-            {fixed: 'right', title: '操作', toolbar: '#tableBar', width: 120}
-        ]],
-        parseData: function(res) {
-            console.log('Parsing response data:', res);
+      cols: [
+        [
+          { field: "id", title: "ID", sort: true, width: 80, fixed: "left" },
+          { field: "player_id", title: "玩家ID", width: 100 },
+          { field: "task_id", title: "任务ID", width: 100 },
+          { field: "task_name", title: "任务名称", minWidth: 150 },
+          {
+            field: "starttime",
+            title: "开始时间",
+            sort: true,
+            minWidth: 160,
+            templet: function (d) {
+              return formatTimestamp(d.starttime);
+            },
+          },
+          {
+            field: "endtime",
+            title: "结束时间",
+            sort: true,
+            minWidth: 160,
+            templet: function (d) {
+              return formatTimestamp(d.endtime);
+            },
+          },
+          {
+            field: "status",
+            title: "状态",
+            width: 100,
+            templet: function (d) {
+              var statusMap = {
+                available: '<span class="layui-badge layui-bg-blue">可用</span>',
+                IN_PROGRESS: '<span class="layui-badge layui-bg-orange">进行中</span>',
+                COMPLETED: '<span class="layui-badge layui-bg-green">已完成</span>',
+                UNFINISH: '<span class="layui-badge layui-bg-black">未完成</span>',
+              };
+              return statusMap[d.status] || d.status;
+            },
+          },
+          {
+            field: "complete_time",
+            title: "完成时间",
+            minWidth: 160,
+            templet: function (d) {
+              return formatTimestamp(d.complete_time);
+            },
+          },
+          { field: "comment", title: "备注", minWidth: 200 },
+          { fixed: "right", title: "操作", toolbar: "#tableBar", width: 120 },
+        ],
+      ],
+      parseData: function (res) {
+        console.log("Parsing response data:", res);
+        return {
+          code: res.code,
+          msg: res.msg,
+          count: res.count,
+          data: res.data.map(function (item) {
             return {
-                "code": res.code,
-                "msg": res.msg,
-                "count": res.count,
-                "data": res.data.map(function(item) {
-                    return {
-                        id: item.id,
-                        player_id: item.player_id,
-                        task_id: item.task_id,
-                        task_name: item.task_name,
-                        starttime: item.starttime,
-                        endtime: item.endtime,
-                        points_earned: item.points_earned,
-                        status: item.status,
-                        complete_time: item.complete_time,
-                        comment: item.comment
-                    };
-                })
+              id: item.id,
+              player_id: item.player_id,
+              task_id: item.task_id,
+              task_name: item.task_name,
+              starttime: item.starttime,
+              endtime: item.endtime,
+              status: item.status,
+              complete_time: item.complete_time,
+              comment: item.comment,
             };
-        },
-        page: true,
-        limit: 20,
-        limits: [10, 20, 50, 100],
-        done: function(res) {
-            console.log('Table rendered:', res);
-            updateDebugInfo({total: res.count, page: this.page});
-            $('.layui-table-cell').css('height', 'auto');  // 允许内容自动换行
-        }
+          }),
+        };
+      },
+      page: true,
+      limit: 20,
+      limits: [10, 20, 50, 100],
+      done: function (res) {
+        console.log("Table rendered:", res);
+        updateDebugInfo({ total: res.count, page: this.page });
+        $(".layui-table-cell").css("height", "auto"); // 允许内容自动换行
+      },
     });
-    
+
     // 表格工具栏事件
-    table.on('toolbar(player-task-table)', function(obj){
-        console.log('Toolbar event:', obj);
-        if(obj.event === 'refresh'){
-            tableIns.reload();
-        } else if(obj.event === 'debug') {
-            layer.alert('当前表格配置：' + JSON.stringify(tableIns.config, null, 2));
-        }
+    table.on("toolbar(player-task-table)", function (obj) {
+      console.log("Toolbar event:", obj);
+      if (obj.event === "refresh") {
+        tableIns.reload();
+      } else if (obj.event === "debug") {
+        layer.alert("当前表格配置：" + JSON.stringify(tableIns.config, null, 2));
+      }
     });
-    
+
     // 表格行工具事件
-    table.on('tool(player-task-table)', function(obj){
-        var data = obj.data;
-        if(obj.event === 'edit'){
-            layer.open({
-                type: 1,
-                title: '编辑用户任务',
-                area: ['500px', '600px'],
-                content: `
+    table.on("tool(player-task-table)", function (obj) {
+      var data = obj.data;
+      if (obj.event === "edit") {
+        layer.open({
+          type: 1,
+          title: "编辑用户任务",
+          area: ["500px", "600px"],
+          content: `
                     <form class="layui-form" lay-filter="edit-form" style="padding: 20px;">
                         <input type="hidden" name="id" value="${data.id}">
                         <div class="layui-form-item">
@@ -284,19 +299,14 @@ layui.use(['table', 'form', 'layer', 'laydate', 'jquery'], function(){
                                 <input type="text" name="endtime" class="layui-input" id="endtime" value="${formatTimestamp(data.endtime)}">
                             </div>
                         </div>
-                        <div class="layui-form-item">
-                            <label class="layui-form-label">获得积分</label>
-                            <div class="layui-input-block">
-                                <input type="number" name="points_earned" class="layui-input" value="${data.points_earned || 0}">
-                            </div>
-                        </div>
+
                         <div class="layui-form-item">
                             <label class="layui-form-label">状态</label>
                             <div class="layui-input-block">
                                 <select name="status" lay-verify="required">
-                                    <option value="available" ${data.status === 'available' ? 'selected' : ''}>可用</option>
-                                    <option value="IN_PROGRESS" ${data.status === 'IN_PROGRESS' ? 'selected' : ''}>进行中</option>
-                                    <option value="COMPLETED" ${data.status === 'COMPLETED' ? 'selected' : ''}>已完成</option>
+                                    <option value="available" ${data.status === "available" ? "selected" : ""}>可用</option>
+                                    <option value="IN_PROGRESS" ${data.status === "IN_PROGRESS" ? "selected" : ""}>进行中</option>
+                                    <option value="COMPLETED" ${data.status === "COMPLETED" ? "selected" : ""}>已完成</option>
                                 </select>
                             </div>
                         </div>
@@ -309,7 +319,7 @@ layui.use(['table', 'form', 'layer', 'laydate', 'jquery'], function(){
                         <div class="layui-form-item layui-form-text">
                             <label class="layui-form-label">备注</label>
                             <div class="layui-input-block">
-                                <textarea name="comment" class="layui-textarea">${data.comment || ''}</textarea>
+                                <textarea name="comment" class="layui-textarea">${data.comment || ""}</textarea>
                             </div>
                         </div>
                         <div class="layui-form-item">
@@ -320,100 +330,99 @@ layui.use(['table', 'form', 'layer', 'laydate', 'jquery'], function(){
                         </div>
                     </form>
                 `,
-                success: function(){
-                    form.render();
-                    
-                    // 初始化日期选择器
-                    laydate.render({
-                        elem: '#starttime',
-                        type: 'datetime',
-                        format: 'yyyy-MM-dd HH:mm:ss'
-                    });
-                    laydate.render({
-                        elem: '#endtime',
-                        type: 'datetime',
-                        format: 'yyyy-MM-dd HH:mm:ss'
-                    });
-                    laydate.render({
-                        elem: '#complete_time',
-                        type: 'datetime',
-                        format: 'yyyy-MM-dd HH:mm:ss'
-                    });
-                }
-            });
-        } else if(obj.event === 'delete'){
-            layer.confirm('确定删除该任务记录吗？', function(index){
-                $.ajax({
-                    url: '/admin/api/player_tasks/' + data.id,
-                    method: 'DELETE',
-                    success: function(res){
-                        if(res.code === 0) {
-                            layer.msg('删除成功');
-                            // 重新加载表格数据
-                            table.reload('player-task-table', {
-                                page: {
-                                    curr: 1 // 重新从第一页开始
-                                }
-                            });
-                        } else {
-                            layer.msg('删除失败：' + res.msg);
-                        }
-                    },
-                    error: function(xhr){
-                        layer.msg('删除失败：' + (xhr.responseJSON?.msg || '未知错误'));
-                    }
-                });
-                layer.close(index);
-            });
-        }
-    });
-    
-    // 监听表单提交
-    form.on('submit(saveEdit)', function(data){
-        console.log('Form submit triggered:', data.field);
-        var formData = {
-            id: data.field.id,
-            player_id: parseInt(data.field.player_id),
-            task_id: parseInt(data.field.task_id),
-            starttime: dateToTimestamp(data.field.starttime),
-            endtime: dateToTimestamp(data.field.endtime),
-            points_earned: parseInt(data.field.points_earned) || 0,
-            status: data.field.status,
-            complete_time: dateToTimestamp(data.field.complete_time),
-            comment: data.field.comment
-        };
-        
-        console.log('Submitting data:', formData);
+          success: function () {
+            form.render();
 
-        $.ajax({
-            url: '/admin/api/player_tasks/' + formData.id,
-            method: 'PUT',
-            contentType: 'application/json',
-            data: JSON.stringify(formData),
-            success: function(res){
-                console.log('API response:', res);
-                if(res.code === 0) {
-                    layer.closeAll();
-                    layer.msg('保存成功');
-                    // 强制刷新表格数据
-                    table.reload('player-task-table', {
-                        url: '/admin/api/player_tasks?_t=' + new Date().getTime(),
-                        page: {
-                            curr: 1
-                        }
-                    });
-                } else {
-                    layer.msg('保存失败：' + res.msg);
-                }
-            },
-            error: function(xhr){
-                console.error('API error:', xhr);
-                layer.msg('保存失败：' + (xhr.responseJSON?.msg || '未知错误'));
-            }
+            // 初始化日期选择器
+            laydate.render({
+              elem: "#starttime",
+              type: "datetime",
+              format: "yyyy-MM-dd HH:mm:ss",
+            });
+            laydate.render({
+              elem: "#endtime",
+              type: "datetime",
+              format: "yyyy-MM-dd HH:mm:ss",
+            });
+            laydate.render({
+              elem: "#complete_time",
+              type: "datetime",
+              format: "yyyy-MM-dd HH:mm:ss",
+            });
+          },
         });
-        
-        return false;  // 阻止表单默认提交
+      } else if (obj.event === "delete") {
+        layer.confirm("确定删除该任务记录吗？", function (index) {
+          $.ajax({
+            url: "/admin/api/player_tasks/" + data.id,
+            method: "DELETE",
+            success: function (res) {
+              if (res.code === 0) {
+                layer.msg("删除成功");
+                // 重新加载表格数据
+                table.reload("player-task-table", {
+                  page: {
+                    curr: 1, // 重新从第一页开始
+                  },
+                });
+              } else {
+                layer.msg("删除失败：" + res.msg);
+              }
+            },
+            error: function (xhr) {
+              layer.msg("删除失败：" + (xhr.responseJSON?.msg || "未知错误"));
+            },
+          });
+          layer.close(index);
+        });
+      }
     });
-});
+
+    // 监听表单提交
+    form.on("submit(saveEdit)", function (data) {
+      console.log("Form submit triggered:", data.field);
+      var formData = {
+        id: data.field.id,
+        player_id: parseInt(data.field.player_id),
+        task_id: parseInt(data.field.task_id),
+        starttime: dateToTimestamp(data.field.starttime),
+        endtime: dateToTimestamp(data.field.endtime),
+        status: data.field.status,
+        complete_time: dateToTimestamp(data.field.complete_time),
+        comment: data.field.comment,
+      };
+
+      console.log("Submitting data:", formData);
+
+      $.ajax({
+        url: "/admin/api/player_tasks/" + formData.id,
+        method: "PUT",
+        contentType: "application/json",
+        data: JSON.stringify(formData),
+        success: function (res) {
+          console.log("API response:", res);
+          if (res.code === 0) {
+            layer.closeAll();
+            layer.msg("保存成功");
+            // 强制刷新表格数据
+            table.reload("player-task-table", {
+              url: "/admin/api/player_tasks?_t=" + new Date().getTime(),
+              page: {
+                curr: 1,
+              },
+            });
+          } else {
+            layer.msg("保存失败：" + res.msg);
+          }
+        },
+        error: function (xhr) {
+          console.error("API error:", xhr);
+          layer.msg("保存失败：" + (xhr.responseJSON?.msg || "未知错误"));
+        },
+      });
+
+      return false; // 阻止表单默认提交
+    });
+  });
 </script>
-{% endblock %} 
+{% endblock %}

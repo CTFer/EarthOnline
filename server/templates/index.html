@@ -1,379 +1,166 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>EarthOnline Backend Monitor</title>
+    <title>团总的地球Online</title>
     <meta charset="UTF-8">
-    <link rel="stylesheet" href="/static/css/monitor.css">
-    <script src="static/js/socket.io.js"></script>
+    <!-- 添加缓存控制 meta 标签 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <link rel="stylesheet" href="/static/css/swiper-bundle.min.css">
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <!-- 修改 CSS 引用，添加随机参数 -->
+    <link rel="stylesheet" href="/static/css/client/index.min.css?v=1.0.1" id="mainStyle">
 
-        
-    <script>
-        let socket;
-        let selectedRequestId = null;
-        
-        // 添加 UTF-8 编码和解码辅助函数
-        function utf8_to_b64(str) {
-            try {
-                return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
-                    function toSolidBytes(match, p1) {
-                        return String.fromCharCode('0x' + p1);
-                    }));
-            } catch (e) {
-                console.error('Encoding error:', e);
-                return '';
-            }
-        }
-
-        function b64_to_utf8(str) {
-            try {
-                return decodeURIComponent(atob(str).split('').map(function(c) {
-                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                }).join(''));
-            } catch (e) {
-                console.error('Decoding error:', e);
-                return '';
-            }
-        }
-
-        // 添加初始数据加载函数
-        async function loadInitialData() {
-            try {
-                const method = document.getElementById('method-filter').value;
-                const path = document.getElementById('path-filter').value;
-                const response = await fetch(`/api/logs?method=${method}&path=${path}`);
-                const logs = await response.json();
-                updateLogs(logs);
-            } catch (error) {
-                console.error('Failed to load initial data:', error);
-            }
-        }
-        
-        function initWebSocket() {
-            socket = io({
-                transports: ['websocket'], // 强制使用WebSocket
-                upgrade: false, // 禁用轮询
-                reconnectionDelay: 1000, // 重连延迟
-                reconnectionAttempts: 5, // 重连尝试次数
-                timeout: 5000 // 连接超时
-            });
-            
-            socket.on('connect', () => {
-                console.log('WebSocket connected');
-                updateConnectionStatus(true);
-            });
-            
-            socket.on('connected', () => {
-                // WebSocket连接成功后加载初始数据
-                loadInitialData();
-            });
-            
-            socket.on('disconnect', () => {
-                console.log('WebSocket disconnected');
-                updateConnectionStatus(false);
-            });
-            
-            socket.on('log_update', (data) => {
-                if (data.latest) {
-                    // 只更新最新的日志条目
-                    updateLatestLog(data.latest);
-                    showNotification(data.latest);
-                }
-            });
-        }
-        
-        // 添加更新最新日志的函数
-        function updateLatestLog(latestLog) {
-            const requestsList = document.querySelector('.requests-list');
-            const encodedLog = utf8_to_b64(JSON.stringify(latestLog));
-            const newLogHtml = `
-                <div class="request-item" 
-                     onclick="selectRequest(0, '${encodedLog}')">
-                    <div class="timestamp">${latestLog.timestamp}</div>
-                    <div>
-                        <span class="method ${latestLog.method}">${latestLog.method}</span>
-                        <span class="path">${latestLog.path}</span>
-                    </div>
-                </div>
-            `;
-            
-            if (requestsList.firstChild) {
-                requestsList.insertAdjacentHTML('afterbegin', newLogHtml);
-            } else {
-                requestsList.innerHTML = newLogHtml;
-            }
-            
-            const maxLogs = 100;
-            const logs = requestsList.querySelectorAll('.request-item');
-            if (logs.length > maxLogs) {
-                logs[logs.length - 1].remove();
-            }
-        }
-        
-        function updateConnectionStatus(connected) {
-            const statusDot = document.querySelector('.status-dot');
-            const statusText = document.querySelector('.status-text');
-            
-            statusDot.style.backgroundColor = connected ? '#4CAF50' : '#F44336';
-            statusText.textContent = connected ? 'WebSocket已连接' : 'WebSocket已断开';
-        }
-        
-        function updateLogs(logs) {
-            const requestsList = document.querySelector('.requests-list');
-            if (!logs || logs.length === 0) {
-                requestsList.innerHTML = '<div class="empty-tip">暂无请求记录</div>';
-                return;
-            }
-            
-            requestsList.innerHTML = logs.map((log, index) => {
-                // 使用新的编码函数
-                const encodedLog = utf8_to_b64(JSON.stringify(log));
-                return `
-                    <div class="request-item ${selectedRequestId === index ? 'selected' : ''}" 
-                         onclick="selectRequest(${index}, '${encodedLog}')">
-                        <div class="timestamp">${log.timestamp}</div>
-                        <div>
-                            <span class="method ${log.method}">${log.method}</span>
-                            <span class="path">${log.path}</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        function selectRequest(id, encodedLog) {
-            try {
-                const log = JSON.parse(b64_to_utf8(encodedLog));
-                
-                selectedRequestId = id;
-                const items = document.querySelectorAll('.request-item');
-                items.forEach(item => item.classList.remove('selected'));
-                items[id].classList.add('selected');
-                
-                const detailsPanel = document.querySelector('.details-panel');
-                
-                // 创建请求详情的副本，移除响应数据
-                const requestDetails = { ...log };
-                delete requestDetails.response;
-                
-                // 获取状态码的类名
-                const statusClass = log.response ? 
-                    `status-${Math.floor(log.response.status_code/100)}xx` : 
-                    'status-unknown';
-                    
-                detailsPanel.innerHTML = `
-                    <div class="details-container">
-                        <!-- 请求详情部分 -->
-                        <div class="request-details">
-                            <h3>请求详情</h3>
-                            <pre class="details-content">${JSON.stringify(requestDetails, null, 2)}</pre>
-                        </div>
-
-                        <!-- 响应数据部分 -->
-                        <div class="response-details">
-                            <h3>响应数据</h3>
-                            ${log.response ? `
-                                <div class="response-header">
-                                    <div class="response-info">
-                                        <span class="status-badge ${statusClass}">
-                                            Status: ${log.response.status_code}
-                                        </span>
-                                        <span class="response-time">
-                                            ${log.timestamp}
-                                        </span>
-                                    </div>
-                                    <div class="view-toggle">
-                                        <button class="btn-toggle active" onclick="toggleResponseView(this, 'formatted')">格式化</button>
-                                        <button class="btn-toggle" onclick="toggleResponseView(this, 'raw')">原始数据</button>
-                                    </div>
-                                </div>
-                                <div class="response-content">
-                                    <div class="formatted-view active">
-                                        ${formatResponseData(log.response.data)}
-                                    </div>
-                                    <div class="raw-view">
-                                        <pre class="details-content">${JSON.stringify(log.response.data, null, 2)}</pre>
-                                    </div>
-                                </div>
-                            ` : '<div class="empty-tip">无响应数据</div>'}
-                        </div>
-                    </div>
-                `;
-            } catch (error) {
-                console.error('Error processing log:', error);
-                alert('处理日志数据时出错');
-            }
-        }
-        
-        // 修改响应数据视图切换函数
-        function toggleResponseView(button, viewType) {
-            // 切换按钮状态
-            const buttons = button.parentElement.querySelectorAll('.btn-toggle');
-            buttons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-            
-            // 在响应数据区域内查找视图
-            const responseContent = button.closest('.response-details').querySelector('.response-content');
-            const formattedView = responseContent.querySelector('.formatted-view');
-            const rawView = responseContent.querySelector('.raw-view');
-            
-            if (viewType === 'formatted') {
-                formattedView.classList.add('active');
-                rawView.classList.remove('active');
-            } else {
-                formattedView.classList.remove('active');
-                rawView.classList.add('active');
-            }
-        }
-        
-        // 添加响应数据格式化函数
-        function formatResponseData(data) {
-            if (!data) return '<div class="empty-tip">无数据</div>';
-            
-            try {
-                // 如果数据已经是对象（已经被解析过）
-                if (typeof data === 'object') {
-                    // 如果是数组，创建表格视图
-                    if (Array.isArray(data)) {
-                        if (data.length === 0) return '<div class="empty-tip">空数组</div>';
-                        
-                        // 获取所有可能的键
-                        const keys = [...new Set(data.flatMap(item => Object.keys(item)))];
-                        
-                        return `
-                            <table class="response-table">
-                                <thead>
-                                    <tr>
-                                        ${keys.map(key => `<th>${key}</th>`).join('')}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${data.map(item => `
-                                        <tr>
-                                            ${keys.map(key => `
-                                                <td>${formatValue(item[key])}</td>
-                                            `).join('')}
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        `;
-                    }
-                    
-                    // 如果是普通对象，创建键值对视图
-                    return `
-                        <div class="response-object">
-                            ${Object.entries(data).map(([key, value]) => `
-                                <div class="response-item">
-                                    <span class="response-key">${key}:</span>
-                                    <span class="response-value">${formatValue(value)}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `;
-                }
-                
-                // 如果是字符串，尝试解析JSON
-                if (typeof data === 'string') {
-                    try {
-                        const parsed = JSON.parse(data);
-                        return formatResponseData(parsed);
-                    } catch {
-                        return `<pre>${data}</pre>`;
-                    }
-                }
-                
-                return `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-            } catch (error) {
-                console.error('Error formatting response:', error);
-                return `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-            }
-        }
-
-        // 格式化值的辅助函数
-        function formatValue(value) {
-            if (value === null) return '<span class="null-value">null</span>';
-            if (value === undefined) return '<span class="undefined-value">undefined</span>';
-            if (typeof value === 'object') return JSON.stringify(value);
-            if (typeof value === 'boolean') return value ? 'true' : 'false';
-            return value;
-        }
-        
-        function switchTab(tabName) {
-            // 切换按钮样式
-            const buttons = document.querySelectorAll('.tab-button');
-            buttons.forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.getAttribute('data-tab') === tabName) {
-                    btn.classList.add('active');
-                }
-            });
-            
-            // 切换内容显示
-            const contents = document.querySelectorAll('.tab-content');
-            contents.forEach(content => {
-                content.classList.remove('active');
-                if (content.id === `${tabName}-tab`) {
-                    content.classList.add('active');
-                }
-            });
-        }
-        
-        function filterLogs() {
-            const method = document.getElementById('method-filter').value;
-            const path = document.getElementById('path-filter').value;
-            socket.emit('filter_logs', { method, path });
-            return false;
-        }
-        
-        function clearLogs() {
-            if (confirm('确定要清除所有日志吗？')) {
-                socket.emit('clear_logs');
-                document.querySelector('.details-panel').innerHTML = '';
-                selectedRequestId = null;
-            }
-        }
-        
-        window.onload = function() {
-            // 先加载初始数据，再初始化WebSocket
-            loadInitialData().then(() => {
-                initWebSocket();
-            });
-        }
-    </script>
+    
+    <!-- Live2D依赖项 -->
+    <script src="/static/js/live2d/live2d.min.js"></script>
+    <script src="/static/js/live2d/live2dcubismcore.min.js"></script>
+    <script src="/static/js/live2d/pixi.min.js"></script>
+    <script src="/static/js/live2d/utils.min.js"></script>
+    <script src="/static/js/live2d/math.min.js"></script>
+    <script src="/static/js/live2d/index.min.js"></script>
 </head>
 <body>
-    <h1>EarthOnline后端请求监控</h1>
-    
-    <div class="control-panel">
-        <form class="filter-form" onsubmit="return filterLogs()">
-            <select id="method-filter" name="method">
-                <option value="">所有方法</option>
-                <option value="GET">GET</option>
-                <option value="POST">POST</option>
-                <option value="PUT">PUT</option>
-                <option value="DELETE">DELETE</option>
-            </select>
-            <input type="text" id="path-filter" name="path" placeholder="路径过滤">
-            <button type="submit" class="btn btn-filter">过滤</button>
-        </form>
-        <button type="button" class="btn btn-clear" onclick="clearLogs()">清除日志</button>
-    </div>
+    <div class="game-container">
+        <!-- 左侧角色面板 -->
+        <div class="character-panel  panel-base">
+            <h2 class="panel-title">
+                <i class="layui-icon layui-icon-user"></i>
+                角色信息
+                <span class="title-decoration"></span>
+            </h2>
+            <div class="character-container">
+                <div class="character-stats">
+                    <!-- 人物形象区域 -->
+                    <div id="live2dContainer"></div>
+                    <!-- 角色基本信息 -->
+                    <div class="character-info">
+                        <div class="info-row nickname-row">
+                            <span class="info-label">昵称</span>
+                            <span class="info-value" id="playerName">加载中...</span>
+                        </div>
+                        <div class="info-row points-row">
+                            <span class="info-label">
+                                <img src="/static/img/points.png" alt="积分">
+                                积分
+                            </span>
+                            <span class="info-value" id="playerPoints">0</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 角色属性 -->
+                    <div class="stat-group">
+                        <div class="stat-item">
+                            <span>生命值</span>
+                            <div class="stat-value">
+                                <div class="stat-bar">
+                                    <div class="stat-bar-inner hp"></div>
+                                </div>
+                                <span id="hp">8666/9999</span>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <span>魔法值</span>
+                            <div class="stat-value">
+                                <div class="stat-bar">
+                                    <div class="stat-bar-inner mp"></div>
+                                </div>
+                                <span id="mp">9999/9999</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-group">
+                        <!-- <div class="stat-item">
+                            <span>物攻</span>
+                            <span id="physicalAtk">99999</span>
+                        </div> -->
 
-    <div class="container">
-        <div class="requests-panel">
-            <div class="requests-list">
-                <!-- 请求列表将通过WebSocket动态更新 -->
+                    </div>
+                    <div class="exp-section">
+                        <div class="exp-bar">
+                            <div class="exp-bar-inner"></div>
+                        </div>
+                        <div class="exp-info">
+                            <span class="level">66/100</span>
+                            <span class="exp">75666/99999</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="details-panel">
-            <!-- 选中的请求详情将在这里显示 -->
-            <div class="empty-tip">选择左侧请求查看详情</div>
+
+
+        <!-- 中间主内容区 -->
+        <div class="main-content panel-base">
+            <!-- 上半部分：Live2D展示区 -->
+            <div class="main-content-top">
+                <h2 class="panel-title">
+                    <i class="layui-icon layui-icon-location"></i>
+                    个人画像
+                    <span class="title-decoration"></span>
+                </h2>
+                <div id="wordCloudContainer" class="word-cloud-container">
+                    <!-- 文字云将通过JS动态生成 -->
+                </div>
+            </div>
+            
+            <!-- 下半部分：进行中的任务 -->
+            <div class="main-content-bottom">
+                <h2 class="panel-title">
+                    <i class="layui-icon layui-icon-loading"></i>
+                    进行中的任务
+                    <span class="title-decoration"></span>
+                </h2>
+                <!-- 任务容器 -->
+                <div class="active-tasks-wrapper">
+                    <div class="swiper active-tasks-swiper">
+                        <div class="swiper-wrapper task-panel">
+                            <!-- 任务将在这里生成 -->
+                        </div>
+                        <div class="swiper-pagination"></div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧任务列表 -->
+        <div class="task-panel panel-base">
+            <h2 class="panel-title">
+                <i class="layui-icon layui-icon-flag"></i>
+                可用任务
+                <span class="title-decoration"></span>
+            </h2>
+            <div class="task-list-container">
+                <div id="taskList">
+                    <!-- 任务卡片将通过JS动态加载 -->
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- WebSocket状态显示 -->
     <div class="websocket-status">
         <span class="status-dot"></span>
-        <span class="status-text">正在连接...</span>
+        <span class="status-text">WebSocket连接中...</span>
     </div>
+
+    <!-- 脚本引用 -->
+    <script src="/static/js/swiper-bundle.min.js"></script>
+    <script src="/static/layui/layui.js"></script>
+    <script src="/static/js/socket.io.js"></script>
+    <script src="/static/js/client/live2d-config.js"></script>
+    <script src="/static/js/client/config.js"></script>
+    <script src="/static/js/client/utils.js"></script>
+    <script src="/static/js/client/game.js?v=1.0.1" id="mainJs"></script>
+    <script src="/static/js/echarts.min.js"></script>
+    <script src="/static/js/echarts-wordcloud.min.js"></script>
+    <script>
+        // 生成随机版本号
+        document.getElementById('mainStyle').href = '/static/css/client/index.min.css?v=' + Math.random();
+        document.getElementById('mainJs').src = '/static/js/client/game.js?v=1' + Math.random();
+    </script>
 </body>
-</html> 
+</html>

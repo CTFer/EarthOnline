@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NFC接口测试</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <script src="/static/layui/layui.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        .container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+        }
+        .left-panel {
+            flex: 1;
+        }
+        .right-panel {
+            flex: 1;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #e6e6e6;
+            background-color: #f9f9f9;
+            min-height: 100px;
+        }
+        .socket-messages {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #e6e6e6;
+            background-color: #f9f9f9;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .message {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .message.success {
+            background-color: #f0f9eb;
+            color: #67c23a;
+            border: 1px solid #c2e7b0;
+        }
+        .message.error {
+            background-color: #fef0f0;
+            color: #f56c6c;
+            border: 1px solid #fbc4c4;
+        }
+        .message.info {
+            background-color: #f4f4f5;
+            color: #909399;
+            border: 1px solid #d3d4d6;
+        }
+        .message-time {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 5px;
+        }
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #f56c6c;
+            margin-right: 10px;
+        }
+        .status-dot.connected {
+            background-color: #67c23a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <h2>NFC接口测试</h2>
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span class="status-text">WebSocket未连接</span>
+            </div>
+            <form class="layui-form" id="nfcForm">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">卡片类型</label>
+                    <div class="layui-input-inline">
+                        <select name="type" lay-verify="required">
+                            <option value="ID">身份识别卡</option>
+                            <option value="TASK">任务卡片</option>
+                            <option value="POINTS">积分卡片</option>
+                            <option value="CARD">道具卡片</option>
+                            <option value="MEDAL">勋章卡片</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="layui-form-item">
+                    <label class="layui-form-label">卡片ID</label>
+                    <div class="layui-input-inline">
+                        <input type="text" name="id" required lay-verify="required" placeholder="请输入卡片ID" class="layui-input">
+                    </div>
+                </div>
+                
+                <div class="layui-form-item">
+                    <label class="layui-form-label">数值</label>
+                    <div class="layui-input-inline">
+                        <input type="number" name="value" required lay-verify="required" placeholder="请输入数值" class="layui-input">
+                    </div>
+                </div>
+                
+                <div class="layui-form-item">
+                    <label class="layui-form-label">玩家ID</label>
+                    <div class="layui-input-inline">
+                        <input type="number" name="player_id" required lay-verify="required" placeholder="请输入玩家ID" class="layui-input">
+                    </div>
+                </div>
+                
+                <div class="layui-form-item">
+                    <div class="layui-input-block">
+                        <button class="layui-btn" lay-submit lay-filter="nfcSubmit">测试</button>
+                        <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                        <button type="button" class="layui-btn layui-btn-danger" id="clearMessages">清空消息</button>
+                    </div>
+                </div>
+            </form>
+            
+            <div class="result">
+                <h3>HTTP响应结果：</h3>
+                <pre id="resultContent"></pre>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <h2>WebSocket消息</h2>
+            <div class="socket-messages" id="socketMessages"></div>
+        </div>
+    </div>
+
+    <script>
+    layui.use(['form', 'layer'], function(){
+        var form = layui.form;
+        var layer = layui.layer;
+        
+        // 初始化Socket连接
+        const socket = io();
+        const statusDot = document.querySelector('.status-dot');
+        const statusText = document.querySelector('.status-text');
+        
+        socket.on('connect', () => {
+            statusDot.classList.add('connected');
+            statusText.textContent = 'WebSocket已连接';
+        });
+
+        socket.on('disconnect', () => {
+            statusDot.classList.remove('connected');
+            statusText.textContent = 'WebSocket已断开';
+        });
+
+        // 监听NFC任务更新
+        socket.on('nfc_task_update', (data) => {
+            const messagesDiv = document.getElementById('socketMessages');
+            const messageDiv = document.createElement('div');
+            
+            // 根据消息类型设置样式
+            let messageClass = 'info';
+            if (data.type === 'ERROR') {
+                messageClass = 'error';
+            } else if (['NEW_TASK', 'COMPLETE', 'CHECK'].includes(data.type)) {
+                messageClass = 'success';
+            }
+            
+            messageDiv.className = `message ${messageClass}`;
+            
+            // 添加时间戳
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = new Date().toLocaleString();
+            messageDiv.appendChild(timeDiv);
+            
+            // 添加消息内容
+            const contentDiv = document.createElement('div');
+            contentDiv.innerHTML = `
+                <strong>${data.type}:</strong> ${data.message}
+                ${data.task ? `<br>任务信息：${JSON.stringify(data.task, null, 2)}` : ''}
+            `;
+            messageDiv.appendChild(contentDiv);
+            
+            messagesDiv.insertBefore(messageDiv, messagesDiv.firstChild);
+        });
+        
+        // 表单提交处理
+        form.on('submit(nfcSubmit)', function(data){
+            // 加入房间
+            socket.emit('join', { room: `user_${data.field.player_id}` });
+            
+            fetch('/api/nfc_post', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data.field)
+            })
+            .then(response => response.json())
+            .then(result => {
+                document.getElementById('resultContent').textContent = 
+                    JSON.stringify(result, null, 2);
+            })
+            .catch(error => {
+                layer.msg('请求失败: ' + error);
+            });
+            
+            return false;
+        });
+        
+        // 清空消息按钮处理
+        document.getElementById('clearMessages').addEventListener('click', function() {
+            document.getElementById('socketMessages').innerHTML = '';
+        });
+    });
+    </script>
+</body>
+</html> 
