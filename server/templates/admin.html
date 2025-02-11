@@ -3,10 +3,12 @@
   <head>
     <title>游戏管理后台</title>
     <link rel="stylesheet" href="/static/layui/css/layui.css" />
-    <link rel="stylesheet" href="/static/css/admin.css" />
+
     <link rel="stylesheet" href="/static/css/mobile.min.css" />
     <script src="/static/js/crypto-js.min.js"></script>
+    <script src="/static/js/config.js"></script>
     <script src="/static/layui/layui.js"></script>
+    <script src="/static/js/socket.io.js"></script>
     <script src="/static/js/admin/taskForm.js"></script>
   </head>
   <body>
@@ -43,6 +45,7 @@
             <tr>
               <th>ID</th>
               <th>玩家名</th>
+              <th>性别</th>
               <th>等级</th>
               <th>经验</th>
               <th>积分</th>
@@ -60,16 +63,25 @@
           <button class="layui-btn" onclick="showAddNFCCardForm()">添加NFC卡片</button>
           <button class="layui-btn layui-btn-normal" onclick="showWriteNFCForm()">写入NFC卡片</button>
         </div>
-        <!-- NFC设备状态 -->
-        <div class="nfc-device-status">
-          <div class="status-item">
-            <span class="label">设备状态：</span>
-            <span id="deviceStatus" class="status">未连接</span>
+        <!-- NFC设备状态面板 -->
+        <div class="nfc-status-panel">
+          <div class="status-header">
+            <button class="layui-btn" id="checkNFCStatus"><i class="layui-icon layui-icon-refresh"></i> 检查设备状态</button>
+            <span id="lastCheckTime" class="layui-text"></span>
           </div>
-          <div class="status-item">
-            <span class="label">卡片状态：</span>
-            <span id="cardStatus" class="status">未检测到卡片</span>
+          <div class="device-status">
+            <span>设备状态：</span>
+            <span id="deviceStatus" class="status">未知</span>
+            <span id="portInfo" class="port-info"></span>
           </div>
+          <div class="card-status">
+            <span>卡片状态：</span>
+            <span id="cardStatus" class="status">未检测</span>
+          </div>
+        </div>
+        <div class="nfc-operations">
+          <button class="layui-btn" >写入卡片</button>
+          <button class="layui-btn layui-btn-normal" >读取卡片</button>
         </div>
         <table class="layui-table" id="nfcCardTable" lay-filter="nfcCardTable"></table>
       </div>
@@ -145,6 +157,43 @@
       </div>
     </div>
 
+    <!-- NFC卡片表格工具条 -->
+    <script type="text/html" id="nfcCardTableBar">
+      <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="write">写入</a>
+      <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+      <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+    </script>
+
+    <!-- 任务管理表格工具条 -->
+    <script type="text/html" id="taskTableBar">
+      <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+      <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+    </script>
+
+    <script src="/static/js/admin/admin.js"></script>
+
+    <script>
+      // 确保 layui 正确初始化
+      window.onload = function () {
+        console.log("Window loaded");
+        console.log("layui:", layui);
+        console.log("showTaskFormDialog:", window.showTaskFormDialog);
+      };
+
+      layui
+        .config({
+          version: true,
+        })
+        .use(["layer", "form"], function () {
+          console.log("Layui modules loaded");
+          var layer = layui.layer,
+            form = layui.form;
+
+          console.log("layer:", layer);
+          console.log("form:", form);
+          console.log("showTaskFormDialog available:", typeof window.showTaskFormDialog);
+        });
+    </script>
     <!-- 用户表单模板 -->
     <div id="userForm" class="popup-form">
       <form class="layui-form">
@@ -274,20 +323,20 @@
         <div class="layui-form-item" id="medalSelectContainer" style="display: none">
           <label class="layui-form-label">选择成就</label>
           <div class="layui-input-block">
-              <select name="medalId" lay-filter="medalSelect">
-                  <option value="">请选择成就</option>
-              </select>
+            <select name="medalId" lay-filter="medalSelect">
+              <option value="">请选择成就</option>
+            </select>
           </div>
-      </div>
-      
-      <div class="layui-form-item" id="cardSelectContainer" style="display: none">
+        </div>
+
+        <div class="layui-form-item" id="cardSelectContainer" style="display: none">
           <label class="layui-form-label">选择道具卡</label>
           <div class="layui-input-block">
-              <select name="gameCardId" lay-filter="gameCardSelect">
-                  <option value="">请选择道具卡</option>
-              </select>
+            <select name="gameCardId" lay-filter="gameCardSelect">
+              <option value="">请选择道具卡</option>
+            </select>
           </div>
-      </div>
+        </div>
         <div class="layui-form-item">
           <label class="layui-form-label">卡片ID</label>
           <div class="layui-input-block">
@@ -322,33 +371,73 @@
             <input type="text" name="nfc_form_device" placeholder="请输入设备标识" class="layui-input" />
           </div>
         </div>
+
+        <div class="layui-form-item">
+          <label class="layui-form-label">状态</label>
+          <div class="layui-input-block">
+            <select name="nfc_form_status" lay-filter="nfcStatus" required>
+              <option value="UNLINK">未关联</option>
+              <option value="BAN">未启用</option>
+              <option value="INACTIVE">待激活</option>
+              <option value="ACTIVE">已激活</option>
+              <option value="USED">已使用</option>
+            </select>
+          </div>
+        </div>
       </form>
     </div>
-
-    <script src="/static/js/admin/admin.js"></script>
-
-    <script>
-      // 确保 layui 正确初始化
-      window.onload = function () {
-        console.log("Window loaded");
-        console.log("layui:", layui);
-        console.log("showTaskFormDialog:", window.showTaskFormDialog);
-      };
-
-      layui
-        .config({
-          version: true,
-        })
-        .use(["layer", "form"], function () {
-          console.log("Layui modules loaded");
-          var layer = layui.layer,
-            form = layui.form;
-
-          console.log("layer:", layer);
-          console.log("form:", form);
-          console.log("showTaskFormDialog available:", typeof window.showTaskFormDialog);
-        });
-    </script>
+    <!-- NFC写入表单模板 -->
+    <div class="layui-form" id="nfcWriteForm" lay-filter="nfcWriteForm" style="padding: 20px;display: none;">
+      <div class="layui-form-item">
+        <label class="layui-form-label">卡片ID</label>
+        <div class="layui-input-block">
+          <input type="text" name="card_id" value="" class="layui-input" readonly />
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">类型</label>
+        <div class="layui-input-block">
+          <select name="type" lay-verify="required">
+            <option value="">请选择类型</option>
+            <option value="ID">身份卡</option>
+            <option value="TASK">任务卡</option>
+            <option value="MEDAL">成就卡</option>
+            <option value="Points">积分卡</option>
+            <option value="CARD">道具卡</option>
+          </select>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">玩家ID</label>
+        <div class="layui-input-block">
+          <input type="number" name="player_id" value="0" class="layui-input" lay-verify="required|number" placeholder="0表示所有玩家可用" />
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">关联ID</label>
+        <div class="layui-input-block">
+          <input type="number" name="id" class="layui-input" lay-verify="required|number" placeholder="根据类型关联相应的ID" />
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">数值</label>
+        <div class="layui-input-block">
+          <input type="number" name="value" value="0" class="layui-input" lay-verify="required|number" placeholder="数值或数量" />
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">设备标识</label>
+        <div class="layui-input-block">
+          <input type="text" name="device" class="layui-input" value="" readonly />
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <div class="layui-input-block">
+          <button class="layui-btn" lay-submit lay-filter="nfcWriteSubmit">写入卡片</button>
+          <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+        </div>
+      </div>
+    </div>
     {% endblock %}
   </body>
 </html>

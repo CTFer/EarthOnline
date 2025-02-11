@@ -1,0 +1,93 @@
+/* 卡片风格的单选框样式 */
+.lay-skin-taskcard {
+  display: flex;
+  padding: 12px;
+  border-radius: 4px;
+  border: 2px solid #e5e5e5;
+  color: #000;
+  background-color: #fff;
+  transition: all .3s;
+  cursor: pointer;
+  position: relative;
+  width: 120px;
+  text-align: center;
+  margin: 5px;
+}
+
+/* 卡片内容布局 */
+.lay-skin-taskcard-detail {
+  width: 100%;
+}
+
+/* 卡片标题样式 */
+.lay-skin-taskcard-header {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  padding: 5px 0;
+}
+
+/* 卡片描述文本样式 */
+.lay-skin-taskcard-description {
+  font-size: 12px;
+  color: #666;
+}
+
+/* 悬停效果 */
+.lay-skin-taskcard:hover {
+  border-color: #16b777;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* 选中状态样式 */
+.lay-skin-taskcard.selected,
+.layui-form-radioed[lay-skin="none"] > .lay-skin-taskcard {
+  color: #fff;
+  border-color: #16b777;
+  background-color: rgb(22 183 119 / 10%);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* 选中状态的角标样式 */
+.lay-skin-taskcard.selected:after,
+.layui-form-radioed[lay-skin="none"] > .lay-skin-taskcard:after {
+  position: absolute;
+  content: "";
+  bottom: 2px;
+  right: 2px;
+  width: 0;
+  height: 0;
+  display: inline-block;
+  vertical-align: middle;
+  border: 10px solid transparent;
+  border-radius: 0 0 6px 0;
+  border-right-color: #16b777;
+  border-bottom-color: #16b777;
+  overflow: hidden;
+}
+
+/* 隐藏原始的radio按钮 */
+input[type="radio"][lay-skin="none"] {
+  display: none;
+}
+
+/* 商品类型容器样式 */
+.product-type-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+/* 响应式布局调整 */
+@media screen and (max-width: 768px) {
+  .product-type-container {
+    justify-content: center;
+  }
+  
+  .lay-skin-taskcard {
+    width: calc(50% - 20px);
+  }
+}

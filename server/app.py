@@ -13,12 +13,17 @@ from datetime import datetime, time, timedelta
 from admin import admin_bp
 import os
 import sqlite3
+import logging
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_cors import CORS
 from flask import Flask, jsonify, request, redirect, send_from_directory, make_response, render_template
 from shop import shop_bp  # 确保在同一目录下
-
-
+from function.player_service import player_service
+from function.task_service import task_service
+from function.GPS_service import gps_service
+from config import SERVER_IP, PORT, DEBUG,WAITRESS_CONFIG
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
@@ -137,125 +142,21 @@ def get_db_connection():
 
 
 @app.route('/api/player/<int:player_id>', methods=['GET'])
-def get_player(player_id):
+def get_player_api(player_id):
     """获取角色信息"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            'SELECT * FROM player_data where player_id=?', (player_id,))
-        columns = [description[0] for description in cursor.description]
-        character = cursor.fetchone()
-
-        if character:
-            player_data = dict(zip(columns, character))
-            return jsonify({
-                'code': 0,
-                'msg': '获取角色信息成功',
-                'data': {
-                    'player_id': player_data['player_id'],
-                    'stamina': player_data['stamina'],
-                    'strength': player_data['strength'],
-                    'player_name': player_data['player_name'],
-                    'points': player_data['points'],
-                    'create_time': player_data['create_time'],
-                    'level': player_data['level'],
-                    'experience': player_data['experience']
-                }
-            })
-        else:
-            return jsonify({
-                'code': 1,
-                'msg': '角色不存在',
-                'data': None
-            }), 404
-
-    except sqlite3.Error as e:
-        print("Database error:", str(e))
-        return jsonify({
-            'code': 2,
-            'msg': f'数据库错误: {str(e)}',
-            'data': None
-        }), 500
-    finally:
-        conn.close()
+    print(player_id)    
+    return player_service.get_player(player_id)
 
 
 @app.route('/api/get_players', methods=['GET'])
 def get_players():
     """获取所有玩家"""
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        cursor.execute('''
-            SELECT player_id, player_name 
-            FROM player_data 
-            ORDER BY player_id ASC
-        ''')
-
-        players = [dict(id=row[0], name=row[1]) for row in cursor.fetchall()]
-
-        return jsonify({
-            "code": 0,
-            "msg": "获取玩家列表成功",
-            "data": players
-        })
-
-    except Exception as e:
-        print(f"获取玩家列表出错: {str(e)}")
-        return jsonify({
-            "code": 1,
-            "msg": f"获取玩家列表失败: {str(e)}",
-            "data": None
-        }), 500
-    finally:
-        if conn:
-            conn.close()
-
+    return player_service.get_players()
 
 @app.route('/api/tasks/available/<int:player_id>', methods=['GET'])
 def get_available_tasks(player_id):
     """获取可用任务列表"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT 
-                t.id, t.name, t.description,  t.stamina_cost,
-                t.task_rewards, t.task_type, t.task_status, t.limit_time, t.icon
-            FROM tasks t
-            WHERE t.is_enabled = 1 
-            AND (t.task_scope = 0 OR t.task_scope = ?)
-            AND t.id NOT IN (
-                SELECT task_id FROM player_task WHERE player_id = ?
-            )
-        ''', (player_id, player_id))
-
-        tasks = []
-        columns = [description[0] for description in cursor.description]
-        rows = cursor.fetchall()
-
-        for row in rows:
-            task_dict = dict(zip(columns, row))
-            tasks.append(task_dict)
-
-        return jsonify({
-            'code': 0,
-            'msg': '获取可用任务成功',
-            'data': tasks
-        })
-
-    except sqlite3.Error as e:
-        print(f"Database error: {str(e)}")
-        return jsonify({
-            'code': 1,
-            'msg': f'获取任务失败: {str(e)}',
-            'data': None
-        }), 500
-    finally:
-        conn.close()
+    return task_service.get_available_tasks(player_id)
 
 # 添加获取玩家当前任务的API
 
@@ -263,543 +164,24 @@ def get_available_tasks(player_id):
 @app.route('/api/tasks/current/<int:player_id>', methods=['GET'])
 def get_current_tasks(player_id):
     """获取用户当前未过期的任务列表"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+    return task_service.get_current_tasks(player_id)
 
-        # 获取当前时间戳
-        current_timestamp = int(datetime.now().timestamp())
 
-        # 获取未过期的任务
-        cursor.execute('''
-            SELECT 
-                pt.id,
-                t.name,
-                t.description,
-                t.stamina_cost,
-                pt.starttime,
-                pt.status,
-                t.task_type,
-                pt.endtime,
-                t.icon
-            FROM player_task pt
-            JOIN tasks t ON pt.task_id = t.id
-            WHERE pt.player_id = ? 
-            AND (pt.endtime > ? or pt.endtime is null)
-            ORDER BY pt.starttime DESC
-        ''', (player_id, current_timestamp))
+@app.route('/api/tasks/accept', methods=['POST'])
+def accept_task():
+    data = request.get_json()
+    return task_service.accept_task(data['player_id'], data['task_id'])
 
-        tasks = []
-        for row in cursor.fetchall():
-            tasks.append({
-                'id': row[0],
-                'name': row[1],
-                'description': row[2],
+@app.route('/api/tasks/abandon', methods=['POST'])
+def abandon_task():
+    data = request.get_json()
+    return task_service.abandon_task(data['player_id'], data['task_id'])
 
-                'stamina_cost': row[3],
-                'starttime': row[4],
+@app.route('/api/tasks/complete', methods=['POST'])
+def complete_task_api():
+    data = request.get_json()
+    return task_service.complete_task_api(data['player_id'], data['task_id'])
 
-                'status': row[5],
-                'task_type': row[6],
-                'endtime': row[7],
-                'icon': row[8]
-            })
-
-        return jsonify({
-            'code': 0,
-            'msg': '获取当前任务成功',
-            'data': tasks
-        })
-
-    except sqlite3.Error as e:
-        print(f"Database error: {str(e)}")
-        return jsonify({
-            'code': 1,
-            'msg': f'获取当前任务失败: {str(e)}',
-            'data': None
-        }), 500
-    finally:
-        conn.close()
-
-
-@app.route('/api/tasks/<int:task_id>/accept', methods=['POST', 'OPTIONS'])
-def accept_task(task_id):
-    """接受任务"""
-    # 处理 OPTIONS 预检请求
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-        response.headers.add('Access-Control-Allow-Methods', 'POST')
-        return response
-
-    conn = None
-    try:
-        print("Request Data:", request.get_json())
-
-        data = request.get_json()
-        if not data or 'player_id' not in data:
-            print("Missing player_id in request:", data)
-            return jsonify({
-                'code': 1,
-                'msg': '缺少玩家ID',
-                'data': None
-            }), 400
-
-        player_id = data['player_id']
-        current_timestamp = int(datetime.now().timestamp())
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # 检查任务信息和前置任务
-        cursor.execute('''
-            SELECT t.task_status, t.limit_time, t.parent_task_id, t.name,
-                   pt.name as parent_name
-            FROM tasks t
-            LEFT JOIN tasks pt ON t.parent_task_id = pt.id
-            WHERE t.id = ?
-        ''', (task_id,))
-
-        task = cursor.fetchone()
-        if not task:
-            return jsonify({'error': 'Task not found'}), 404
-
-        task_status, limit_time, parent_task_id, task_name, parent_name = task
-
-        if task_status != 'AVAILABLE':
-            return jsonify({'error': 'Task is not available'}), 400
-
-        # 如果有前置任务，检查前置任务完成状态
-        if parent_task_id:
-            cursor.execute('''
-                SELECT status 
-                FROM player_task 
-                WHERE task_id = ? AND player_id = ?
-                ORDER BY starttime DESC 
-                LIMIT 1
-            ''', (parent_task_id, player_id))
-
-            parent_task_status = cursor.fetchone()
-
-            if not parent_task_status:
-                return jsonify({
-                    'msg': f'需要先完成前置任务: {parent_name}',
-                    'code': 'PREREQUISITE_NOT_STARTED'
-                }), 400
-
-            if parent_task_status[0] != 'COMPLETED':
-                return jsonify({
-                    'msg': f'需要先完成前置任务: {parent_name}',
-                    'code': 'PREREQUISITE_NOT_COMPLETED'
-                }), 400
-
-        # 检查玩家是否已接受此任务
-        cursor.execute('''
-            SELECT status 
-            FROM player_task 
-            WHERE task_id = ? AND player_id = ? AND status != 'ABANDONED'
-            ORDER BY starttime DESC 
-            LIMIT 1
-        ''', (task_id, player_id))
-
-        existing_task = cursor.fetchone()
-        if existing_task:
-            return jsonify({
-                'msg': f'已接受任务: {task_name}',
-                'code': 'TASK_ALREADY_ACCEPTED'
-            }), 400
-
-        # 计算结束时间
-        endtime = current_timestamp + limit_time if limit_time else None
-
-        # 将任务添加到player_task表
-        cursor.execute('''
-            INSERT INTO player_task (
-                task_id,
-                player_id,
-                starttime,
-                endtime,
-                status,
-            ) VALUES (?, ?, ?, ?, ?,)
-        ''', (
-            task_id,
-            player_id,
-            current_timestamp,
-            endtime,
-            'IN_PROGRESS',
-            0
-        ))
-
-        # 更新任务状态
-        cursor.execute('''
-            UPDATE tasks 
-            SET task_status = 'IN_PROGRESS'
-            WHERE id = ?
-        ''', (task_id,))
-
-        conn.commit()
-
-        response = jsonify({
-            'code': 0,
-            'msg': '任务接受成功',
-            'data': {
-                'starttime': current_timestamp,
-                'endtime': endtime,
-                'task_name': task_name
-            }
-        })
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
-
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        print(f"Error accepting task: {str(e)}")
-        return jsonify({
-            'code': 2,
-            'msg': f'接受任务失败: {str(e)}',
-            'data': None
-        }), 500
-    finally:
-        if conn:
-            conn.close()
-
-
-@app.route('/api/tasks/<int:task_id>/abandon', methods=['POST'])
-def abandon_task(task_id):
-    """放弃任务"""
-    conn = None
-    try:
-        data = request.get_json()
-        if not data or 'player_id' not in data:
-            return jsonify({
-                'code': 1,
-                'msg': '缺少玩家ID',
-                'data': None
-            }), 400
-
-        player_id = data['player_id']
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # 检查任务状态
-        cursor.execute('''
-            SELECT task_status, name 
-            FROM tasks 
-            WHERE id = ?
-        ''', (task_id,))
-
-        task = cursor.fetchone()
-        if not task:
-            return jsonify({
-                'code': 2,
-                'msg': '任务不存在',
-                'data': None
-            }), 404
-
-        if task[0] != 'IN_PROGRESS':
-            return jsonify({
-                'code': 3,
-                'msg': '任务不在进行中状态',
-                'data': None
-            }), 400
-
-        # 更新任务状态
-        cursor.execute('''
-            UPDATE tasks 
-            SET task_status = 'ABANDONED'
-            WHERE id = ?
-        ''', (task_id,))
-
-        conn.commit()
-
-        return jsonify({
-            'code': 0,
-            'msg': f'已放弃任务: {task[1]}',
-            'data': None
-        })
-
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        return jsonify({
-            'code': 4,
-            'msg': f'放弃任务失败: {str(e)}',
-            'data': None
-        }), 500
-    finally:
-        if conn:
-            conn.close()
-
-
-@app.route('/api/tasks/<int:task_id>/complete', methods=['POST'])
-def complete_task_api(task_id):
-    """完成任务"""
-    conn = None
-    try:
-        data = request.get_json()
-        if not data or 'player_id' not in data:
-            return jsonify({
-                'code': 1,
-                'msg': '缺少玩家ID',
-                'data': None
-            }), 400
-
-        player_id = data['player_id']
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # 检查任务状态
-        cursor.execute('''
-            SELECT task_status, task_rewards, name
-            FROM tasks 
-            WHERE id = ?
-        ''', (task_id,))
-
-        task = cursor.fetchone()
-        if not task:
-            return jsonify({
-                'code': 2,
-                'msg': '任务不存在',
-                'data': None
-            }), 404
-
-        if task[0] != 'IN_PROGRESS':
-            return jsonify({
-                'code': 3,
-                'msg': '任务不在进行中状态',
-                'data': None
-            }), 400
-
-        # 更新任务状态
-        cursor.execute('''
-            UPDATE tasks 
-            SET task_status = 'COMPLETED'
-            WHERE id = ?
-        ''', (task_id,))
-
-        conn.commit()
-
-        return jsonify({
-            'code': 0,
-            'msg': f'任务完成: {task[2]}',
-            'data': {
-                'rewards': task[1],
-
-                'task_name': task[2]
-            }
-        })
-
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        return jsonify({
-            'code': 4,
-            'msg': f'完成任务失败: {str(e)}',
-            'data': None
-        }), 500
-    finally:
-        if conn:
-            conn.close()
-
-
-@app.route('/api/tasks/nfc_post_old', methods=['POST'])
-def nfc_task_post():
-    """废弃接口 处理NFC任务提交"""
-    conn = None
-    try:
-        print("\n[NFC] ====== 开始处理NFC任务提交 ======")
-        data = request.values  # 使用request.values获取form-data数据
-        print(f"[NFC] 接收到的原始数据: {data}")
-
-        # 验证数据
-        if not data:
-            print("[NFC] 错误: 未提供数据")
-            socketio.emit('nfc_task_update', {
-                'type': 'ERROR',
-                'message': '未提供任务数据'
-            }, broadcast=True)  # 广播错误消息
-            return jsonify({'error': 'No data provided'}), 400
-
-        # 验证必要字段
-        required_fields = ['id', 'player', 'device']
-        if not all(field in data for field in required_fields):
-            print(f"[NFC] 错误: 缺少必要字段. 收到的字段: {list(data.keys())}")
-            socketio.emit('nfc_task_update', {
-                'type': 'ERROR',
-                'message': '缺少必要字段'
-            }, broadcast=True)
-            return jsonify({'error': 'Missing required fields'}), 400
-
-        task_id = int(data['id'])
-        player_id = data['player']
-        room = f'user_{player_id}'
-        print(f"[NFC] 任务ID: {task_id}, 玩家ID: {player_id}, 房间: {room}")
-
-        # 如果是身份识别卡
-        if task_id == 0:
-            print("[NFC] 处理身份识别卡")
-            update_data = {
-                'type': 'IDENTITY',
-                'player_id': player_id,
-                'message': '身份识别成功'
-            }
-            print(f"[NFC] 发送身份识别更新: {update_data}")
-            socketio.emit('nfc_task_update', update_data, room=room)
-            return jsonify({'success': True})
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # 检查任务是否存在且启用
-        cursor.execute('''
-            SELECT id, name, description, is_enabled, task_type, task_rewards
-            FROM tasks 
-            WHERE id = ?
-        ''', (task_id,))
-
-        task = cursor.fetchone()
-        if not task:
-            socketio.emit('nfc_task_update', {
-                'type': 'ERROR',
-                'message': '任务不存在',
-                'task_id': task_id
-            }, room=room)
-            return jsonify({'success': True})
-
-        # 构建基础任务信息
-        task_info = {
-            'id': task[0],
-            'name': task[1],
-            'description': task[2],
-            'task_type': task[4],
-            'rewards': task[5],
-
-        }
-
-        # 根据不同状态返回不同的消息
-        if task[3] == 0:  # is_enabled = 0
-            socketio.emit('nfc_task_update', {
-                'type': 'ERROR',
-                'message': '该任务未启用',
-                'task': task_info
-            }, room=room)
-            return jsonify({'success': True})
-
-        # 检查任务状态
-        print(f"[NFC] 检查玩家 {player_id} 的任务状态")
-        cursor.execute('''
-            SELECT status, comment 
-            FROM player_task 
-            WHERE task_id = ? AND player_id = ?
-        ''', (task_id, player_id))
-
-        task_status = cursor.fetchone()
-        print(f"[NFC] 当前任务状态: {task_status}")
-
-        # 根据任务状态处理
-        if not task_status:
-            # 任务不存在，创建新任务
-            print(f"[NFC] 为玩家 {player_id} 创建新任务")
-            current_timestamp = int(datetime.now().timestamp())
-            cursor.execute('''
-                INSERT INTO player_task (
-                    task_id, player_id, starttime, status
-                ) VALUES (?, ?, ?, 'IN_PROGRESS')
-            ''', (task_id, player_id, current_timestamp))
-
-            conn.commit()
-            update_data = {
-                'type': 'NEW_TASK',
-                'message': '任务已接受',
-                'task': {
-                    'id': task_id,
-                    'name': task[1],
-                    'description': task[2],
-                    'task_type': task[4],
-                    'timestamp': current_timestamp
-                }
-            }
-            print(f"[NFC] 发送新任务通知: {update_data}")
-            socketio.emit('nfc_task_update', update_data, room=room)
-            return jsonify({'success': True})
-
-        # 处理现有任务状态
-        status = task_status[0]
-        print(f"[NFC] 处理任务状态: {status}")
-
-        update_data = None
-        if status == 'IN_PROGRESS':
-            current_timestamp = int(datetime.now().timestamp())
-            cursor.execute('''
-                UPDATE player_task 
-                SET status = 'COMPLETED', 
-                    complete_time = ? 
-                WHERE task_id = ? AND player_id = ?
-            ''', (current_timestamp, task_id, player_id))
-
-            conn.commit()
-            update_data = {
-                'type': 'COMPLETE',
-                'message': '任务完成！',
-                'task': task_info,
-                'timestamp': current_timestamp
-            }
-        elif status == 'COMPLETED':
-            update_data = {
-                'type': 'ALREADY_COMPLETED',
-                'message': '该任务已完成',
-                'task': task_info
-            }
-        elif status == 'REJECT':
-            update_data = {
-                'type': 'REJECTED',
-                'message': f'任务被驳回: {task_status[1] or "无驳回原因"}'
-            }
-        elif status == 'CHECK':
-            update_data = {
-                'type': 'CHECKING',
-                'message': '任务正在审核中'
-            }
-        else:
-            update_data = {
-                'type': 'ERROR',
-                'message': '任务状态未知'
-            }
-
-        # 发送更新通知
-        if update_data:
-            print(f"[NFC] 发送任务状态更新: {update_data}")
-            socketio.emit('nfc_task_update', update_data, room=room)
-
-        print("[NFC] ====== NFC任务处理完成 ======\n")
-        return jsonify({'success': True})
-
-    except Exception as e:
-        print(f"[NFC] ====== 发生错误 ======")
-        print(f"[NFC] 错误信息: {str(e)}")
-        if conn:
-            conn.rollback()
-
-        # 发送错误通知
-        error_data = {
-            'type': 'ERROR',
-            'message': f'处理任务时出错: {str(e)}'
-        }
-        print(f"[NFC] 发送错误通知: {error_data}")
-        if 'player_id' in locals():
-            socketio.emit('nfc_task_update', error_data,
-                          room=f'user_{player_id}')
-        else:
-            socketio.emit('nfc_task_update', error_data, broadcast=True)
-
-        return jsonify({'error': str(e)}), 500
-    finally:
-        if conn:
-            conn.close()
 
 
 def assign_daily_tasks():
@@ -828,7 +210,7 @@ def assign_daily_tasks():
         # 获取所有启用的每日任务
         cursor.execute('''
             SELECT id, task_scope 
-            FROM tasks 
+            FROM task 
             WHERE is_enabled = 1 AND task_type = 'DAILY'
         ''')
         daily_tasks = cursor.fetchall()
@@ -1070,445 +452,48 @@ def send_static(path):
 
 @app.route('/api/nfc_post', methods=['POST'])
 def handle_nfc_card():
-    """处理NFC卡片请求
-
-    支持的卡片类型:
-    - ID: 身份识别卡
-    - TASK: 任务卡片
-    - POINTS: 积分卡片
-    - CARD: 道具卡片
-    - MEDAL: 勋章卡片
-
-    Returns:
-        JSON响应，包含处理结果
-    """
-    conn = None
     try:
-        print("\n[NFC] ====== 开始处理NFC卡片 ======")
-        data = request.get_json()
-        print(f"[NFC] 接收到的数据: {json.dumps(data, ensure_ascii=False)}")
+        print("\n[NFC API] ====== 开始处理NFC卡片请求 ======")
+        
+        # 获取请求数据（支持 JSON 和 Form 格式）
+        if request.is_json:
+            data = request.json
+            print(f"[NFC API Debug] 接收到JSON数据: {json.dumps(data, ensure_ascii=False)}")
+        else:
+            data = request.form.to_dict()
+            print(f"[NFC API Debug] 接收到Form数据: {json.dumps(data, ensure_ascii=False)}")
+        
+        # 获取必要参数
+        card_id = data.get('card_id')
+        player_id = data.get('player_id')
 
         # 参数验证
-        card_type = data.get('type')
-        card_id = data.get('id')
-        value = data.get('value')
-        player_id = data.get('player_id')
-        room = f'user_{player_id}'
-
-        print(f"[NFC] 卡片类型: {card_type}, ID: {
-              card_id}, 值: {value}, 玩家ID: {player_id}")
-
-        if not all([card_type, card_id, value, player_id]):
-            error_msg = "缺少必要参数"
-            print(f"[NFC] 错误: {error_msg}")
+        if not card_id or not player_id:
+            error_msg = '缺少必要参数: card_id 或 player_id'
+            print(f"[NFC API Debug] 错误: {error_msg}")
             return jsonify({
                 'code': 400,
                 'msg': error_msg,
                 'data': None
             }), 400
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        print(f"[NFC API Debug] 卡片ID: {card_id}")
+        print(f"[NFC API Debug] 玩家ID: {player_id}")
 
-        response = {
-            'code': 0,
-            'msg': '',
-            'data': None
-        }
+        # 调用 NFC 服务处理
+        from function.NFC_service import NFCService
+        nfc_service = NFCService()
+        response, status_code = nfc_service.handle_nfc_card(card_id, player_id, socketio)
 
-        # 身份识别卡处理
-        if card_type == 'ID':
-            print(f"[NFC] 处理身份识别卡")
-            cursor.execute(
-                'SELECT * FROM player_data WHERE player_id = ?', (value,))
-            player = cursor.fetchone()
-            print(f"[NFC] 查询到的玩家信息: {json.dumps(
-                dict(player) if player else None, ensure_ascii=False)}")
-
-            if player:
-                response['data'] = dict(player)
-                response['msg'] = '玩家信息获取成功'
-                socketio.emit('nfc_task_update', {
-                    'type': 'IDENTITY',
-                    'player_id': value,
-                    'message': '身份识别成功',
-                    'player_data': dict(player)
-                }, room=room)
-            else:
-                error_msg = f'未找到玩家信息 (ID: {value})'
-                print(f"[NFC] 错误: {error_msg}")
-                response.update({
-                    'code': 404,
-                    'msg': error_msg
-                })
-                socketio.emit('nfc_task_update', {
-                    'type': 'ERROR',
-                    'message': error_msg
-                }, room=room)
-
-        # 任务卡片处理
-        elif card_type == 'TASK':
-            print(f"[NFC] 处理任务卡片")
-            cursor.execute('''
-                SELECT t.* 
-                FROM tasks t 
-                WHERE t.id = ?
-            ''', (value,))
-            task = cursor.fetchone()
-            print(f"[NFC] 查询到的任务信息: {json.dumps(
-                dict(task) if task else None, ensure_ascii=False)}")
-
-            if not task:
-                error_msg = f'任务不存在 (ID: {value})'
-                print(f"[NFC] 错误: {error_msg}")
-                response.update({
-                    'code': 404,
-                    'msg': error_msg
-                })
-                socketio.emit('nfc_task_update', {
-                    'type': 'ERROR',
-                    'message': error_msg,
-                    'task_id': value
-                }, room=room)
-            else:
-                if not task['is_enabled']:
-                    error_msg = f'任务未启用 (ID: {value}, 名称: {task["name"]})'
-                    print(f"[NFC] 错误: {error_msg}")
-                    response.update({
-                        'code': 403,
-                        'msg': error_msg
-                    })
-                    socketio.emit('nfc_task_update', {
-                        'type': 'ERROR',
-                        'message': error_msg,
-                        'task': {
-                            'id': task['id'],
-                            'name': task['name'],
-                            'description': task['description']
-                        }
-                    }, room=room)
-                else:
-                    cursor.execute('''
-                        SELECT * FROM player_task 
-                        WHERE player_id = ? AND task_id = ?
-                    ''', (player_id, value))
-                    player_task = cursor.fetchone()
-                    print(f"[NFC] 查询到的玩家任务状态: {json.dumps(
-                        dict(player_task) if player_task else None, ensure_ascii=False)}")
-
-                    # 解析任务奖励
-                    rewards = {}
-                    if task['task_rewards']:
-                        try:
-                            rewards = json.loads(task['task_rewards'])
-                            print(f"[NFC] 原始任务奖励数据: {json.dumps(
-                                rewards, ensure_ascii=False)}")
-                        except json.JSONDecodeError as e:
-                            print(f"[NFC] 警告: 任务奖励解析失败: {str(e)}")
-                            print(f"[NFC] 原始奖励数据: {task['task_rewards']}")
-                            rewards = {}
-
-                    # 安全地解析各种奖励
-                    points_rewards = rewards.get('points_rewards', [])
-                    card_rewards = rewards.get('card_rewards', [])
-                    medal_rewards = rewards.get('medal_rewards', [])
-                    real_rewards = rewards.get('real_rewards', [])
-
-                    # 计算积分和经验值总和
-                    total_points = 0
-                    total_exp = 0
-                    for reward in points_rewards:
-                        if isinstance(reward, dict):
-                            reward_type = reward.get('name', '')
-                            reward_number = reward.get('number', 0)
-                            if reward_type == 'points':
-                                total_points += reward_number
-                            elif reward_type == 'exp':
-                                total_exp += reward_number
-
-                    print(
-                        f"[NFC] 计算的奖励总和 - 积分: {total_points}, 经验: {total_exp}")
-
-                    task_info = {
-                        'id': task['id'],
-                        'name': task['name'],
-                        'description': task['description'],
-                        'task_type': task['task_type'],
-                        'stamina_cost': task['stamina_cost'],
-                        'rewards': {
-                            'points': total_points,
-                            'exp': total_exp,
-                            'cards': card_rewards,
-                            'medals': medal_rewards,
-                            'real': real_rewards
-                        }
-                    }
-                    print(f"[NFC] 处理后的任务信息: {json.dumps(
-                        task_info, ensure_ascii=False)}")
-
-                    # 根据任务状态处理
-                    if not player_task:
-                        # 新任务
-                        current_time = int(time.time())
-                        endtime = current_time + \
-                            task['limit_time'] if task['limit_time'] else None
-                        cursor.execute('''
-                            INSERT INTO player_task (
-                                player_id, task_id, status, starttime, endtime
-                            ) VALUES (?, ?, 'IN_PROGRESS', ?, ?)
-                        ''', (player_id, value, current_time, endtime))
-                        conn.commit()
-                        response.update({
-                            'code': 0,
-                            'msg': '任务已接受',
-                            'data': task_info
-                        })
-                        print(f"[NFC] 新任务已接受: {task['name']}")
-                        socketio.emit('nfc_task_update', {
-                            'type': 'NEW_TASK',
-                            'message': f'成功接受新任务！\n任务名称：{task["name"]}\n任务描述：{task["description"]}',
-                            'task': task_info,
-                            'timestamp': current_time
-                        }, room=room)
-                    else:
-                        status = player_task['status']
-                        print(f"[NFC] 当前任务状态: {status}")
-
-                        if status == 'IN_PROGRESS':
-                            current_time = int(time.time())
-                            if not task['need_check']:
-                                try:
-                                    success, message, rewards_summary = complete_task(
-                                        cursor, player_id, value, task_info, current_time)
-                                    
-                                    if success:
-                                        conn.commit()
-                                        response.update({
-                                            'code': 0,
-                                            'msg': message,
-                                            'data': task_info
-                                        })
-                                        
-                                        # 发送任务完成通知
-                                        socketio.emit('nfc_task_update', {
-                                            'type': 'COMPLETE',
-                                            'message': f'''恭喜完成任务！
-任务ID：{task["id"]}
-任务名称：{task["name"]}
-任务类型：{task["task_type"]}
-任务描述：{task["description"]}
-获得奖励：
-{'积分 +' + str(rewards_summary['points']) if rewards_summary['points'] else ''}
-{'经验 +' + str(rewards_summary['exp']) if rewards_summary['exp'] else ''}
-{'卡片 x' + str(len(rewards_summary['cards'])) if rewards_summary['cards'] else ''}
-{'勋章 x' + str(len(rewards_summary['medals'])) if rewards_summary['medals'] else ''}
-状态：已完成''',
-                                            'task': task_info,
-                                            'rewards': rewards_summary,
-                                            'timestamp': current_time
-                                        }, room=room)
-                                        
-                                except Exception as e:
-                                    conn.rollback()
-                                    raise
-                            else:
-                                # 提交检查
-                                cursor.execute('''
-                                    UPDATE player_task 
-                                    SET status = 'CHECK'
-                                    WHERE player_id = ? AND task_id = ?
-                                ''', (player_id, value))
-                                conn.commit()
-                                response.update({
-                                    'code': 0,
-                                    'msg': '任务已提交检查',
-                                    'data': task_info
-                                })
-                                print(f"[NFC] 任务已提交检查: {task['name']}")
-                                socketio.emit('nfc_task_update', {
-                                    'type': 'CHECK',
-                                    'message': f'''任务已提交，等待检查
-任务ID：{task["id"]}
-任务名称：{task["name"]}
-任务类型：{task["task_type"]}
-任务描述：{task["description"]}
-状态：等待检查''',
-                                    'task': task_info
-                                }, room=room)
-                        elif status == 'COMPLETED':
-                            response.update({
-                                'code': 0,
-                                'msg': '任务已经完成',
-                                'data': task_info
-                            })
-                            print(f"[NFC] 任务已经完成: {task['name']}")
-                            socketio.emit('nfc_task_update', {
-                                'type': 'ALREADY_COMPLETED',
-                                'message': f'''该任务已经完成
-任务ID：{task["id"]}
-任务名称：{task["name"]}
-任务类型：{task["task_type"]}
-任务描述：{task["description"]}
-状态：已完成''',
-                                'task': task_info
-                            }, room=room)
-                        elif status == 'REJECT':
-                            reject_reason = player_task.get('comment', '无驳回原因')
-                            response.update({
-                                'code': 0,
-                                'msg': f'任务被驳回: {reject_reason}',
-                                'data': task_info
-                            })
-                            print(f"[NFC] 任务被驳回: {
-                                  task['name']}, 原因: {reject_reason}")
-                            socketio.emit('nfc_task_update', {
-                                'type': 'REJECT',
-                                'message': f'''任务被驳回
-任务ID：{task["id"]}
-任务名称：{task["name"]}
-任务类型：{task["task_type"]}
-任务描述：{task["description"]}
-状态：已驳回
-驳回原因：{reject_reason}''',
-                                'task': task_info
-                            }, room=room)
-                        elif status == 'CHECK':
-                            response.update({
-                                'code': 0,
-                                'msg': '任务正在检查中',
-                                'data': task_info
-                            })
-                            print(f"[NFC] 任务正在检查中: {task['name']}")
-                            socketio.emit('nfc_task_update', {
-                                'type': 'CHECKING',
-                                'message': f'''任务正在检查中
-任务ID：{task["id"]}
-任务名称：{task["name"]}
-任务类型：{task["task_type"]}
-任务描述：{task["description"]}
-状态：检查中''',
-                                'task': task_info
-                            }, room=room)
-
-        # 积分卡片处理
-        elif card_type == 'POINTS':
-            print(f"[NFC] 处理积分卡片")
-            cursor.execute(
-                'SELECT * FROM NFC_card WHERE card_id = ? AND status = "active"', (card_id,))
-            card = cursor.fetchone()
-            print(f"[NFC] 查询到的卡片信息: {json.dumps(
-                dict(card) if card else None, ensure_ascii=False)}")
-
-            if not card:
-                error_msg = '无效的积分卡'
-                print(f"[NFC] 错误: {error_msg}")
-                response.update({
-                    'code': 403,
-                    'msg': error_msg
-                })
-            else:
-                # 获取当前积分
-                cursor.execute(
-                    'SELECT points FROM player_data WHERE player_id = ?', (player_id,))
-                current_points = cursor.fetchone()['points']
-                new_points = current_points + value
-                print(f"[NFC] 积分更新: {current_points} + {value} = {new_points}")
-
-                # 更新玩家积分
-                cursor.execute('''
-                    UPDATE player_data SET points = ? WHERE player_id = ?
-                ''', (new_points, player_id))
-
-                # 记录积分变动
-                cursor.execute('''
-                    INSERT INTO points_record (player_id, number, addtime, total)
-                    VALUES (?, ?, CURRENT_TIMESTAMP, ?)
-                ''', (player_id, value, new_points))
-
-                conn.commit()
-                response.update({
-                    'msg': f'积分已更新: +{value}',
-                    'data': {'new_points': new_points}
-                })
-                print(f"[NFC] 积分更新成功")
-
-        # 道具卡片处理
-        elif card_type == 'CARD':
-            print(f"[NFC] 处理道具卡片")
-            cursor.execute('''
-                SELECT * FROM player_game_card 
-                WHERE player_id = ? AND game_card_id = ?
-            ''', (player_id, value))
-            existing_card = cursor.fetchone()
-            print(f"[NFC] 查询到的玩家道具信息: {json.dumps(
-                dict(existing_card) if existing_card else None, ensure_ascii=False)}")
-
-            if existing_card:
-                new_number = existing_card['number'] + 1
-                cursor.execute('''
-                    UPDATE player_game_card 
-                    SET number = ?, timestamp = CURRENT_TIMESTAMP
-                    WHERE player_id = ? AND game_card_id = ?
-                ''', (new_number, player_id, value))
-                print(f"[NFC] 更新道具数量: {
-                      existing_card['number']} -> {new_number}")
-            else:
-                cursor.execute('''
-                    INSERT INTO player_game_card (player_id, game_card_id, number, timestamp)
-                    VALUES (?, ?, 1, CURRENT_TIMESTAMP)
-                ''', (player_id, value))
-                print(f"[NFC] 添加新道具")
-
-            conn.commit()
-            response['msg'] = '道具卡片已添加'
-
-        # 勋章卡片处理
-        elif card_type == 'MEDAL':
-            print(f"[NFC] 处理勋章卡片")
-            cursor.execute('''
-                SELECT * FROM player_medal 
-                WHERE player_id = ? AND medal_id = ?
-            ''', (player_id, value))
-            existing_medal = cursor.fetchone()
-            print(f"[NFC] 查询到的玩家勋章信息: {json.dumps(
-                dict(existing_medal) if existing_medal else None, ensure_ascii=False)}")
-
-            if existing_medal:
-                error_msg = '已拥有该勋章'
-                print(f"[NFC] 错误: {error_msg}")
-                response.update({
-                    'code': 400,
-                    'msg': error_msg
-                })
-            else:
-                cursor.execute('''
-                    INSERT INTO player_medal (player_id, medal_id, addtime)
-                    VALUES (?, ?, CURRENT_TIMESTAMP)
-                ''', (player_id, value))
-                conn.commit()
-                response['msg'] = '勋章已添加'
-                print(f"[NFC] 勋章添加成功")
-
-        else:
-            error_msg = f'未知的卡片类型: {card_type}'
-            print(f"[NFC] 错误: {error_msg}")
-            response.update({
-                'code': 400,
-                'msg': error_msg
-            })
-
-        print(f"[NFC] 处理结果: {json.dumps(response, ensure_ascii=False)}")
-        print("[NFC] ====== NFC卡片处理完成 ======\n")
-        return jsonify(response)
+        print(f"[NFC API Debug] 处理结果: {json.dumps(response, ensure_ascii=False)}")
+        print("[NFC API] ====== NFC卡片请求处理完成 ======\n")
+        
+        return response, status_code
 
     except Exception as e:
-        error_msg = f'处理失败: {str(e)}'
-        print(f"[NFC] 错误: {error_msg}")
-        print(f"[NFC] 详细错误信息: ", traceback.format_exc())
-
-        if conn:
-            conn.rollback()
-            print("[NFC] 数据库事务已回滚")
+        error_msg = f'API处理失败: {str(e)}'
+        print(f"[NFC API] 错误: {error_msg}")
+        print(f"[NFC API] 详细错误信息: ", traceback.format_exc())
 
         if 'player_id' in locals():
             socketio.emit('nfc_task_update', {
@@ -1522,10 +507,148 @@ def handle_nfc_card():
             'data': None
         }), 500
 
-    finally:
-        if conn:
-            conn.close()
-            print("[NFC] 数据库连接已关闭")
+@app.route('/api/gps', methods=['POST'])
+def add_gps():
+    """添加GPS记录"""
+    try:
+        data = json.loads(request.data)
+        print(f"[GPS] 获取到数据: {data}") 
+        location = data.get('location', '')
+        player_id = data.get('player_id')
+        
+        # 分割经纬度数据
+        try:
+            latitude, longitude = map(float, location.split(','))
+        except (ValueError, AttributeError):
+            return jsonify({
+                'code': 400,
+                'msg': '无效的位置数据格式',
+                'data': None
+            }), 400
+
+        # 处理时间戳
+        try:
+            timestamp_str = data.get('timestamp')
+            if timestamp_str:
+                # 将时间字符串转换为时间戳
+                timestamp = int(datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S').timestamp())
+            else:
+                timestamp = int(time_module.time())
+        except ValueError:
+            timestamp = int(time_module.time())
+            logger.warning(f"无效的时间戳格式: {timestamp_str}, 使用当前时间")
+
+        # 构建标准格式的GPS数据
+        gps_data = {
+            'x': longitude,        # 经度
+            'y': latitude,         # 纬度
+            'player_id': player_id,
+            'device': data.get('device', 'unknown'),
+            'remark': data.get('timestamp', ''),  # 原始时间字符串
+            'accuracy': float(data.get('accuracy', 0)),  # GPS精度
+            'speed': float(data.get('speed', 0)),    # 速度
+            'device_time': timestamp  # 设备采集时间
+        }
+        print(f"[GPS] 添加GPS记录: {gps_data}")
+
+        # 调用 GPS 服务添加记录
+        result = gps_service.add_gps(gps_data)
+        response_data = result.get_json()
+        
+        # 只有在新增GPS记录时才发送 WebSocket 通知
+        if (response_data['code'] == 0 and 
+            response_data['msg'] == '添加GPS记录成功' and 
+            player_id):
+            # 添加速度和时间信息到推送数据中
+            socket_data = {
+                'x': longitude,
+                'y': latitude,
+                'player_id': player_id,
+                'device': gps_data['device'],
+                'remark': gps_data['remark'],
+                'speed': gps_data['speed'],
+                'battery': data.get('battery', 0),
+                'timestamp': timestamp,
+                'accuracy': gps_data['accuracy']
+            }
+            
+            print(f"[GPS] 发送新GPS点位更新通知: {socket_data}")
+        else:
+            socket_data = {
+                'speed': gps_data['speed'],
+                'battery': data.get('battery', 0),
+                'timestamp': timestamp,
+                'accuracy': gps_data['accuracy']
+            }
+            print(f"[GPS] 仅更新时间，发送电量、速度、更新时间：{socket_data}")
+        socketio.emit('gps_update', socket_data, room=f'user_{player_id}')    
+        return result
+
+    except Exception as e:
+        logger.error(f"处理GPS数据失败: {str(e)}")
+        return jsonify({
+            'code': 500,
+            'msg': f'处理GPS数据失败: {str(e)}',
+            'data': None
+        }), 500
+
+@app.route('/api/gps/<int:gps_id>', methods=['GET'])
+def get_gps(gps_id):
+    """获取单个GPS记录"""
+    return gps_service.get_gps(gps_id)
+
+@app.route('/api/gps/player/<int:player_id>', methods=['GET'])
+def get_player_gps(player_id):
+    try:
+        # 获取时间筛选参数
+        start_time = request.args.get('start_time', type=int)
+        end_time = request.args.get('end_time', type=int)
+        
+        # 获取分页参数
+        page = request.args.get('page', type=int)
+        per_page = request.args.get('per_page', type=int)
+        
+        print(f"[GPS] 获取玩家GPS记录")
+        print(f"[GPS] 玩家ID: {player_id}")
+        print(f"[GPS] 时间范围: {start_time} -> {end_time}")
+        print(f"[GPS] 分页: page={page}, per_page={per_page}")
+        
+        # 添加数据验证
+        if start_time and end_time and start_time > end_time:
+            return jsonify({
+                'code': 400,
+                'msg': '开始时间不能大于结束时间',
+                'data': None
+            }), 400
+
+        result = gps_service.get_gps_records(
+            player_id=player_id,
+            start_time=start_time,
+            end_time=end_time,
+            page=page,
+            per_page=per_page
+        )
+        
+        # 添加调试日志
+        # print(f"[GPS] 返回数据: {result.get_json() if hasattr(result, 'get_json') else result}")
+        return result
+
+    except Exception as e:
+        error_msg = f"获取玩家GPS记录失败: {str(e)}"
+        print(f"[GPS] 错误: {error_msg}")
+        return jsonify({
+            'code': 500,
+            'msg': error_msg,
+            'data': None
+        }), 500
+
+@app.route('/api/gps/<int:gps_id>', methods=['PUT'])
+def update_gps(gps_id):
+    """更新GPS记录"""
+    data = request.get_json()
+    return gps_service.update_gps(gps_id, data)
+
+
 
 # 添加NFC接口测试页面路由
 
@@ -1533,28 +656,6 @@ def handle_nfc_card():
 @app.route('/nfc_test')
 def nfc_test():
     return render_template('nfc_test.html')
-
-
-# 在应用启动时调用
-if __name__ == '__main__':
-    start_scheduler()
-    print("Server started")
-    try:
-        # 使用 eventlet 启动服务器
-        socketio.run(
-            app,
-            # host='192.168.5.18',  # 监听所有网络接口
-            host='192.168.1.5',  # 监听所有网络接口
-            port=5000,
-            debug=True,
-            use_reloader=True,
-            log_output=True
-        )
-    except Exception as e:
-        print(f"Error starting server: {str(e)}")
-        # 如果 eventlet 启动失败，回退到开发服务器
-        print("Falling back to development server...")
-        app.run(debug=True)
 
 def complete_task(cursor, player_id, task_id, task_info, current_time):
     """
@@ -1690,3 +791,67 @@ def complete_task(cursor, player_id, task_id, task_info, current_time):
     except Exception as e:
         print(f"完成任务时出错: {str(e)}")
         raise
+
+def setup_logging():
+    """配置日志系统"""
+    log_level = logging.DEBUG if DEBUG else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('server.log')
+        ]
+    )
+    return logging.getLogger(__name__)
+
+# 在应用启动时调用
+if __name__ == '__main__':
+    logger = setup_logging()
+    logger.info("Starting server initialization...")
+    
+    try:
+        start_scheduler()
+        logger.info("Scheduler started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {str(e)}", exc_info=True)
+    
+    logger.info(f"Server configuration - IP: {SERVER_IP}, Port: {PORT}, Debug: {DEBUG}")
+    
+    try:
+        if DEBUG:
+            # 开发环境：使用 eventlet（支持热重载和WebSocket）
+            logger.info("Starting development server with eventlet...")
+            socketio.run(
+                app,
+                host=SERVER_IP,
+                port=PORT,
+                debug=True,
+                use_reloader=True,
+                log_output=True
+            )
+        else:
+            # 生产环境：使用 waitress
+            from waitress import serve
+            from paste.translogger import TransLogger
+            
+            logger.info("Starting production server with waitress...")
+            # 使用 TransLogger 记录访问日志
+            app_logged = TransLogger(app)
+            
+            # 配置 waitress
+            serve(
+                app_logged,
+                host=SERVER_IP,
+                port=PORT,
+                threads=WAITRESS_CONFIG['THREADS'],               
+                connection_limit=WAITRESS_CONFIG['CONNECTION_LIMIT'],   
+                channel_timeout=WAITRESS_CONFIG['TIMEOUT'],      
+                cleanup_interval=WAITRESS_CONFIG['CLEANUP_INTERVAL'],     
+                ident=WAITRESS_CONFIG['IDENT']      
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to start server: {str(e)}", exc_info=True)
+        raise
+

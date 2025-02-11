@@ -1,90 +1,52 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-08 14:41:57
- * @LastEditTime: 2025-02-02 16:39:05
+ * @LastEditTime: 2025-02-07 22:02:27
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
 
-// 后端服务器地址配置
-const SERVER = 'http://192.168.1.5:5000/';
+
+// import GPSManager from '../function/GPSManager.js';
+// import AMapManager from '../function/AMapManager.js';
+import WebSocketManager from '../function/WebSocketManager.js';
+import MapSwitcher from '../function/MapSwitcher.js';
 
 // WebSocket连接
 const socket = io(SERVER);
 
 // 在文件开头声明全局变量
 let taskManager;
+let gpsManager;
 
 // 任务管理类
 class TaskManager {
     constructor() {
+        console.log('[Debug] TaskManager 构造函数开始');
         this.activeTasksSwiper = null;
-        this.playerId = localStorage.getItem('playerId') || localStorage.setItem('playerId', '1');// 如果本地没有playerId，则设置为1
+        this.taskListSwiper = null;
+        this.playerId = localStorage.getItem('playerId') || '1';
         this.loading = false;
-        this.initWebSocket();
-        this.loadPlayerInfo(); // 在构造函数中调用加载角色信息
-    }
-
-    // 初始化WebSocket
-    initWebSocket() {
-        const statusDot = document.querySelector('.status-dot');
-        const statusText = document.querySelector('.status-text');
-
-        socket.on('connect', () => {
-            console.log('[WebSocket] Connected to server');
-            statusDot.classList.add('connected');
-            statusText.textContent = 'WebSocket已连接';
-            
-            // 连接成功后订阅任务更新，使用统一的房间格式
-            const room = `user_${this.playerId}`;
-            const subscribeData = { 
-                player_id: this.playerId,
-                room: room 
-            };
-            console.log('[WebSocket] Subscribing to tasks with data:', subscribeData);
-            socket.emit('subscribe_tasks', subscribeData);
-            
-            // 显式加入房间
-            socket.emit('join', { room: room });
-
-            // 订阅标签更新
-            socket.on('tags_update', (data) => {
-                console.log('[WebSocket] Received tags update:', data);
-                this.updateWordCloud();
-            });
-        });
-
-        socket.on('disconnect', () => {
-            console.log('[WebSocket] Disconnected from server');
-            statusDot.classList.remove('connected');
-            statusText.textContent = 'WebSocket已断开';
-        });
-
-        socket.on('connect_error', (error) => {
-            console.error('[WebSocket] Connection error:', error);
-            statusDot.classList.remove('connected');
-            statusText.textContent = 'WebSocket连接错误';
-        });
-
-        // NFC任务更新处理
-        socket.on('nfc_task_update', (data) => {
-            console.log('[WebSocket] Received NFC task update:', data);
-            this.handleTaskUpdate(data);
-        });
-
-        // 任务状态更新处理
-        socket.on('task_update', (data) => {
-            console.log('[WebSocket] Received task status update:', data);
-            this.handleTaskStatusUpdate(data);
-        });
+        
+        // 初始化WebSocket管理器
+        this.wsManager = new WebSocketManager();
+        
+        // 设置事件监听
+        this.wsManager.subscribeToTasks(this.playerId);
+        this.wsManager.onTaskUpdate(this.handleTaskStatusUpdate.bind(this));
+        this.wsManager.onNFCTaskUpdate(this.handleTaskUpdate.bind(this));
+        this.wsManager.onTagsUpdate(() => this.updateWordCloud());
+        
+        this.loadPlayerInfo();
+        console.log('[Debug] TaskManager 构造函数完成');
     }
 
     // 处理NFC任务更新通知
     handleTaskUpdate(data) {
-        console.log('[WebSocket] Processing task update:', data);
+        console.log('[TaskManager] 开始处理NFC任务更新:', data);
         
         if (!data || !data.type) {
-            console.error('[WebSocket] Invalid task update data');
+            console.error('[TaskManager] 无效的任务更新数据:', data);
             this.showNotification({
                 type: 'ERROR',
                 message: '收到无效的任务更新'
@@ -93,37 +55,43 @@ class TaskManager {
         }
 
         // 处理特殊类型
+        console.log('[TaskManager] 处理任务类型:', data.type);
         switch(data.type) {
             case 'IDENTITY':
+                console.log('[TaskManager] 处理身份识别更新');
                 this.playerId = data.player_id;
                 localStorage.setItem('playerId', data.player_id);
-                this.loadPlayerInfo(); // 重新加载玩家信息
-                this.refreshTasks();   // 刷新任务列表
+                this.loadPlayerInfo();
+                this.refreshTasks();
                 break;
             
             case 'NEW_TASK':
             case 'COMPLETE':
             case 'CHECK':
-                // 刷新任务列表
+                console.log('[TaskManager] 处理任务状态更新');
                 this.refreshTasks();
-                // 播放相应的音效
                 this.playTaskSound(data.type);
                 break;
             
-            case 'ALREADY_COMPLETE':
+            case 'ALREADY_COMPLETED':
             case 'REJECT':
             case 'CHECKING':
-                // 这些状态只需要显示通知，不需要刷新任务
+                console.log('[TaskManager] 处理通知消息');
                 break;
             
             case 'ERROR':
-                // 错误状态可以播放错误音效
+                console.log('[TaskManager] 处理错误消息');
                 this.playErrorSound();
                 break;
+            
+            default:
+                console.log('[TaskManager] 未知的任务类型:', data.type);
         }
 
         // 显示通知
+        console.log('[TaskManager] 准备显示通知:', data);
         this.showNotification(data);
+        console.log('[TaskManager] 通知显示完成');
     }
 
     // 播放任务相关音效
@@ -151,57 +119,63 @@ class TaskManager {
 
     // 显示通知
     showNotification(data) {
+        console.log('[Notification] 开始显示通知:', data);
         const typeInfo = data.task?.task_type ? 
             gameUtils.getTaskTypeInfo(data.task.task_type) : 
             { color: '#009688', icon: 'layui-icon-notice', text: '系统消息' };
 
-        layer.open({
-            type: 1,
-            title: false,
-            closeBtn: true,
-            shadeClose: true,
-            area: ['500px', 'auto'],
-            skin: 'layui-layer-nobg',
-            content: `
-                <div class="task-notification">
-                    <div class="task-header">
-                        <div class="task-icon" style="color: ${typeInfo.color}">
-                            <i class="layui-icon ${typeInfo.icon}"></i>
-                        </div>
-                        <div class="task-title">
-                            <h3>${data.task?.name || '系统消息'}</h3>
-                            <small>${typeInfo.text}</small>
-                        </div>
-                    </div>
-                    ${data.task?.description ? `
-                        <div class="task-description">${data.task.description}</div>
-                    ` : ''}
-                    <div class="task-status">
-                        <span class="status-badge" style="background: ${this.getStatusColor(data.type)}">
-                            ${this.getStatusText(data.type)}
-                        </span>
-                        <span class="task-message">${data.message || this.getDefaultMessage(data.type)}</span>
-                    </div>
-                    ${data.task?.rewards ? `
-                        <div class="task-rewards">
-                            <div class="reward-item">
-                                <i class="layui-icon layui-icon-diamond"></i>
-                                <span>经验 +${data.task.points || 0}</span>
+        try {
+            layer.open({
+                type: 1,
+                title: false,
+                closeBtn: true,
+                shadeClose: true,
+                area: ['500px', 'auto'],
+                skin: 'layui-layer-nobg',
+                content: `
+                    <div class="task-notification">
+                        <div class="task-header">
+                            <div class="task-icon" style="color: ${typeInfo.color}">
+                                <i class="layui-icon ${typeInfo.icon}"></i>
                             </div>
-                            <div class="reward-item">
-                                <i class="layui-icon layui-icon-dollar"></i>
-                                <span>奖励 ${data.task.rewards}</span>
+                            <div class="task-title">
+                                <h3>${data.task?.name || '系统消息'}</h3>
+                                <small>${typeInfo.text}</small>
                             </div>
                         </div>
-                    ` : ''}
-                    ${data.timestamp ? `
-                        <div class="task-time">
-                            打卡时间: ${new Date(data.timestamp * 1000).toLocaleString()}
+                        ${data.task?.description ? `
+                            <div class="task-description">${data.task.description}</div>
+                        ` : ''}
+                        <div class="task-status">
+                            <span class="status-badge" style="background: ${this.getStatusColor(data.type)}">
+                                ${this.getStatusText(data.type)}
+                            </span>
+                            <span class="task-message">${data.message || this.getDefaultMessage(data.type)}</span>
                         </div>
-                    ` : ''}
-                </div>
-            `
-        });
+                        ${data.task?.rewards ? `
+                            <div class="task-rewards">
+                                <div class="reward-item">
+                                    <i class="layui-icon layui-icon-diamond"></i>
+                                    <span>经验 +${data.task.points || 0}</span>
+                                </div>
+                                <div class="reward-item">
+                                    <i class="layui-icon layui-icon-dollar"></i>
+                                    <span>奖励 ${data.task.rewards}</span>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${data.timestamp ? `
+                            <div class="task-time">
+                                打卡时间: ${new Date(data.timestamp * 1000).toLocaleString()}
+                            </div>
+                        ` : ''}
+                    </div>
+                `
+            });
+            console.log('[Notification] 通知显示成功');
+        } catch (error) {
+            console.error('[Notification] 显示通知失败:', error);
+        }
     }
 
     // 获取默认消息
@@ -289,18 +263,25 @@ class TaskManager {
         
         this.loading = true;
         const taskList = document.getElementById('taskList');
-        taskList.innerHTML = `
-            <div class="swiper task-list-swiper">
-                <div class="swiper-wrapper">
-                    <div class="swiper-slide">
-                        <div class="loading-state">加载中...</div>
-                    </div>
-                </div>
-                <div class="swiper-scrollbar"></div>
-            </div>
-        `;
         
         try {
+            taskList.innerHTML = `
+                <div class="swiper task-list-swiper">
+                    <div class="swiper-wrapper">
+                        <div class="swiper-slide">
+                            <div class="loading-state">加载中...</div>
+                        </div>
+                    </div>
+                    <div class="swiper-scrollbar"></div>
+                </div>
+            `;
+
+            // 等待DOM更新
+            await new Promise(resolve => setTimeout(resolve, 0));
+
+            // 重新初始化滑动组件
+            await this.initSwipers();
+
             const response = await fetch(`${SERVER}/api/tasks/available/${this.playerId}`);
             const result = await response.json();
             
@@ -317,9 +298,6 @@ class TaskManager {
                 } else {
                     swiperWrapper.innerHTML = tasks.map(task => this.createTaskCard(task)).join('');
                 }
-                
-                // 初始化任务列表的 Swiper
-                this.initTaskListSwiper();
             } else {
                 this.showError('taskList', result.msg);
             }
@@ -360,7 +338,7 @@ class TaskManager {
                     typeInfo: taskTypeInfo,
                     rewards: rewards
                 }).replace(/"/g, '&quot;')})">
-                    <div class="task-header" style="background-color: ${taskTypeInfo.color}20">
+                    <div class="task-header" style="background-color: ${taskTypeInfo.color}">
                         <div class="task-icon">
                             <i class="layui-icon ${taskTypeInfo.icon}"></i>
                         </div>
@@ -410,7 +388,7 @@ class TaskManager {
     // 显示任务详情
     showTaskDetails(taskData) {
         const { typeInfo, rewards } = taskData;
-        
+        console.log(typeInfo);
         layui.use('layer', function() {
             const layer = layui.layer;
             
@@ -423,8 +401,8 @@ class TaskManager {
                 area: ['600px', 'auto'],
                 content: `
                     <div class="task-detail-popup">
-                        <div class="task-detail-header" style="background-color: ${typeInfo.color}20">
-                            <div class="task-type-badge" style="background: ${typeInfo.color}20; color: ${typeInfo.color}">
+                        <div class="task-detail-header" style="background-color: ${typeInfo.color}">
+                            <div class="task-type-badge" style="background: ${typeInfo.color}; color: ${typeInfo.color}">
                                 <i class="layui-icon ${typeInfo.icon}"></i>
                                 <span>${typeInfo.text}</span>
                             </div>
@@ -601,7 +579,7 @@ class TaskManager {
                 <div class="task-progress-bar" style="width: ${progressPercent}%"></div>
                 <div class="task-content">
                     <div class="task-header">
-                        <div class="task-type-badge" style="background: ${typeInfo.color}20; color: ${typeInfo.color}">
+                        <div class="task-type-badge" style="background: ${typeInfo.color}; color: ${typeInfo.color}">
                             <i class="layui-icon ${typeInfo.icon}"></i>
                             <span>${typeInfo.text}</span>
                         </div>
@@ -824,20 +802,25 @@ class TaskManager {
 
     // 获取状态颜色
     getStatusColor(type) {
-        switch(type) {
-            case 'NEW_TASK':
-            case 'COMPLETE':
-                return '#009688';
-            case 'ALREADY_COMPLETED':
-                return '#FFB800';
-            case 'CHECKING':
-                return '#1E9FFF';
-            case 'REJECTED':
-            case 'ERROR':
-                return '#FF5722';
-            default:
-                return '#393D49';
+        console.log(type);
+        console.log(TASK_TYPE_MAP[type]);
+        // 从配置文件中获取任务类型的颜色
+        if (type && TASK_TYPE_MAP[type]) {
+            return TASK_TYPE_MAP[type].color;
         }
+        
+        // // 如果是玩家任务，使用玩家任务状态颜色
+        // if (this.playerId && PLAYER_TASK_STATUS_MAP[type]) {
+        //     return PLAYER_TASK_STATUS_MAP[type].color;
+        // }
+        
+        // // 如果是任务池中的任务，使用任务池状态颜色
+        // if (TASK_STATUS_MAP[type]) {
+        //     return TASK_STATUS_MAP[type].color;
+        // }
+        
+        // 默认返回未定义任务的颜色
+        return TASK_TYPE_MAP['UNDEFINED'].color;
     }
 
     // 获取状态文本
@@ -863,25 +846,84 @@ class TaskManager {
 
     // 初始化应用
     async initializeApplication() {
-        // 等待 DOM 加载完成
-        if (document.readyState !== 'complete') {
-            await new Promise(resolve => window.addEventListener('load', resolve));
+        console.log('[Debug] 初始化应用开始');
+        await this.initSwipers();
+        console.log('[Debug] 初始化应用完成');
+    }
+
+    // 初始化滑动组件
+    async initSwipers() {
+        console.log('[Debug] 开始初始化滑动组件');
+        
+        // 确保在初始化新的swiper之前销毁旧的
+        this.destroySwipers();
+
+        try {
+            // 检查DOM元素是否存在
+            const activeTasksContainer = document.querySelector('.active-tasks-swiper');
+            const taskListContainer = document.querySelector('.task-list-swiper');
+
+            if (activeTasksContainer) {
+                // 初始化活动任务滑动组件
+                this.activeTasksSwiper = new Swiper('.active-tasks-swiper', {
+                    slidesPerView: 'auto',
+                    spaceBetween: 20,
+                    pagination: {
+                        el: '.swiper-pagination',
+                        clickable: true
+                    }
+                });
+            }
+
+            if (taskListContainer) {
+                // 初始化任务列表滑动组件
+                this.taskListSwiper = new Swiper('.task-list-swiper', {
+                    direction: 'vertical',
+                    slidesPerView: 'auto',
+                    freeMode: true,
+                    scrollbar: {
+                        el: '.swiper-scrollbar',
+                    },
+                    mousewheel: true,
+                });
+            }
+
+            console.log('[Debug] 滑动组件初始化成功');
+        } catch (error) {
+            console.error('[Debug] 初始化滑动组件时出错:', error);
         }
+    }
 
-        // 延迟一帧执行初始化，避免与 Layui 的初始化冲突
-        await new Promise(resolve => requestAnimationFrame(resolve));
-
-        // 初始化 Layui
-        await new Promise(resolve => {
-            layui.use(['element'], function() {
-                const element = layui.element;
-                element.render('tab');
-                resolve();
-            });
-        });
-
-        // 初始化观察器
-        this.initializeObservers();
+    // 销毁滑动组件
+    destroySwipers() {
+        console.log('[Debug] 开始销毁滑动组件');
+        try {
+            // 销毁活动任务滑动组件
+            if (this.activeTasksSwiper && this.activeTasksSwiper.destroy && typeof this.activeTasksSwiper.destroy === 'function') {
+                try {
+                    this.activeTasksSwiper.destroy(true, true);
+                    console.log('[Debug] 销毁活动任务滑动组件成功');
+                } catch (e) {
+                    console.log('[Debug] 销毁活动任务滑动组件时出错:', e);
+                }
+                this.activeTasksSwiper = null;
+            }
+            
+            // 销毁任务列表滑动组件
+            if (this.taskListSwiper && this.taskListSwiper.destroy && typeof this.taskListSwiper.destroy === 'function') {
+                try {
+                    this.taskListSwiper.destroy(true, true);
+                    console.log('[Debug] 销毁任务列表滑动组件成功');
+                } catch (e) {
+                    console.log('[Debug] 销毁任务列表滑动组件时出错:', e);
+                }
+                this.taskListSwiper = null;
+            }
+            
+            console.log('[Debug] 滑动组件销毁完成');
+        } catch (error) {
+            console.error('[Debug] 销毁滑动组件时出错:', error);
+        }
     }
 
     // 初始化观察器
@@ -1022,7 +1064,7 @@ class TaskManager {
                 
                 // 更新角色信息显示
                 document.getElementById('playerName').textContent = playerData.player_name;
-                document.getElementById('playerPoints').textContent = playerData.experience;
+                document.getElementById('playerPoints').textContent = playerData.points;
                 
                 // 更新等级和经验条
                 const levelElement = document.querySelector('.level');
@@ -1053,50 +1095,30 @@ class TaskManager {
         }
     }
 
-    // 添加任务列表 Swiper 初始化方法
-    initTaskListSwiper() {
-        if (this.taskListSwiper) {
-            this.taskListSwiper.destroy(true, true);
-        }
-
-        this.taskListSwiper = new Swiper('.task-list-swiper', {
-            direction: 'vertical',
-            slidesPerView: 'auto',
-            freeMode: true,
-            mousewheel: true,
-            scrollbar: {
-                el: '.swiper-scrollbar',
-                draggable: true,
-                hide: false
-            },
-            height: 500, // 设置固定高度
-            spaceBetween: 15
-        });
-    }
-
     // 初始化文字云
     initWordCloud() {
+        console.log('[Debug] 初始化文字云开始');
         const wordCloudChart = echarts.init(document.getElementById('wordCloudContainer'));
         
         // 模拟数据
         const testData = [
             // 头衔（较大字体，金色）
-            { name: '地球守护者', value: 100, textStyle: { color: '#ffd700', fontSize: 32 } },
-            { name: '环保先锋', value: 90, textStyle: { color: '#ffd700', fontSize: 28 } },
+            { name: '尿不湿守护者', value: 100, textStyle: { color: '#ffd700', fontSize: 32 } },
+            { name: '爬行先锋', value: 90, textStyle: { color: '#ffd700', fontSize: 28 } },
             
             // 荣誉（中等字体，银色）
-            { name: '垃圾分类达人', value: 80, textStyle: { color: '#c0c0c0' } },
-            { name: '节能减排标兵', value: 75, textStyle: { color: '#c0c0c0' } },
-            { name: '生态保护使者', value: 70, textStyle: { color: '#c0c0c0' } },
+            { name: '卫生纸摧毁达人', value: 80, textStyle: { color: '#c0c0c0' } },
+            { name: '干饭小能手', value: 75, textStyle: { color: '#c0c0c0' } },
+            { name: '玩具保护使者', value: 70, textStyle: { color: '#c0c0c0' } },
             
             // 个人标签（较小字体，青色系）
-            { name: '热心环保', value: 60, textStyle: { color: '#8aa2c1' } },
-            { name: '绿色出行', value: 55, textStyle: { color: '#8aa2c1' } },
-            { name: '低碳生活', value: 50, textStyle: { color: '#8aa2c1' } },
+            { name: '热心干饭', value: 60, textStyle: { color: '#8aa2c1' } },
+            { name: '推车出行', value: 55, textStyle: { color: '#8aa2c1' } },
+            { name: '吃奶能手', value: 50, textStyle: { color: '#8aa2c1' } },
             { name: '植树达人', value: 45, textStyle: { color: '#8aa2c1' } },
             { name: '节水卫士', value: 40, textStyle: { color: '#8aa2c1' } },
-            { name: '环保志愿者', value: 35, textStyle: { color: '#8aa2c1' } },
-            { name: '可再生能源支持者', value: 30, textStyle: { color: '#8aa2c1' } }
+            { name: '夜间嚎叫者', value: 35, textStyle: { color: '#8aa2c1' } },
+            { name: '米粉爱好者', value: 30, textStyle: { color: '#8aa2c1' } }
         ];
 
         const option = {
@@ -1112,11 +1134,11 @@ class TaskManager {
                 shape: 'circle',
                 left: 'center',
                 top: 'center',
-                width: '90%',
-                height: '90%',
+                width: '100%',
+                height: '100%',
                 right: null,
                 bottom: null,
-                sizeRange: [12, 32],
+                sizeRange: [16, 50],
                 rotationRange: [-45, 45],
                 rotationStep: 45,
                 gridSize: 8,
@@ -1144,6 +1166,7 @@ class TaskManager {
         };
 
         wordCloudChart.setOption(option);
+        console.log('[Debug] 文字云初始化完成');
 
         // 响应窗口大小变化
         window.addEventListener('resize', function() {
@@ -1174,25 +1197,41 @@ class TaskManager {
     }
 }
 
-// 修改页面初始化代码
+// 页面初始化代码
 document.addEventListener('DOMContentLoaded', async () => {
-    taskManager = new TaskManager();
-    await taskManager.initializeApplication();
-    taskManager.initTaskEvents();
+    console.log('[Debug] 页面加载开始');
+    console.log('[Debug] 当前地图渲染类型:', MAP_CONFIG.RENDER_TYPE);
+    
+    // 创建全局管理器实例
+    window.taskManager = new TaskManager();
+    console.log('[Debug] TaskManager 已创建');
+    
+    // 初始化应用
+    await window.taskManager.initializeApplication();
+    window.taskManager.initTaskEvents();
     
     // 加载任务数据
     await Promise.all([
-        taskManager.loadTasks(),
-        taskManager.loadCurrentTasks()
+        window.taskManager.loadTasks(),
+        window.taskManager.loadCurrentTasks()
     ]);
 
     // 初始化文字云
-    taskManager.initWordCloud();
+    window.taskManager.initWordCloud();
+
+    // 初始化地图切换器
+    window.mapSwitcher = new MapSwitcher();
+    
+    // 设置 WebSocket 管理器并订阅 GPS 更新
+    window.mapSwitcher.setWebSocketManager(window.taskManager.wsManager);
+    window.taskManager.wsManager.subscribeToGPS(window.taskManager.playerId);
+
+    console.log('[Debug] 页面初始化完成');
 });
 
 // 页面卸载前清理
 window.addEventListener('beforeunload', () => {
-    if (taskManager.activeTasksSwiper) {
-        taskManager.activeTasksSwiper.destroy(true, true);
+    if (window.taskManager) {
+        window.taskManager.destroySwipers();
     }
 });     

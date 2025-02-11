@@ -85,7 +85,7 @@ api_registry.register(
         "title": "称号",
         "stamina": "体力值",
         "intelligence": "智力值",
-        "strength": "力量值"
+        "sex": "性别"
     }
 )
 

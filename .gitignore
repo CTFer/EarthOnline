@@ -3,3 +3,5 @@ server/__pycache__
 earthonline/nginx.htaccess
 server/database/game.db
 main.sql
+resource/
+test/

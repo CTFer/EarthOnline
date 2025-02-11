@@ -1,3 +1,12 @@
+<!--
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-01-29 16:40:28
+ * @LastEditTime: 2025-02-07 18:45:26
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2025 迷舍
+-->
 <!DOCTYPE html>
 <html>
 <head>
@@ -21,6 +30,19 @@
     <script src="/static/js/live2d/utils.min.js"></script>
     <script src="/static/js/live2d/math.min.js"></script>
     <script src="/static/js/live2d/index.min.js"></script>
+    <!-- jQuery -->
+    <script src="/static/js/jquery.min.js"></script>
+    <!-- 高德地图配置项 -->
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode: "a64ba8d506a1154e41b9ca50a6113c55",   // 安全密钥
+        };
+    </script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=16de1da59d44d6967f9a6bf5248963c5&plugin=AMap.Scale,AMap.ToolBar"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-extension-amap@latest/dist/echarts-extension-amap.min.js"></script>
+    <script src="/static/js/echarts.min.js"></script>
+    <!-- 在已有的高德地图 JS 后面添加 -->
+    <script src="https://webapi.amap.com/ui/1.1/main.js"></script>
 </head>
 <body>
     <div class="game-container">
@@ -32,6 +54,9 @@
                 <span class="title-decoration"></span>
             </h2>
             <div class="character-container">
+                <div id="wordCloudContainer" class="word-cloud-container">
+                    <!-- 文字云将通过JS动态生成 -->
+                </div>
                 <div class="character-stats">
                     <!-- 人物形象区域 -->
                     <div id="live2dContainer"></div>
@@ -101,8 +126,55 @@
                     个人画像
                     <span class="title-decoration"></span>
                 </h2>
-                <div id="wordCloudContainer" class="word-cloud-container">
-                    <!-- 文字云将通过JS动态生成 -->
+
+                <!-- 在GPS地图容器上方添加时间筛选 -->
+                <div class="map-controls">
+                    <div class="control-group time-filter">
+                        <i class="layui-icon layui-icon-date"></i>
+                        <select id="timeRangeSelect" class="time-range-select">
+                            <option value="today">当日</option>
+                            <option value="week">近一周</option>
+                            <option value="month">近一月</option>
+                            <option value="year">近一年</option>
+                            <option value="custom">自定义时间范围</option>
+                        </select>
+                        <!-- 自定义时间范围选择器,默认隐藏 -->
+                        <div id="customDateRange" class="custom-date-range" style="display: none;">
+                            <input type="datetime-local" id="startTime" class="date-input">
+                            <span>至</span>
+                            <input type="datetime-local" id="endTime" class="date-input">
+                            <button id="applyCustomRange" class="apply-btn">应用</button>
+                        </div>
+                    </div>
+
+                    <div class="control-group status-info">
+                        <div class="info-item gps-speed">
+                            <i class="layui-icon layui-icon-engine"></i>
+                            <span id="currentSpeed">0.0 km/h</span>
+                        </div>
+                        <div class="info-item gps-time">
+                            <i class="layui-icon layui-icon-time"></i>
+                            <span id="lastUpdateTime">未更新</span>
+                        </div>
+                        <div class="info-item battery-status">
+                            <i class="layui-icon layui-icon-cellphone"></i>
+                            <span id="batteryLevel">100%</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group map-controls-buttons">
+                        <button id="switchMapType" class="control-btn">
+                            <i class="layui-icon layui-icon-chart"></i>
+                            <span>切换地图</span>
+                        </button>
+                        <button id="switchDisplayMode" class="control-btn">
+                            <i class="layui-icon layui-icon-share"></i>
+                            <span>切换显示</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="gpsMapContainer" class="gps-map-container">
+                    <!-- GPS地图将通过JS动态生成 -->
                 </div>
             </div>
             
@@ -152,11 +224,10 @@
     <script src="/static/layui/layui.js"></script>
     <script src="/static/js/socket.io.js"></script>
     <script src="/static/js/client/live2d-config.js"></script>
-    <script src="/static/js/client/config.js"></script>
+    <script src="/static/js/config.js"></script>
     <script src="/static/js/client/utils.js"></script>
-    <script src="/static/js/client/game.js?v=1.0.1" id="mainJs"></script>
-    <script src="/static/js/echarts.min.js"></script>
     <script src="/static/js/echarts-wordcloud.min.js"></script>
+    <script type="module" src="/static/js/client/game.js?v=1.0.1" id="mainJs"></script>
     <script>
         // 生成随机版本号
         document.getElementById('mainStyle').href = '/static/css/client/index.min.css?v=' + Math.random();

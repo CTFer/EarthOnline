@@ -3,7 +3,7 @@ eventlet.monkey_patch()
 
 from flask import Blueprint, jsonify, request, render_template, current_app
 from admin import admin_required
-from datetime import datetime
+from datetime import datetime, timedelta
 from dataclasses import dataclass
 import sqlite3
 import os
@@ -47,49 +47,11 @@ class Shop:
             self.app = app
             logger.info("Shop 实例与应用关联完成")
             
-    def init_db(self):
-        """初始化数据库连接"""
-        try:
-            logger.debug(f"尝试连接数据库: {self.db_path}")
-            if not os.path.exists(self.db_path):
-                logger.error(f"数据库文件不存在: {self.db_path}")
-                raise FileNotFoundError(f"数据库文件不存在: {self.db_path}")
-                
-            db = sqlite3.connect(self.db_path)
-            db.row_factory = sqlite3.Row
-            
-            # 测试连接
-            cursor = db.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='shop'")
-            if not cursor.fetchone():
-                logger.error("shop表不存在")
-                raise Exception("shop表不存在")
-            
-            logger.debug("数据库连接成功")
-            return db
-        except Exception as e:
-            logger.error(f"数据库连接失败: {str(e)}")
-            raise
-            
     def get_db(self):
         """获取数据库连接"""
         try:
-            logger.debug(f"尝试连接数据库: {DATABASE}")
-            if not os.path.exists(DATABASE):
-                logger.error(f"数据库文件不存在: {DATABASE}")
-                raise FileNotFoundError(f"数据库文件不存在: {DATABASE}")
-                
-            db = sqlite3.connect(DATABASE, check_same_thread=False)
+            db = sqlite3.connect(self.db_path, check_same_thread=False)
             db.row_factory = sqlite3.Row
-            
-            # 测试连接
-            cursor = db.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='shop'")
-            if not cursor.fetchone():
-                logger.error("shop表不存在")
-                raise Exception("shop表不存在")
-                
-            logger.debug("数据库连接成功")
             return db
         except Exception as e:
             logger.error(f"数据库连接失败: {str(e)}")
@@ -98,8 +60,10 @@ class Shop:
     def get_items(self, sort_by='price', order='asc', enabled_only=True):
         """获取商品列表"""
         try:
+            current_timestamp = int(datetime.now().timestamp())
             with self.get_db() as db:
                 cursor = db.cursor()
+                
                 query = """
                     SELECT 
                         product_id as id,
@@ -107,110 +71,161 @@ class Shop:
                         product_description as description,
                         product_price as price,
                         product_stock as stock,
+                        product_type,
                         product_image as image_url,
-                        create_time as created_at,
-                        CASE WHEN delete_time IS NULL THEN 1 ELSE 0 END as is_enabled
+                        online_time,
+                        offline_time,
+                        create_time
                     FROM shop 
-                    WHERE 1=1
+                    WHERE (online_time IS NULL OR online_time <= ?)
+                    AND (offline_time='' OR offline_time IS NULL OR offline_time > ?)
                 """
-                if enabled_only:
-                    query += " AND delete_time IS NULL"
-                    
-                # 安全处理排序字段
-                sort_field_map = {
+                
+                # 安全的排序
+                sort_map = {
                     'price': 'product_price',
                     'stock': 'product_stock',
-                    'created_at': 'create_time',
+                    'online_time': 'online_time',
+                    'offline_time': 'offline_time',
+                    'product_type': 'product_type',
                     'name': 'product_name'
                 }
-                sort_by = sort_field_map.get(sort_by, 'product_price')
-                    
-                query += f" ORDER BY {sort_by} {'ASC' if order=='asc' else 'DESC'}"
+                sort_field = sort_map.get(sort_by, 'product_price')
+                sort_order = 'ASC' if order.lower() == 'asc' else 'DESC'
                 
-                logger.debug(f"执行查询: {query}")
+                query += f" ORDER BY {sort_field} {sort_order}"
                 
-                cursor.execute(query)
-                items = cursor.fetchall()
-                
-                logger.debug(f"查询结果: {len(items)} 条记录")
-                return [dict(item) for item in items]
+                cursor.execute(query, (current_timestamp, current_timestamp))
+                return [dict(row) for row in cursor.fetchall()]
                 
         except Exception as e:
             logger.error(f"获取商品列表失败: {str(e)}")
             raise
         
-    def add_item(self, name: str, description: str, price: int, 
-                stock: int, image_url: str) -> int:
+    def add_item(self, name: str, description: str, price: int, stock: int, 
+                 image_url: str, product_type: str, online_time: int = None, 
+                 offline_time: int = None) -> int:
         """添加商品"""
-        cursor = self.get_db().cursor()
-        cursor.execute("""
-            INSERT INTO shop (
-                product_name, 
-                product_description, 
-                product_price, 
-                product_stock, 
-                product_image,
-                create_time
-            ) VALUES (?, ?, ?, ?, ?, datetime('now'))
-        """, (name, description, price, stock, image_url))
-        self.get_db().commit()
-        return cursor.lastrowid
+        try:
+            # 设置默认时间戳
+            current_timestamp = int(datetime.now().timestamp())
+            if not online_time:
+                online_time = current_timestamp
+            if not offline_time:
+                # 默认下架时间为2099年
+                offline_time = int(datetime(2099, 12, 31, 23, 59, 59).timestamp())
+            
+            logger.debug(f"添加商品: name={name}, price={price}, stock={stock}, "
+                        f"type={product_type}, online={online_time}, offline={offline_time}")
+            
+            with self.get_db() as db:
+                cursor = db.cursor()
+                cursor.execute("""
+                    INSERT INTO shop (
+                        product_name, 
+                        product_description, 
+                        product_price, 
+                        product_stock, 
+                        product_image,
+                        product_type,
+                        online_time,
+                        offline_time,
+                        create_time
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (name, description, price, stock, image_url, 
+                      product_type, online_time, offline_time, current_timestamp))
+                
+                item_id = cursor.lastrowid
+                db.commit()
+                logger.info(f"商品添加成功: id={item_id}")
+                return item_id
+                
+        except Exception as e:
+            logger.error(f"添加商品失败: {str(e)}")
+            raise
         
     def update_item(self, item_id: int, **kwargs) -> bool:
         """更新商品信息"""
-        field_map = {
-            'name': 'product_name',
-            'description': 'product_description',
-            'price': 'product_price',
-            'stock': 'product_stock',
-            'image_url': 'product_image',
-            'is_enabled': 'delete_time'
-        }
-        
-        fields = []
-        values = []
-        
-        for key, value in kwargs.items():
-            if key in field_map:
-                if key == 'is_enabled':
-                    fields.append(f"delete_time = {'NULL' if value else 'datetime(''now'')'}")
-                else:
-                    fields.append(f"{field_map[key]} = ?")
-                    values.append(value)
-        
-        if not fields:
-            return False
-            
-        values.append(item_id)
-        query = f"""
-            UPDATE shop 
-            SET {', '.join(fields)}
-            WHERE product_id = ?
-        """
-        
-        cursor = self.get_db().cursor()
-        cursor.execute(query, values)
-        self.get_db().commit()
-        return True
+        try:
+            logger.debug(f"更新商品: item_id={item_id}, data={kwargs}")
+            with self.get_db() as db:
+                cursor = db.cursor()
+                
+                # 字段映射
+                field_map = {
+                    'name': 'product_name',
+                    'description': 'product_description',
+                    'price': 'product_price',
+                    'stock': 'product_stock',
+                    'image_url': 'product_image',
+                    'product_type': 'product_type',
+                    'online_time': 'online_time',
+                    'offline_time': 'offline_time'
+                }
+                
+                updates = []
+                values = []
+                
+                for key, value in kwargs.items():
+                    if key in field_map and value is not None:
+                        updates.append(f"{field_map[key]} = ?")
+                        # 对数值类型进行转换
+                        if key in ['price', 'stock', 'online_time', 'offline_time']:
+                            values.append(int(value))
+                        else:
+                            values.append(value)
+                
+                if not updates:
+                    logger.warning("没有需要更新的字段")
+                    return False
+                    
+                values.append(item_id)  # WHERE 条件的参数
+                query = f"""
+                    UPDATE shop 
+                    SET {', '.join(updates)}
+                    WHERE product_id = ?
+                """
+                
+                logger.debug(f"执行SQL: {query}, 参数: {values}")
+                cursor.execute(query, values)
+                db.commit()
+                
+                affected_rows = cursor.rowcount
+                logger.info(f"更新商品成功: 影响行数={affected_rows}")
+                return affected_rows > 0
+                
+        except Exception as e:
+            logger.error(f"更新商品失败: {str(e)}")
+            raise
         
     def delete_item(self, item_id: int) -> bool:
         """删除商品（软删除）"""
-        cursor = self.get_db().cursor()
-        cursor.execute("""
-            UPDATE shop 
-            SET delete_time = datetime('now')
-            WHERE product_id = ?
-        """, (item_id,))
-        self.get_db().commit()
-        return True
+        try:
+            with self.get_db() as db:
+                cursor = db.cursor()
+                cursor.execute("""
+                    UPDATE shop 
+                    SET delete_time = datetime('now')
+                    WHERE product_id = ?
+                """, (item_id,))
+                db.commit()
+                
+                success = cursor.rowcount > 0
+                logger.info(f"删除商品 {item_id} {'成功' if success else '失败'}")
+                return success
+                
+        except Exception as e:
+            logger.error(f"删除商品失败: {str(e)}")
+            raise
         
     def purchase_item(self, user_id: int, item_id: int, quantity: int = 1) -> dict:
         """购买商品"""
         try:
+            current_timestamp = int(datetime.now().timestamp())
             cursor = self.get_db().cursor()
             cursor.execute("BEGIN TRANSACTION")
             
-            # 获取商品信息
+            # 获取商品信息并检查是否可购买
             cursor.execute("""
                 SELECT 
                     product_id as id,
@@ -218,13 +233,15 @@ class Shop:
                     product_price as price,
                     product_stock as stock
                 FROM shop 
-                WHERE product_id = ? AND delete_time IS NULL
-            """, (item_id,))
-            item = cursor.fetchone()
+                WHERE product_id = ? 
+                AND online_time <= ?
+                AND (offline_time IS NULL OR offline_time > ?)
+            """, (item_id, current_timestamp, current_timestamp))
             
+            item = cursor.fetchone()
             if not item:
                 raise ValueError("商品不存在或已下架")
-                
+            
             if item['stock'] < quantity:
                 raise ValueError("库存不足")
                 
@@ -318,16 +335,29 @@ def get_items():
 def add_item():
     """添加商品"""
     data = request.get_json()
+    logger.debug(f"收到添加商品请求: {data}")
+    
     try:
+        # 验证必填字段
+        required_fields = ['name', 'description', 'price', 'stock', 'image_url', 'product_type']
+        for field in required_fields:
+            if field not in data:
+                raise ValueError(f"缺少必填字段: {field}")
+        
         item_id = shop.add_item(
             name=data['name'],
             description=data['description'],
             price=int(data['price']),
             stock=int(data['stock']),
-            image_url=data['image_url']
+            image_url=data['image_url'],
+            product_type=data['product_type'],
+            online_time=data.get('online_time'),
+            offline_time=data.get('offline_time')
         )
+        logger.info(f"商品添加成功，ID: {item_id}")
         return jsonify({"code": 0, "data": {"id": item_id}})
     except Exception as e:
+        logger.error(f"添加商品失败: {str(e)}")
         return jsonify({"code": 1, "msg": str(e)})
 
 @shop_bp.route('/api/shop/items/<int:item_id>', methods=['PUT'])
@@ -335,10 +365,14 @@ def add_item():
 def update_item(item_id):
     """更新商品"""
     data = request.get_json()
+    logger.debug(f"收到更新商品请求: item_id={item_id}, data={data}")
+    
     try:
         success = shop.update_item(item_id, **data)
+        logger.info(f"商品更新{'成功' if success else '失败'}: item_id={item_id}")
         return jsonify({"code": 0 if success else 1})
     except Exception as e:
+        logger.error(f"更新商品失败: {str(e)}")
         return jsonify({"code": 1, "msg": str(e)})
 
 @shop_bp.route('/api/shop/items/<int:item_id>', methods=['DELETE'])
@@ -375,7 +409,6 @@ def shop_page():
 
 # 启动时检查数据库
 try:
-    logger.info("正在检查数据库连接...")
     with shop.get_db() as db:
         cursor = db.cursor()
         cursor.execute("SELECT COUNT(*) FROM shop")

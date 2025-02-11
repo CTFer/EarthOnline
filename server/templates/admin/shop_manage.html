@@ -1,109 +1,104 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-02 16:03:25
- * @LastEditTime: 2025-02-02 23:15:51
+ * @LastEditTime: 2025-02-03 22:42:19
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
  * Copyright 2025 迷舍
 -->
-{% extends "admin_base.html" %}
-
-{% block title %}商店管理{% endblock %}
-
-{% block head %}
-{{ super() }}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/shop_manage.css') }}">
-{% endblock %}
-
-{% block content %}
+{% extends "admin_base.html" %} {% block title %}商店管理{% endblock %} {% block content %}
+<link rel="stylesheet" href="/static/css/admin/shop_manage.css" />
 <div class="layui-container">
-    <div class="layui-row">
-        <div class="layui-col-md12">
-            <div class="layui-card">
-                <div class="layui-card-header">
-                    <span>商品管理</span>
-                    <div class="layui-btn-group">
-                        <button class="layui-btn layui-btn-sm" onclick="showItemForm()">
-                            <i class="layui-icon">&#xe654;</i> 添加商品
-                        </button>
-                    </div>
-                </div>
-                <div class="layui-card-body">
-                    <table id="itemTable" lay-filter="itemTable"></table>
-                </div>
-            </div>
+  <div class="layui-row">
+    <div class="layui-col-md12">
+      <div class="layui-card">
+        <div class="layui-card-header">
+          <span>商品管理</span>
+          <div class="layui-btn-group">
+            <button class="layui-btn layui-btn-sm" onclick="showItemForm()"><i class="layui-icon">&#xe654;</i> 添加商品</button>
+          </div>
         </div>
+        <div class="layui-card-body">
+          <table id="itemTable" lay-filter="itemTable"></table>
+        </div>
+      </div>
     </div>
+  </div>
 </div>
 
 <!-- 商品表单模板 -->
-<script type="text/html" id="itemFormTpl">
-    <form class="layui-form" id="itemForm" style="padding: 20px;">
-        <div class="layui-form-item">
-            <label class="layui-form-label">商品名称</label>
-            <div class="layui-input-block">
-                <input type="text" name="name" required lay-verify="required" 
-                       placeholder="请输入商品名称" class="layui-input">
-            </div>
-        </div>
-        
-        <div class="layui-form-item">
-            <label class="layui-form-label">商品描述</label>
-            <div class="layui-input-block">
-                <textarea name="description" placeholder="请输入商品描述" 
-                          class="layui-textarea"></textarea>
-            </div>
-        </div>
-        
-        <div class="layui-form-item">
-            <label class="layui-form-label">价格(积分)</label>
-            <div class="layui-input-block">
-                <input type="number" name="price" required lay-verify="required|number" 
-                       placeholder="请输入价格" class="layui-input">
-            </div>
-        </div>
-        
-        <div class="layui-form-item">
-            <label class="layui-form-label">库存</label>
-            <div class="layui-input-block">
-                <input type="number" name="stock" required lay-verify="required|number" 
-                       placeholder="请输入库存" class="layui-input">
-            </div>
-        </div>
-        
-        <div class="layui-form-item">
-            <label class="layui-form-label">商品图片</label>
-            <div class="layui-input-block">
-                <input type="text" name="image_url" required lay-verify="required" 
-                       placeholder="请输入图片URL" class="layui-input">
-            </div>
-        </div>
-        
-        <div class="layui-form-item">
-            <label class="layui-form-label">是否启用</label>
-            <div class="layui-input-block">
-                <input type="checkbox" name="is_enabled" lay-skin="switch" lay-text="是|否" checked>
-            </div>
-        </div>
-        
-        <div class="layui-form-item">
-            <div class="layui-input-block">
-                <button class="layui-btn" lay-submit lay-filter="itemForm">提交</button>
-                <button type="reset" class="layui-btn layui-btn-primary">重置</button>
-            </div>
-        </div>
-    </form>
+<script type="text/html" id="shopForm">
+  <form class="layui-form" id="itemForm" style="padding: 20px;">
+    <div class="layui-form-item">
+      <label class="layui-form-label">商品名称</label>
+      <div class="layui-input-block">
+        <input type="text" name="name" required lay-verify="required" placeholder="请输入商品名称" class="layui-input" />
+      </div>
+    </div>
+
+    <div class="layui-form-item">
+      <label class="layui-form-label">商品描述</label>
+      <div class="layui-input-block">
+        <textarea name="description" placeholder="请输入商品描述" class="layui-textarea"></textarea>
+      </div>
+    </div>
+
+    <div class="layui-form-item">
+      <label class="layui-form-label">价格(积分)</label>
+      <div class="layui-input-block">
+        <input type="number" name="price" required lay-verify="required|number" placeholder="请输入价格" class="layui-input" />
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <label class="layui-form-label">商品类型</label>
+      <div class="layui-input-block product-type-container">
+        <!-- 商品类型选项将通过 JS 动态生成 -->
+      </div>
+    </div>
+
+    <div class="layui-form-item">
+      <label class="layui-form-label">库存</label>
+      <div class="layui-input-block">
+        <input type="number" name="stock" required lay-verify="required|number" placeholder="请输入库存" class="layui-input" />
+      </div>
+    </div>
+
+    <div class="layui-form-item">
+      <label class="layui-form-label">商品图片</label>
+      <div class="layui-input-block">
+        <input type="text" name="image_url" required lay-verify="required" placeholder="请输入图片URL" class="layui-input" />
+      </div>
+    </div>
+
+    <div class="layui-form-item">
+      <label class="layui-form-label">上架时间</label>
+      <div class="layui-input-block">
+        <input type="text" name="online_time" class="layui-input" id="onlineTime" placeholder="请选择上架时间" />
+      </div>
+    </div>
+
+    <div class="layui-form-item">
+      <label class="layui-form-label">下架时间</label>
+      <div class="layui-input-block">
+        <input type="text" name="offline_time" class="layui-input" id="offlineTime" placeholder="请选择下架时间" />
+      </div>
+    </div>
+
+    <div class="layui-form-item">
+      <div class="layui-input-block">
+        <button class="layui-btn" lay-submit lay-filter="itemForm">提交</button>
+        <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+      </div>
+    </div>
+  </form>
 </script>
 
 <!-- 操作按钮模板 -->
 <script type="text/html" id="itemTableBar">
-    <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
-    <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+  <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+  <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
 </script>
-{% endblock %}
 
-{% block scripts %}
-{{ super() }}
-<script src="{{ url_for('static', filename='js/admin/shop_manage.js') }}"></script>
-{% endblock %} 
+<script src="/static/js/admin/shop_manage.js"></script>
+{% endblock %}

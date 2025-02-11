@@ -1,0 +1,685 @@
+body {
+    margin: 0;
+    padding: 20px;
+    background: #0a192f;
+    color: #fff;
+    font-family: Arial, sans-serif;
+}
+
+.admin-container {
+    padding: 80px 20px 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.panel {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(27, 39, 53, 0.5);
+    border: 1px solid rgba(87, 202, 255, 0.2);
+    border-radius: 8px;
+}
+
+h1, h2 {
+    color: #57CAFF;
+}
+.layui-table .layui-badge{
+    line-height: 9px;
+}
+.layui-table {
+    background: #1e2128;
+    color: #b0b6c2;
+}
+
+.layui-table th {
+    background: rgba(87, 202, 255, 0.1);
+    color: #57CAFF;
+}
+.layui-table-view{
+    border: none;
+}
+.control-panel {
+    margin-bottom: 20px;
+}
+
+.popup-form {
+    padding: 30px;
+    display: none;
+    background: #0a192f;
+}
+
+.popup-form .layui-form-label {
+    color: #57CAFF;
+    font-weight: bold;
+}
+
+.popup-form .layui-input,
+.popup-form .layui-textarea {
+    background: rgba(27, 39, 53, 0.5);
+    border: 1px solid rgba(87, 202, 255, 0.2);
+    color: #fff;
+    transition: all 0.3s ease;
+}
+
+.popup-form .layui-input:focus,
+.popup-form .layui-textarea:focus {
+    border-color: #57CAFF;
+    box-shadow: 0 0 5px rgba(87, 202, 255, 0.3);
+}
+
+.popup-form .layui-form-item {
+    margin-bottom: 20px;
+}
+
+.popup-form .layui-input-block {
+    margin-left: 110px;
+}
+
+/* 表单验证提示样式 */
+.layui-form-danger:focus {
+    border-color: #FF5722 !important;
+}
+
+/* 按钮样式优化 */
+.control-panel .layui-btn {
+    background-color: #57CAFF;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.control-panel .layui-btn:hover {
+    background-color: #3ba8ff;
+    box-shadow: 0 0 10px rgba(87, 202, 255, 0.3);
+}
+
+/* 弹出层样式优化 */
+.layui-layer {
+    background: #0a192f !important;
+    border: 1px solid rgba(87, 202, 255, 0.2) !important;
+    border-radius: 8px !important;
+}
+
+.layui-layer-title {
+    background: rgba(27, 39, 53, 0.5) !important;
+    color: #57CAFF !important;
+    border-bottom: 1px solid rgba(87, 202, 255, 0.2) !important;
+}
+
+.layui-layer-btn {
+    border-top: 1px solid rgba(87, 202, 255, 0.2) !important;
+    background: rgba(27, 39, 53, 0.5) !important;
+}
+
+.layui-layer-btn a {
+    background-color: #57CAFF !important;
+    border-color: #57CAFF !important;
+    border-radius: 4px !important;
+}
+
+.layui-layer-btn .layui-layer-btn1 {
+    background-color: transparent !important;
+    color: #57CAFF !important;
+    border: 1px solid #57CAFF !important;
+}
+
+/* 进行中任务卡片样式 */
+.task-card.current {
+    position: relative;
+    background: rgba(27, 39, 53, 0.8);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(87, 202, 255, 0.2);
+}
+
+.task-progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: #57CAFF;
+    transition: width 0.3s linear;
+}
+
+.task-content-wrapper {
+    position: relative;
+    z-index: 1;
+}
+
+.task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.task-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.task-type-badge i {
+    margin-right: 4px;
+    font-size: 14px;
+}
+
+.task-timer {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+}
+
+.task-timer i {
+    margin-right: 4px;
+    font-size: 14px;
+}
+
+.task-body {
+    margin: 12px 0;
+}
+
+.task-title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: #fff;
+}
+
+.task-description {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.4;
+}
+
+.task-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(87, 202, 255, 0.1);
+}
+
+.task-rewards {
+    display: flex;
+    gap: 12px;
+}
+
+.reward-item {
+    display: flex;
+    align-items: center;
+    color: rgba(87, 202, 255, 0.9);
+    font-size: 13px;
+}
+
+.reward-item i {
+    margin-right: 4px;
+    font-size: 14px;
+}
+
+/* Swiper样式优化 */
+.active-tasks-swiper {
+    padding: 10px 0;
+}
+
+.swiper-slide {
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.swiper-slide-active {
+    opacity: 1;
+}
+
+.swiper-pagination-bullet {
+    width: 6px;
+    height: 6px;
+    background: rgba(87, 202, 255, 0.5);
+    opacity: 0.5;
+}
+
+.swiper-pagination-bullet-active {
+    opacity: 1;
+    background: #57CAFF;
+}
+
+.swiper-button-next,
+.swiper-button-prev {
+    color: rgba(87, 202, 255, 0.8);
+    width: 30px;
+    height: 30px;
+}
+
+.swiper-button-next:after,
+.swiper-button-prev:after {
+    font-size: 16px;
+}
+
+/* 任务行布局 */
+.active-tasks-row {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+/* 空状态提示 */
+.empty-tip {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 30px;
+    font-size: 14px;
+}
+
+/* 表格样式优化 */
+.layui-table {
+    background: #1e2128;
+    color: #b0b6c2;
+}
+
+/* 表头样式 */
+.layui-table thead tr {
+    background-color: #272b34;
+}
+
+.layui-table thead th {
+    color: #8f96a3;
+    font-weight: 500;
+    border-color: #363a43;
+}
+
+/* 表格内容样式 */
+.layui-table tbody tr {
+    transition: background 0.3s;
+}
+
+.layui-table tbody tr:hover {
+    background-color: #2a2f3a !important;
+}
+
+/* 斑马纹样式 */
+.layui-table tr:nth-child(even) {
+    background-color: #23262f;
+}
+
+/* 表格边框颜色 */
+.layui-table td, .layui-table th {
+    border-color: #363a43;
+}
+
+/* 状态标签样式 */
+.layui-badge {
+    padding: 4px 8px;
+    border-radius: 2px;
+}
+
+.layui-badge.layui-bg-green {
+    background-color: #27ae60 !important;
+}
+
+.layui-badge.layui-bg-gray {
+    background-color: #636e7b !important;
+}
+
+/* 操作按钮样式 */
+.layui-table .layui-btn {
+    padding: 0 10px;
+    height: 24px;
+    line-height: 24px;
+    font-size: 12px;
+    border-radius: 2px;
+}
+
+.layui-table .layui-btn-xs {
+    background-color: #2980b9;
+    border: none;
+}
+
+.layui-table .layui-btn-danger {
+    background-color: #c0392b;
+}
+
+/* 分页样式 */
+.layui-laypage a, .layui-laypage span {
+    background-color: #272b34;
+    color: #b0b6c2;
+    border-color: #363a43;
+}
+
+.layui-laypage a:hover {
+    color: #fff;
+}
+
+.layui-laypage .layui-laypage-curr .layui-laypage-em {
+    background-color: #2980b9;
+}
+
+/* 表格行选中状态 */
+.layui-table-click {
+    background-color: #2a2f3a !important;
+    color: #fff !important;
+}
+
+/* 表格排序图标 */
+.layui-table-sort {
+    width: 10px;
+    height: 20px;
+}
+
+.layui-table-sort-asc {
+    border-bottom-color: #8f96a3;
+}
+
+.layui-table-sort-desc {
+    border-top-color: #8f96a3;
+}
+
+/* 表格工具栏 */
+.layui-table-tool {
+    background-color: #272b34;
+    border-color: #363a43;
+}
+
+/* 空数据提示 */
+.layui-table-none {
+    color: #8f96a3;
+    background-color: #1e2128;
+}
+
+.admin-nav {
+    margin-bottom: 20px;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.admin-nav .layui-btn {
+    margin-right: 10px;
+}
+
+.panel-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.panel-header h2 {
+    margin: 0;
+}
+
+.layui-btn i {
+    margin-right: 5px;
+}
+
+/* 顶部导航样式优化 */
+.admin-header {
+    background-color: rgba(27, 39, 53, 0.95);
+    padding: 0 20px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(87, 202, 255, 0.2);
+}
+
+/* Logo区域 */
+.admin-header .logo {
+    display: flex;
+    align-items: center;
+}
+
+.admin-header .logo h1 {
+    color: #57CAFF;
+    font-size: 18px;
+    margin: 0;
+    padding: 0;
+}
+
+/* 导航菜单 */
+.admin-header .nav-menu {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 100%;
+}
+
+.admin-header .nav-menu .layui-btn {
+    height: 36px;
+    line-height: 36px;
+    padding: 0 15px;
+    border-radius: 4px;
+    background-color: rgba(87, 202, 255, 0.1);
+    color: #57CAFF;
+    border: 1px solid rgba(87, 202, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.admin-header .nav-menu .layui-btn:hover {
+    background-color: rgba(87, 202, 255, 0.2);
+    border-color: rgba(87, 202, 255, 0.4);
+    box-shadow: 0 0 10px rgba(87, 202, 255, 0.1);
+}
+
+.admin-header .nav-menu .layui-btn.layui-btn-danger {
+    background-color: rgba(255, 87, 87, 0.1);
+    color: #ff5757;
+    border-color: rgba(255, 87, 87, 0.2);
+}
+
+.admin-header .nav-menu .layui-btn.layui-btn-danger:hover {
+    background-color: rgba(255, 87, 87, 0.2);
+    border-color: rgba(255, 87, 87, 0.4);
+    box-shadow: 0 0 10px rgba(255, 87, 87, 0.1);
+}
+.admin-header .admin-name {
+    color: #FFB800;
+    font-size: 14px;
+}
+
+
+/* 主容器样式 */
+.admin-container {
+    padding: 80px 20px 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* 页脚样式 */
+.admin-footer {
+    text-align: center;
+    padding: 20px;
+    color: rgba(255, 255, 255, 0.6);
+    background-color: rgba(27, 39, 53, 0.5);
+    margin-top: 20px;
+    border-top: 1px solid rgba(87, 202, 255, 0.1);
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 768px) {
+    .admin-header {
+        padding: 10px;
+        height: auto;
+        flex-direction: column;
+    }
+
+    .admin-header .logo {
+        margin-bottom: 10px;
+    }
+
+    .admin-header .nav-menu {
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .admin-header .nav-menu .layui-btn {
+        margin: 5px;
+    }
+
+    .admin-container {
+        padding: 100px 10px 20px;
+    }
+
+    .panel {
+        margin: 10px;
+        padding: 15px;
+    }
+}
+
+/* NFC设备状态样式 */
+.nfc-device-status {
+    margin: 15px 0;
+    padding: 15px;
+    border-radius: 8px;
+    background: #f8f8f8;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    margin: 10px 0;
+    font-size: 14px;
+}
+
+.status-item .label {
+    min-width: 120px;
+    font-weight: 500;
+    color: #666;
+}
+
+.status {
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+}
+
+.status.connected {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.status.connected::before {
+    background-color: #4caf50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.status.disconnected {
+    background-color: #fbe9e7;
+    color: #c62828;
+}
+
+.status.disconnected::before {
+    background-color: #ef5350;
+    box-shadow: 0 0 0 2px rgba(239, 83, 80, 0.2);
+}
+
+.status.card-present {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+.status.card-present::before {
+    background-color: #42a5f5;
+    box-shadow: 0 0 0 2px rgba(66, 165, 245, 0.2);
+}
+
+.status.no-card {
+    background-color: #fff3e0;
+    color: #ef6c00;
+}
+
+.status.no-card::before {
+    background-color: #ffa726;
+    box-shadow: 0 0 0 2px rgba(255, 167, 38, 0.2);
+}
+
+/* 添加端口信息显示 */
+.port-info {
+    font-size: 12px;
+    color: #000;
+    margin-left: 8px;
+}
+
+.nfc-status-panel {
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    color: #f8f8f8;
+}
+
+.status-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+#lastCheckTime {
+    margin-left: 15px;
+    color: #666;
+}
+
+.device-status, .card-status {
+    margin: 10px 0;
+}
+
+
+.status {
+    padding: 4px 8px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+
+.status.connected {
+    background: #5FB878;
+    color: white;
+}
+
+.status.disconnected {
+    background: #FF5722;
+    color: white;
+}
+
+.status.card-present {
+    background: #1E9FFF;
+    color: white;
+}
+
+.port-info {
+    margin-left: 8px;
+    color: #666;
+}
+
+.nfc-operations {
+    margin-top: 15px;
+}
