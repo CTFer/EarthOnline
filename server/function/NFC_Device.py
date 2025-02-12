@@ -227,38 +227,84 @@ class NFC_Device:
             return None
 
     def write_card_data(self, page, data):
-        """写入单页数据"""
+        """写入单页数据到NTAG215并验证
+        Args:
+            page: 页码 (0-129)
+            data: 8字节的十六进制数据
+        Returns:
+            bool: 写入并验证成功返回True
+        """
         try:
-            # 使用与旧方法相同的命令格式
+            if not self.initialized or not self.serial_port:
+                print("[NFC] 设备未初始化")
+                return False
+                
+            # 构造写入命令 (NTAG215 Write Command: A2)
             cmd_body = bytes.fromhex(f'D4 40 01 A2 {page:02x} {data}')
             cmd = self._build_command(cmd_body)
-            print(f"[NFC] 写入命令: {cmd.hex()}")
+            print(f"\n[NFC] === 页 {page} 写入操作 ===")
+            print(f"预期数据: {data}")
+            print(f"写入命令: {cmd.hex()}")
             
-            # 发送命令前清空缓冲区
-            self.serial_port.reset_input_buffer()
-            self.serial_port.reset_output_buffer()
-            
-            # 发送写入命令
-            self.serial_port.write(cmd)
-            
-            # 等待响应
-            time.sleep(0.02)
-            
-            # 读取响应
-            response = self.serial_port.read_all()
-            print(f"[NFC] 写入响应: {response.hex() if response else 'None'}")
-            
-            # 使用与旧方法相同的响应检查
-            success = bool(response and 'd541' in response.hex())
-            if success:
-                print(f"[NFC] 页 {page} 写入成功")
-            else:
-                print(f"[NFC] 页 {page} 写入失败")
-            
-            return success
+            max_retries = 3
+            for retry in range(max_retries):
+                # 发送命令前清空缓冲区
+                self.serial_port.reset_input_buffer()
+                self.serial_port.reset_output_buffer()
+                
+                # 发送写入命令
+                self.serial_port.write(cmd)
+                time.sleep(0.02)  # 等待写入完成
+                
+                # 读取写入响应
+                response = self.serial_port.read_all()
+                print(f"写入响应: {response.hex() if response else 'None'}")
+                
+                # 检查写入响应 (D5 41 00 表示成功)
+                if response and 'd541' in response.hex().lower():
+                    # 验证写入的数据
+                    time.sleep(0.02)  # 等待数据稳定
+                    read_data = self.read_card_data(page)
+                    
+                    if read_data:
+                        print(f"读取数据: {read_data}")
+                        # 比较预期数据和实际数据
+                        if read_data.upper() == data.upper():
+                            print(f"数据验证: [成功] 预期={data} 实际={read_data}")
+                            print(f"[NFC] 页 {page} 写入成功，验证通过")
+                            return True
+                        else:
+                            print(f"数据验证: [失败]")
+                            print(f"  预期数据: {data}")
+                            print(f"  实际数据: {read_data}")
+                            print(f"  差异位置: ", end='')
+                            for i in range(min(len(data), len(read_data))):
+                                if data[i].upper() != read_data[i].upper():
+                                    print(f"位置{i}[{data[i]}!={read_data[i]}] ", end='')
+                            print()
+                            
+                            if retry < max_retries - 1:
+                                print(f"正在重试 ({retry + 1}/{max_retries})...")
+                                time.sleep(0.05)  # 重试前等待
+                                continue
+                    else:
+                        print(f"数据验证: [失败] 无法读取数据")
+                        if retry < max_retries - 1:
+                            print(f"正在重试 ({retry + 1}/{max_retries})...")
+                            time.sleep(0.05)
+                            continue
+                else:
+                    print(f"写入响应: [失败] 未收到正确的响应")
+                    if retry < max_retries - 1:
+                        print(f"正在重试 ({retry + 1}/{max_retries})...")
+                        time.sleep(0.05)
+                        continue
+                    
+            print(f"[NFC] 页 {page} 写入失败，重试次数达到上限")
+            return False
             
         except Exception as e:
-            print(f"[NFC] 写入页 {page} 数据错误: {str(e)}")
+            print(f"[NFC] 写入页 {page} 错误: {str(e)}")
             return False
 
     def write_card_data_old(self, block_number, data):
@@ -279,7 +325,7 @@ class NFC_Device:
             self.serial_port.write(cmd)
             
             # 使用更短的等待时间
-            # time.sleep(0.05)
+            time.sleep(0.05)
             
             # 快速检查响应
             response = self.serial_port.read_all()
@@ -313,10 +359,10 @@ class NFC_Device:
             if card_id:
                 if not card_present or card_id != last_card_id:
                     print(f"[NFC] 检测到卡片: {card_id}")
-                    # 尝试一次性读取，如果失败则使用分页读取
-                    data = self.read_all_card_data()
+                    # 尝试分页读取，如果失败则使用一次性读取
+                    data = self.read_card_data_by_page()
                     if not data:
-                        data = self.read_card_data_by_page()
+                        data = self.read_all_card_data()
                     if data:
                         print(f"[NFC] 读取数据: {data}")
                         
@@ -458,42 +504,62 @@ class NFC_Device:
             return None
 
     def read_all_card_data(self, start_page=4, end_page=129):
-        """自动识别卡片类型并读取数据"""
-        if not self.initialized or not self.serial_port:
-            print("[NFC] 设备未初始化")
-            return None
-        
+        """读取NTAG215所有数据
+        Args:
+            start_page: 起始页码 (默认4)
+            end_page: 结束页码 (默认129)
+        Returns:
+            str: 十六进制数据字符串
+        """
         try:
+            if not self.initialized or not self.serial_port:
+                print("[NFC] 设备未初始化")
+                return None
+                
+            # 检查卡片
             if not self.read_card_id():
                 print("[NFC] 未检测到卡片")
                 return None
+                
+            print("[NFC] 开始读取数据...")
+            all_data = []
             
-            # 识别卡片类型
-            card_type = self.read_card_type()
-            if not card_type:
-                # 尝试通过读取特征块来识别卡片类型
-                test_data = self.read_card_data(0)  # 读取第0块
-                if test_data and len(test_data) == 32:
-                    # Mifare Classic通常在第0块有特定格式
-                    if test_data.startswith('0400'):
-                        print("[NFC] 通过数据特征识别为Mifare Classic")
-                        return self._read_classic_data()
-                        
-                print("[NFC] 无法识别卡片类型，尝试默认读取方式")
-                return self._read_ntag_data(start_page, end_page)
-            
-            print(f"[NFC] 检测到卡片类型: {card_type}")
-            
-            if card_type == 'NTAG215':
-                return self._read_ntag_data(start_page, end_page)
-            elif card_type == 'MIFARE_CLASSIC_1K':
-                return self._read_classic_data()
-            else:
-                print("[NFC] 不支持的卡片类型")
+            # 逐页读取数据
+            for page in range(start_page, end_page):
+                # 清空缓冲区
+                self.serial_port.reset_input_buffer()
+                self.serial_port.reset_output_buffer()
+                
+                # 读取单页数据
+                page_data = self.read_card_data(page)
+                if not page_data:
+                    print(f"[NFC] 读取页 {page} 失败")
+                    break
+                    
+                print(f"[NFC] 页 {page}: {page_data}")
+                all_data.append(page_data)
+                
+                # 检查是否遇到结束标记 (FE)
+                if 'FE' in page_data:
+                    # 找到FE的位置
+                    fe_pos = page_data.find('FE')
+                    # 保留FE及之前的数据
+                    all_data[-1] = page_data[:fe_pos + 2]
+                    break
+                    
+                time.sleep(0.01)  # 短暂延时确保稳定性
+                
+            if not all_data:
+                print("[NFC] 未读取到有效数据")
                 return None
+                
+            # 合并所有数据
+            complete_data = ''.join(all_data)
+            print(f"\n[NFC] 完整数据: {complete_data}")
+            return complete_data
             
         except Exception as e:
-            print(f"[NFC] 读取错误: {str(e)}")
+            print(f"[NFC] 读取数据错误: {str(e)}")
             return None
 
     def _wait_for_card(self):
@@ -901,6 +967,67 @@ class NFC_Device:
             return False
 
     def _write_ntag_data(self, hex_data):
+        """写入数据到NTAG卡片"""
+        try:
+            # 初始检查卡片
+            card_id = self.read_card_id()
+            if not card_id:
+                print("[NFC] 未检测到卡片")
+                return False
+                
+            print(f"[NFC] 开始写入NTAG215数据...")
+            
+            # 计算需要写入的页数
+            data_len = len(hex_data)
+            pages = (data_len + 7) // 8
+            
+            # 分页写入数据
+            for page in range(pages):
+                start = page * 8
+                end = min(start + 8, data_len)
+                page_data = hex_data[start:end].ljust(8, '0')
+                
+                # 写入单页数据
+                if not self.write_card_data(page + 4, page_data):
+                    print(f"[NFC] 写入页 {page + 4} 失败")
+                    return False
+                    
+                time.sleep(0.05)
+            
+            print("[NFC] 验证完整数据...")
+            # 读取完整数据进行验证
+            read_data = ""
+            for page in range(pages):
+                page_data = self.read_card_data(page + 4)
+                if not page_data:
+                    print(f"[NFC] 读取页 {page + 4} 失败")
+                    return False
+                read_data += page_data
+                
+            # 移除末尾的填充零
+            written_data = hex_data.rstrip('0')
+            read_data = read_data.rstrip('0')
+            
+            print("\n[NFC] 数据对比:")
+            print(f"预期数据: {written_data}")
+            print(f"实际数据: {read_data}")
+            
+            if written_data == read_data:
+                print("[NFC] 数据验证成功")
+                return True
+            else:
+                print("[NFC] 数据验证失败")
+                print("差异位置:")
+                for i, (w, r) in enumerate(zip(written_data, read_data)):
+                    if w != r:
+                        print(f"位置 {i}: 预期={w} 实际={r}")
+                return False
+                
+        except Exception as e:
+            print(f"[NFC] 写入NTAG数据错误: {str(e)}")
+            return False
+
+    def _write_ntag_data_old(self, hex_data):
         """写入NTAG215数据"""
         try:
             # 初始检查卡片，只检查一次
@@ -931,7 +1058,7 @@ class NFC_Device:
                     return False
                 
                 # 最小化延时
-                time.sleep(0.01)
+                time.sleep(0.05)
             
             print("[NFC] 验证数据...")
             written_data = hex_data.rstrip('0')
@@ -941,13 +1068,13 @@ class NFC_Device:
                 print("[NFC] 数据验证失败")
                 return False            
             # 写入完成后等待数据稳定
-            time.sleep(0.1)
+            time.sleep(0.05)
             
             print("[NFC] 写入完成")
             return True
             
         except Exception as e:
-            print(f"[NFC] NTAG215写入错误: {str(e)}")
+            print(f"[NFC] 写入NTAG数据错误: {str(e)}")
             return False
 
     def _write_classic_data(self, hex_data):
@@ -1023,16 +1150,20 @@ class NFC_Device:
             # 原始数据展示
             print("\n[原始HEX数据]")
             if debug_color:
-                # 染色显示不同部分
-                colored_hex = (
-                    f"\033[94m{full_hex[:8]}\033[0m"  # NDEF头部(蓝色)
-                    f"\033[92m{full_hex[8:12]}\033[0m"  # 标识符(绿色)
-                    f"\033[93m{full_hex[12:20]}\033[0m"  # w1/10前缀(黄色)
-                    f"\033[97m{full_hex[20:-14]}\033[0m"  # URL数据(白色)
-                    f"\033[91m{full_hex[-14:-6]}\033[0m"  # 结束标记(红色)
-                    f"\033[90m{full_hex[-6:]}\033[0m"  # 填充(灰色)
-                )
-                print(colored_hex)
+                try:
+                    # 染色显示不同部分
+                    colored_hex = (
+                        f"\033[94m{full_hex[:8]}\033[0m"  # NDEF头部(蓝色)
+                        f"\033[92m{full_hex[8:12]}\033[0m"  # 标识符(绿色)
+                        f"\033[93m{full_hex[12:20]}\033[0m"  # w1/10前缀(黄色)
+                        f"\033[97m{full_hex[20:-14]}\033[0m"  # URL数据(白色)
+                        f"\033[91m{full_hex[-14:-6]}\033[0m"  # 结束标记(红色)
+                        f"\033[90m{full_hex[-6:]}\033[0m"  # 填充(灰色)
+                    )
+                    print(colored_hex)
+                except Exception as e:
+                    print(full_hex)
+                    print(f"染色显示错误: {str(e)}")
             else:
                 print(full_hex)
                 
@@ -1040,48 +1171,45 @@ class NFC_Device:
             print(f"总长度: {len(full_hex)//2} 字节")
             
             # 尝试多种编码解码
-            encodings = {
-                'ASCII': 'ascii',
-
-
-            }
+            encodings = ['ascii', 'utf-8']
+            decoded_data = None
             
-            # 不同数据段的解码尝试
-            data_segments = {
-                '完整数据': full_hex,
-            }
-            
-
-                
-            for enc_name, encoding in encodings.items():
+            for encoding in encodings:
                 try:
-                    decoded = bytes.fromhex(full_hex).decode(encoding, errors='ignore')
+                    # 确保hex字符串是有效的
+                    clean_hex = ''.join(c for c in full_hex if c.isalnum())
+                    if len(clean_hex) % 2 != 0:
+                        clean_hex = clean_hex[:-1]  # 确保长度为偶数
+                        
+                    decoded = bytes.fromhex(clean_hex).decode(encoding, errors='ignore')
                     # 移除空字符和控制字符
                     cleaned = ''.join(char for char in decoded if ord(char) >= 32)
                     if cleaned:
-                        print(f"{enc_name:10}: {cleaned}")
+                        print(f"{encoding:10}: {cleaned}")
+                        if not decoded_data:
+                            decoded_data = cleaned
                 except Exception as e:
-                    print(f"{enc_name:10}: 解码失败 - {str(e)}")
-            
+                    print(f"{encoding:10}: 解码失败 - {str(e)}")
 
             print("\n" + "="*50)
             return {
                 'data': {
-                    'decoded_data': decoded
+                    'decoded_data': decoded_data if decoded_data else "解码失败"
                 }
             }
+            
         except Exception as e:
             print(f"整体解码过程出错: {str(e)}")
             traceback.print_exc()
-            return jsonify({
+            return {
                 'code': -1,
                 'msg': f'解码错误: {str(e)}',
                 'data': None
-            })
+            }
 
     def decode_hex_data_test(self, full_hex):
         """测试解码HEX数据"""
-        self.decode_hex_data(full_hex, debug_color=True)
+        return self.decode_hex_data(full_hex, debug_color=True)
 
     def read_card_type(self):
         """读取卡片类型"""
@@ -1313,99 +1441,62 @@ class NFC_Device:
         return status
 
     def parse_nfc_data(self, hex_data):
-        """解析NFC卡片数据，提取URL和参数
+        """解析NFC数据，处理特定的干扰字符
         Args:
-            hex_data: 十六进制格式的数据字符串
+            hex_data: 十六进制字符串
         Returns:
-            dict: 包含解析结果的字典
+            dict: 解析后的数据字典
         """
         try:
-            print("[NFC] 开始解析数据")
-            result = {
-                'url': '',
-                'params': {},
-                'raw_data': hex_data
+            # 转换为ASCII字符串
+            ascii_data = bytes.fromhex(hex_data).decode('ascii', errors='ignore')
+            print(f"[NFC] 原始ASCII数据: {ascii_data}")
+            
+            # 提取基本结构：http开头的URL
+            full_match = re.search(r'(http:[^|]+)', ascii_data)
+            if not full_match:
+                print("[NFC] 未找到有效URL格式")
+                return None
+            
+            # 提取并清理URL
+            base_url = full_match.group(1)
+            print(f"[NFC] 清理后的URL: {base_url}")
+            # 提取参数部分：从|后面开始，到T或;T之前的内容
+            params_match = re.search(r'\|(.*?)(?=;?T[a-z]|$)', ascii_data)
+            if params_match:
+                params_str = params_match.group(1)
+                print(f"[NFC] 找到参数字符串: {params_str}")
+            else:
+                print("[NFC] 未找到参数")
+                print(f"[NFC] 尝试查找 '|' 位置: {ascii_data.find('|')}")
+            print(f"[NFC] 原始参数字符串: {params_str}")
+            
+            # 清理并解析参数
+            # 移除所有控制字符和可能的干扰
+            clean_params_str = re.sub(r'[\x00-\x1F\x7F-\xFF]', '', params_str)
+            clean_params_str = re.sub(r'\s+', '', clean_params_str)  # 移除所有空白字符
+            
+            # 解析参数对
+            params = {}
+            param_pairs = clean_params_str.split(';')
+            for pair in param_pairs:
+                if '=' in pair:
+                    key, value = pair.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    if key and value:  # 确保键值都不为空
+                        params[key] = value
+            
+            print(f"[NFC] 解析后的参数: {params}")
+            
+            return {
+                'url': base_url,
+                'params': params,
+                'ascii': ascii_data
             }
             
-            # 1. 解码为ASCII并清理数据
-            try:
-                ascii_data = bytes.fromhex(hex_data).decode('ascii', errors='ignore')
-                # 清理不可见字符
-                ascii_data = ''.join(char for char in ascii_data if char.isprintable())
-                result['ascii'] = ascii_data
-                print(f"[NFC] ASCII数据: {ascii_data}")
-            except Exception as e:
-                print(f"[NFC] ASCII解码失败: {str(e)}")
-                return None
-            
-            # 2. 提取基本URL部分
-            try:
-                # 查找标准URL开始位置
-                url_start = ascii_data.find('http://')
-                if url_start == -1:
-                    print("[NFC] 未找到有效的URL")
-                    return None
-                
-                # 从URL开始处理数据
-                ascii_data = ascii_data[url_start:]
-                
-                # 分离URL和参数
-                if '|' in ascii_data:
-                    base_url, params_str = ascii_data.split('|', 1)
-                    result['url'] = base_url.strip()
-                    
-                    # 3. 解析参数
-                    if params_str:
-                        # 去除android包信息部分
-                        if 'android.com' in params_str:
-                            params_str = params_str[:params_str.find('android.com')]
-                        
-                        params_list = params_str.strip(';').split(';')
-                        for param in params_list:
-                            if '=' in param:
-                                key, value = [p.strip() for p in param.split('=', 1)]
-                                # 清理key和value中的特殊字符
-                                key = ''.join(c for c in key if c.isalnum() or c == '_')
-                                value = value.strip()
-                                
-                                # 根据参数类型进行转换
-                                if key in ['card_id', 'player_id', 'id', 'value']:
-                                    try:
-                                        # 提取数字部分
-                                        num_value = ''.join(c for c in value if c.isdigit() or c == '-')
-                                        value = int(num_value) if num_value else 0
-                                    except ValueError:
-                                        print(f"[NFC] 警告: 参数 {key} 的值 {value} 不是有效的数字")
-                                        continue
-                                    
-                                elif key == 'type':
-                                    valid_types = ['ID', 'TASK', 'MEDAL', 'Points', 'CARD']
-                                    if value not in valid_types:
-                                        print(f"[NFC] 警告: 无效的type值: {value}")
-                                        continue
-                                    
-                                result['params'][key] = value
-                                
-                    print(f"[NFC] 解析结果:")
-                    print(f"基础URL: {result['url']}")
-                    print(f"参数: {json.dumps(result['params'], indent=2, ensure_ascii=False)}")
-                    
-                    # 4. 验证必要参数
-                    required_params = ['card_id', 'type', 'player_id', 'id', 'value', 'device']
-                    missing_params = [param for param in required_params if param not in result['params']]
-                    if missing_params:
-                        print(f"[NFC] 警告: 缺少必要参数: {', '.join(missing_params)}")
-                        
-                    return result
-                    
-            except Exception as e:
-                print(f"[NFC] 参数解析错误: {str(e)}")
-                traceback.print_exc()
-                return None
-            
         except Exception as e:
-            print(f"[NFC] 数据解析错误: {str(e)}")
-            traceback.print_exc()
+            print(f"[NFC] 解析数据错误: {str(e)}")
             return None
 
 def main():
@@ -1420,7 +1511,7 @@ def main():
         print("1. 读取卡片")
         print("2. 写入ASCII数据")
         print("3. 写入HEX数据")
-        print("4. 格式化HEX数据")
+        print("4. ASCII转HEX数据")
         print("5. 解码HEX数据")
         print("6. 读取卡片类型")
         print("7. 列出nfcpy可连接的设备")
@@ -1451,13 +1542,7 @@ def main():
         elif choice == '7':
             '''列出nfcpy可连接的设备'''
             try:
-                clf = nfc.ContactlessFrontend('com7')  # 根据实际情况修改端口
-                targets = clf.sense(nfc.clf.RemoteTarget('106A'), nfc.clf.RemoteTarget('106B'), nfc.clf.RemoteTarget('212F'))
-                if targets:
-                    print("NFC target detected!")
-                else:
-                    print("No NFC target detected.")
-                clf.close()
+                device = nfc_device.init_nfc_reader()
             except Exception as e:
                 print(f"Error listing devices: {str(e)}")
         elif choice == '8':

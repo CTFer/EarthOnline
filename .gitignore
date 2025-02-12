@@ -5,3 +5,4 @@ server/database/game.db
 main.sql
 resource/
 test/
+server.log

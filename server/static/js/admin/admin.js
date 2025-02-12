@@ -1319,7 +1319,7 @@ layui.use(["layer", "form", "element", "table"], function () {
   }
 
   // 写入NFC实体卡片（硬件操作）
-  function writeNFCHardware(cardData) {
+  async function writeNFCHardware(cardData) {
     console.log("[NFC Hardware] 准备写入实体卡片:", cardData);
     
     // 检查卡片状态并调用checkNFCHardwareAndWrite
@@ -1352,18 +1352,18 @@ layui.use(["layer", "form", "element", "table"], function () {
   }
 
   // 检查NFC设备状态并写入
-  function checkNFCHardwareAndWrite(cardData) {
+  async function checkNFCHardwareAndWrite(cardData) {
     console.log("[NFC Hardware] 检查设备状态");
     $.ajax({
         url: "/admin/api/nfc/hardware/status",
         type: "GET",
-        success: function(res) {
+        success: async function(res) {
             console.log("[NFC Hardware] 设备状态检查结果:", res); // 添加日志
             
             // 修正属性名称
             if (res.code === 0 && res.data.device_connected && res.data.card_present) {
                 console.log("[NFC Hardware] 设备就绪，开始写入");
-                executeNFCHardwareWrite(cardData);
+                await executeNFCHardwareWrite(cardData);
             } else {
                 // 添加更详细的错误信息
                 let errorMsg = "NFC设备未就绪或未检测到卡片: ";
@@ -1384,7 +1384,7 @@ layui.use(["layer", "form", "element", "table"], function () {
   }
 
   // 执行NFC硬件写入操作
-  function executeNFCHardwareWrite(cardData) {
+  async function executeNFCHardwareWrite(cardData) {
     console.log("[NFC Hardware] 执行写入操作");
     const writeData = {
         CARD_ID: cardData.card_id,
@@ -1414,27 +1414,90 @@ layui.use(["layer", "form", "element", "table"], function () {
     
     console.log("[NFC Hardware] 生成的URL数据:", urlData);
 
-    $.ajax({
-        url: "/admin/api/nfc/hardware/write",
-        type: "POST",
-        contentType: "application/json",
-        data: JSON.stringify({
-            data: urlData
-        }),
-        success: function(res) {
-            if (res.code === 0) {
-                layer.msg("实体卡片写入成功");
-                updateCardStatus(cardData.card_id, "ACTIVE");
-            } else {
-                layer.msg(res.msg || "实体卡片写入失败");
-                console.error("[NFC Hardware] 写入失败:", res.msg);
-            }
-        },
-        error: function(xhr, error) {
-            console.error("[NFC Hardware] 写入请求失败:", error);
-            layer.msg("写入请求失败: " + error);
-        }
+    // 显示写入进度
+    const loadingIndex = layer.load(1, {
+        shade: [0.3, '#fff'],
+        content: '正在写入卡片...'
     });
+
+    try {
+        const response = await fetch("/admin/api/nfc/hardware/write", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                data: urlData
+            })
+        });
+
+        const result = await response.json();
+        layer.close(loadingIndex);
+
+        if (result.code === 0) {
+            // 写入成功后验证数据
+            const verifyResult = await verifyCardData(cardData.card_id, urlData);
+            if (verifyResult.success) {
+                layer.msg("实体卡片写入成功");
+                await updateCardStatus(cardData.card_id, "ACTIVE");
+                return true;
+            } else {
+                layer.msg("写入验证失败: " + verifyResult.message);
+                return false;
+            }
+        } else {
+            layer.msg(result.msg || "实体卡片写入失败");
+            console.error("[NFC Hardware] 写入失败:", result.msg);
+            return false;
+        }
+    } catch (error) {
+        layer.close(loadingIndex);
+        console.error("[NFC Hardware] 写入请求失败:", error);
+        layer.msg("写入请求失败: " + error.message);
+        return false;
+    }
+  }
+
+  // 验证卡片数据
+  async function verifyCardData(cardId, expectedData) {
+    console.log("[NFC Hardware] 验证写入数据");
+    try {
+        const response = await fetch("/admin/api/nfc/hardware/read", {
+            method: "POST"
+        });
+        const result = await response.json();
+
+        if (result.code === 0) {
+            // 比较写入的数据和读取的数据
+            const readData = result.data.raw_data;
+            console.log("[NFC Hardware] 验证数据对比:");
+            console.log("预期数据:", expectedData);
+            console.log("读取数据:", readData);
+
+            // 移除可能的填充字符后比较
+            const normalizedExpected = expectedData.replace(/\s+/g, '').toUpperCase();
+            const normalizedRead = readData.replace(/\s+/g, '').toUpperCase();
+
+            if (normalizedRead.includes(normalizedExpected)) {
+                return { success: true };
+            } else {
+                return { 
+                    success: false, 
+                    message: "数据验证不匹配" 
+                };
+            }
+        } else {
+            return { 
+                success: false, 
+                message: result.msg || "读取验证数据失败" 
+            };
+        }
+    } catch (error) {
+        return { 
+            success: false, 
+            message: "验证过程发生错误: " + error.message 
+        };
+    }
   }
 
   // 格式化NFC硬件数据显示
@@ -1965,9 +2028,6 @@ layui.use(["layer", "form", "element", "table"], function () {
         time: 0,
         shade: 0.3
     });
-    // const loadingIndex = layer.load(1, {
-    //   shade: [0.3, '#fff']
-    // });
     
     try {
         const response = await fetch('/admin/api/nfc/hardware/read', {
@@ -1979,51 +2039,67 @@ layui.use(["layer", "form", "element", "table"], function () {
         if (result.code === 0 && result.data) {
             console.log("[NFC] 读取结果:", result.data);
             
+            // 确保params存在
+            const params = result.data.params || {};
+            console.log("[NFC] 解析的参数:", params);
+            
             // 构建显示内容
             let content = `
-                <div class="layui-card">
+                <div class="layui-card" style="width: 600px; height: 700px;background-color: unset;">
                     <div class="layui-card-header">卡片数据</div>
                     <div class="layui-card-body">
                         <div class="layui-form">
                             <div class="layui-form-item">
+                                <label class="layui-form-label">卡片ID</label>
+                                <div class="layui-input-block">
+                                    <input type="text" class="layui-input" value="${params.CARD_ID || ''}" readonly>
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
                                 <label class="layui-form-label">类型</label>
                                 <div class="layui-input-block">
-                                    <input type="text" class="layui-input" value="${result.data.params.type || ''}" readonly>
+                                    <input type="text" class="layui-input" value="${params.TYPE || ''}" readonly>
                                 </div>
                             </div>
                             <div class="layui-form-item">
                                 <label class="layui-form-label">玩家ID</label>
                                 <div class="layui-input-block">
-                                    <input type="text" class="layui-input" value="${result.data.params.player_id || ''}" readonly>
+                                    <input type="text" class="layui-input" value="${params.PLAYER_ID || ''}" readonly>
                                 </div>
                             </div>
                             <div class="layui-form-item">
                                 <label class="layui-form-label">关联ID</label>
                                 <div class="layui-input-block">
-                                    <input type="text" class="layui-input" value="${result.data.params.id || ''}" readonly>
+                                    <input type="text" class="layui-input" value="${params.ID || ''}" readonly>
                                 </div>
                             </div>
                             <div class="layui-form-item">
                                 <label class="layui-form-label">数值</label>
                                 <div class="layui-input-block">
-                                    <input type="text" class="layui-input" value="${result.data.params.value || '0'}" readonly>
+                                    <input type="text" class="layui-input" value="${params.VALUE || '0'}" readonly>
                                 </div>
                             </div>
                             <div class="layui-form-item">
                                 <label class="layui-form-label">设备标识</label>
                                 <div class="layui-input-block">
-                                    <input type="text" class="layui-input" value="${result.data.params.device || ''}" readonly>
+                                    <input type="text" class="layui-input" value="${params.DEVICE || ''}" readonly>
                                 </div>
                             </div>
                             <div class="layui-form-item">
-                                <label class="layui-form-label">原始数据</label>
+                                <label class="layui-form-label">HEX数据</label>
                                 <div class="layui-input-block">
-                                    <textarea class="layui-textarea" readonly style="height: 100px">${result.data.raw_data}</textarea>
+                                    <textarea class="layui-textarea" readonly style="height: 100px">${result.data.raw_data || ''}</textarea>
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">ASCII数据</label>
+                                <div class="layui-input-block">
+                                    <textarea class="layui-textarea" readonly style="height: 100px">${result.data.raw_ascii || ''}</textarea>
                                 </div>
                             </div>
                         </div>
                         <div class="layui-btn-container" style="margin-top: 15px">
-                            <button class="layui-btn" onclick="fillWriteForm(${JSON.stringify(result.data.params).replace(/"/g, '&quot;')})">
+                            <button class="layui-btn" onclick='fillWriteForm(${JSON.stringify(params)})'>
                                 填充到写卡表单
                             </button>
                         </div>
@@ -2034,7 +2110,7 @@ layui.use(["layer", "form", "element", "table"], function () {
                 type: 1,
                 title: 'NFC卡片数据',
                 content: content,
-                area: ['600px', '700px'],
+                area: ['650px', '750px'],
                 shadeClose: true
             });
         } else {

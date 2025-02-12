@@ -9,7 +9,9 @@ from datetime import datetime
 import time
 from function.player_service import player_service
 from flask_socketio import SocketIO
-from function.NFC_Device import NFC_Device
+from config import ENV
+if ENV == 'local':
+    from function.NFC_Device import NFC_Device
 from function.admin_service import admin_service
 import threading
 
@@ -1600,6 +1602,12 @@ def delete_nfc_card(card_id):
 @admin_required
 def get_nfc_hardware_status():
     """获取NFC硬件设备状态"""
+    if ENV == 'prod':
+        return jsonify({
+            'code': 0,
+            'msg': 'NFC功能已关闭',
+            'data': None
+        })
     try:
         print("[NFC] 检查设备状态")
         nfc_device = get_nfc_device()
@@ -1656,6 +1664,12 @@ def get_nfc_hardware_status():
 @admin_required
 def read_nfc_hardware():
     """读取NFC实体卡片"""
+    if ENV == 'prod':
+        return jsonify({
+            'code': 0,
+            'msg': 'NFC功能已关闭',
+            'data': None
+        })
     print("[NFC] 开始读取卡片数据")
     
     nfc_device = get_nfc_device()
@@ -1731,6 +1745,12 @@ def get_nfc_device():
 @admin_required
 def write_nfc_hardware():
     """写入NFC实体卡片"""
+    if ENV == 'prod':
+        return jsonify({
+            'code': 0,
+            'msg': 'NFC功能已关闭',
+            'data': None
+        })
     print("[NFC] 开始写入卡片数据")
     
     nfc_device = get_nfc_device()
@@ -1742,25 +1762,51 @@ def write_nfc_hardware():
         })
 
     data = request.json
-    if not data:
+    if not data or 'data' not in data:
         return jsonify({
             'code': -1,
             'msg': '写入数据不能为空'
         })
 
     try:
-        # 使用_write_ntag_data写入第4块
+        # 写入前检查卡片状态
+        card_id = nfc_device.read_card_id()
+        if not card_id:
+            return jsonify({
+                'code': -1,
+                'msg': '未检测到卡片'
+            })
+
         print(f"[NFC] 写入数据: {data}")
         hex_data = nfc_device.format_ascii_to_hex(data['data'])
+        
+        # 写入数据
         if nfc_device._write_ntag_data(hex_data):
             print(f"[NFC] 写入成功: {hex_data}")
-            return jsonify({
-                'code': 0,
-                'msg': '写入成功',
-                'data': {
-                    'hex_data': hex_data
-                }
-            })
+            
+            # 写入后立即读取验证
+            read_data = nfc_device.read_card_data_by_page()
+            if not read_data:
+                return jsonify({
+                    'code': -1,
+                    'msg': '写入后验证失败：无法读取数据'
+                })
+                
+            # 验证写入的数据
+            if hex_data.rstrip('0').upper() in read_data.upper():
+                return jsonify({
+                    'code': 0,
+                    'msg': '写入成功',
+                    'data': {
+                        'hex_data': hex_data,
+                        'verified': True
+                    }
+                })
+            else:
+                return jsonify({
+                    'code': -1,
+                    'msg': '写入验证失败：数据不匹配'
+                })
         else:
             print("[NFC] 写入失败")
             return jsonify({
