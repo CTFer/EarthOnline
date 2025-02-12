@@ -1,7 +1,7 @@
 import eventlet
 eventlet.monkey_patch()
 
-from flask import Blueprint, jsonify, request, render_template, current_app
+from flask import Blueprint, request, render_template, current_app
 from admin import admin_required
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -325,10 +325,10 @@ def get_items():
         enabled_only = request.args.get('enabled_only', '1') == '1'
         
         items = shop.get_items(sort_by, order, enabled_only)
-        return jsonify({"code": 0, "data": items})
+        return json.dumps({"code": 0, "data": items})
     except Exception as e:
         logger.error(f"处理请求失败: {str(e)}")
-        return jsonify({"code": 1, "msg": str(e)}), 500
+        return json.dumps({"code": 1, "msg": str(e)}), 500
 
 @shop_bp.route('/api/shop/items', methods=['POST'])
 @admin_required
@@ -355,10 +355,10 @@ def add_item():
             offline_time=data.get('offline_time')
         )
         logger.info(f"商品添加成功，ID: {item_id}")
-        return jsonify({"code": 0, "data": {"id": item_id}})
+        return json.dumps({"code": 0, "data": {"id": item_id}})
     except Exception as e:
         logger.error(f"添加商品失败: {str(e)}")
-        return jsonify({"code": 1, "msg": str(e)})
+        return json.dumps({"code": 1, "msg": str(e)})
 
 @shop_bp.route('/api/shop/items/<int:item_id>', methods=['PUT'])
 @admin_required
@@ -370,10 +370,10 @@ def update_item(item_id):
     try:
         success = shop.update_item(item_id, **data)
         logger.info(f"商品更新{'成功' if success else '失败'}: item_id={item_id}")
-        return jsonify({"code": 0 if success else 1})
+        return json.dumps({"code": 0 if success else 1})
     except Exception as e:
         logger.error(f"更新商品失败: {str(e)}")
-        return jsonify({"code": 1, "msg": str(e)})
+        return json.dumps({"code": 1, "msg": str(e)})
 
 @shop_bp.route('/api/shop/items/<int:item_id>', methods=['DELETE'])
 @admin_required
@@ -381,9 +381,9 @@ def delete_item(item_id):
     """删除商品"""
     try:
         success = shop.delete_item(item_id)
-        return jsonify({"code": 0 if success else 1})
+        return json.dumps({"code": 0 if success else 1})
     except Exception as e:
-        return jsonify({"code": 1, "msg": str(e)})
+        return json.dumps({"code": 1, "msg": str(e)})
 
 @shop_bp.route('/api/shop/purchase', methods=['POST'])
 def purchase():
@@ -394,7 +394,7 @@ def purchase():
     quantity = data.get('quantity', 1)
     
     result = shop.purchase_item(user_id, item_id, quantity)
-    return jsonify({"code": 0 if result['success'] else 1, "msg": result.get('error')})
+    return json.dumps({"code": 0 if result['success'] else 1, "msg": result.get('error')})
 
 @shop_bp.route('/admin/shop')
 @admin_required

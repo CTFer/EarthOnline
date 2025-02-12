@@ -1,11 +1,13 @@
 import sqlite3
-from flask import jsonify
+
 import os
 import logging
 import time
 from config import *
 from datetime import datetime, timedelta
 import numpy as np
+from flask import request
+import json
 logger = logging.getLogger(__name__)
 
 
@@ -69,7 +71,7 @@ class GPSService:
                     ''', (current_time, last_record['id']))
 
                     conn.commit()
-                    return jsonify({
+                    return json.dumps({
                         'code': 0,
                         'msg': '更新GPS时间成功',
                         'data': {'id': last_record['id']}
@@ -91,7 +93,7 @@ class GPSService:
             gps_id = cursor.lastrowid
             conn.commit()
 
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': '添加GPS记录成功',
                 'data': {'id': gps_id}
@@ -99,7 +101,7 @@ class GPSService:
 
         except sqlite3.Error as e:
             logger.error(f"添加GPS记录失败: {str(e)}")
-            return jsonify({
+            return json.dumps({
                 'code': 1,
                 'msg': f'添加GPS记录失败: {str(e)}',
                 'data': None
@@ -117,26 +119,73 @@ class GPSService:
             gps = cursor.fetchone()
 
             if not gps:
-                return jsonify({
+                return json.dumps({
                     'code': 1,
                     'msg': 'GPS记录不存在',
                     'data': None
                 }), 404
 
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': '获取GPS记录成功',
                 'data': dict(gps)
             })
 
         except sqlite3.Error as e:
-            return jsonify({
+            return json.dumps({
                 'code': 1,
                 'msg': f'获取GPS记录失败: {str(e)}',
                 'data': None
             }), 500
         finally:
             conn.close()
+
+    def get_player_gps(self, player_id):
+        """
+        获取玩家GPS记录
+        """
+        try:
+            # 获取时间筛选参数
+            start_time = request.args.get('start_time', type=int)
+            end_time = request.args.get('end_time', type=int)
+            
+            # 获取分页参数
+            page = request.args.get('page', type=int)
+            per_page = request.args.get('per_page', type=int)
+            
+            print(f"[GPS] 获取玩家GPS记录")
+            print(f"[GPS] 玩家ID: {player_id}")
+            print(f"[GPS] 时间范围: {start_time} -> {end_time}")
+            print(f"[GPS] 分页: page={page}, per_page={per_page}")
+            
+            # 添加数据验证
+            if start_time and end_time and start_time > end_time:
+                return json.dumps({
+                    'code': 400,
+                    'msg': '开始时间不能大于结束时间',
+                    'data': None
+                })
+
+            result = gps_service.get_gps_records(
+                player_id=player_id,
+                start_time=start_time,
+                end_time=end_time,
+                page=page,
+                per_page=per_page
+            )
+            
+            # 添加调试日志
+            # print(f"[GPS] 返回数据: {result.get_json() if hasattr(result, 'get_json') else result}")
+            return result
+
+        except Exception as e:
+            error_msg = f"获取玩家GPS记录失败: {str(e)}"
+            print(f"[GPS] 错误: {error_msg}")
+            return json.dumps({
+                'code': 500,
+                'msg': error_msg,
+                'data': None
+            })
 
     def analyze_gps_data(self, data):
         """分析GPS数据的特征"""
@@ -172,10 +221,10 @@ class GPSService:
             avg_distance = max_distance = min_distance = 0
 
         print(f"""
-[GPS] 数据分析结果:
-- 总点数: {len(data)}
-- 时间间隔(秒): 平均={avg_time_diff:.2f}, 最大={max_time_diff}, 最小={min_time_diff}
-- 距离间隔: 平均={avg_distance:.6f}, 最大={max_distance:.6f}, 最小={min_distance:.6f}
+            [GPS] 数据分析结果:
+            - 总点数: {len(data)}
+            - 时间间隔(秒): 平均={avg_time_diff:.2f}, 最大={max_time_diff}, 最小=           {min_time_diff}
+            - 距离间隔: 平均={avg_distance:.6f}, 最大={max_distance:.6f}, 最小=         {min_distance:.6f}
         """)
 
         return {
@@ -379,7 +428,7 @@ class GPSService:
             cursor.execute(query, params)
             records = [dict(row) for row in cursor.fetchall()]
 
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': '获取GPS记录成功',
                 'data': {
@@ -390,11 +439,11 @@ class GPSService:
 
         except Exception as e:
             print(f"Error in get_gps_records: {str(e)}")
-            return jsonify({
+            return json.dumps({
                 'code': 1,
                 'msg': str(e),
                 'data': None
-            }), 500
+            })
         finally:
             conn.close()
 
@@ -437,17 +486,17 @@ class GPSService:
                     'total': total
                 }
             }
-            return jsonify(response)
+            return json.dumps(response)
 
         except Exception as e:
             error_msg = f"获取GPS记录失败: {str(e)}"
             print(f"[GPS Service] 错误: {error_msg}")
             logger.error(error_msg)
-            return jsonify({
+            return json.dumps({
                 'code': 1,
                 'msg': error_msg,
                 'data': None
-            }), 500
+            })
 
     def update_gps(self, gps_id, data):
         """更新GPS记录"""
@@ -468,25 +517,25 @@ class GPSService:
             ))
 
             if cursor.rowcount == 0:
-                return jsonify({
+                return json.dumps({
                     'code': 1,
                     'msg': 'GPS记录不存在',
                     'data': None
-                }), 404
+                })
 
             conn.commit()
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': '更新GPS记录成功',
                 'data': None
             })
 
         except sqlite3.Error as e:
-            return jsonify({
+            return json.dumps({
                 'code': 1,
                 'msg': f'更新GPS记录失败: {str(e)}',
                 'data': None
-            }), 500
+            })
         finally:
             conn.close()
 
@@ -499,21 +548,21 @@ class GPSService:
             cursor.execute('DELETE FROM GPS WHERE id = ?', (gps_id,))
 
             if cursor.rowcount == 0:
-                return jsonify({
+                return json.dumps({
                     'code': 1,
                     'msg': 'GPS记录不存在',
                     'data': None
                 }), 404
 
             conn.commit()
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': '删除GPS记录成功',
                 'data': None
             })
 
         except sqlite3.Error as e:
-            return jsonify({
+            return json.dumps({
                 'code': 1,
                 'msg': f'删除GPS记录失败: {str(e)}',
                 'data': None

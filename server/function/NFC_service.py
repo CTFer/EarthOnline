@@ -1,5 +1,4 @@
 import sqlite3
-from flask import jsonify
 import os
 import logging
 import time
@@ -89,7 +88,7 @@ class NFCService:
             else:
                 error_msg = f'未知的卡片类型: {card_type}'
                 print(f"[NFC] 错误: {error_msg}")
-                return jsonify({
+                return json.dumps({
                     'code': 400,
                     'msg': error_msg,
                     'data': None
@@ -417,7 +416,7 @@ class NFCService:
             card = cursor.fetchone()
             
             if not card:
-                return jsonify({
+                return json.dumps({
                     'code': 403, 
                     'msg': '无效的积分卡或卡片已被使用',
                     'data': None
@@ -450,7 +449,7 @@ class NFCService:
             ''', (current_time, player_id, card_id))
 
             conn.commit()
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': f'成功使用积分卡，获得 {points} 积分',
                 'data': {'points': points}
@@ -459,7 +458,7 @@ class NFCService:
         except Exception as e:
             conn.rollback()
             logger.error(f"处理积分卡片失败: {str(e)}")
-            return jsonify({
+            return json.dumps({
                 'code': 500,
                 'msg': f'处理积分卡片失败: {str(e)}',
                 'data': None
@@ -473,7 +472,7 @@ class NFCService:
             prop = cursor.fetchone()
             
             if not prop:
-                return jsonify({
+                return json.dumps({
                     'code': 404,
                     'msg': '道具不存在',
                     'data': None
@@ -505,7 +504,7 @@ class NFCService:
                 ''', (player_id, value, current_time))
 
             conn.commit()
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': f'成功获得道具：{prop["name"]}',
                 'data': {'prop_id': value, 'prop_name': prop['name']}
@@ -514,7 +513,7 @@ class NFCService:
         except Exception as e:
             conn.rollback()
             logger.error(f"处理道具卡片失败: {str(e)}")
-            return jsonify({
+            return json.dumps({
                 'code': 500,
                 'msg': f'处理道具卡片失败: {str(e)}',
                 'data': None
@@ -528,7 +527,7 @@ class NFCService:
             medal = cursor.fetchone()
             
             if not medal:
-                return jsonify({
+                return json.dumps({
                     'code': 404,
                     'msg': '勋章不存在',
                     'data': None
@@ -541,7 +540,7 @@ class NFCService:
             ''', (player_id, value))
             
             if cursor.fetchone():
-                return jsonify({
+                return json.dumps({
                     'code': 400,
                     'msg': '已拥有该勋章',
                     'data': None
@@ -556,7 +555,7 @@ class NFCService:
             ''', (player_id, value, current_time))
 
             conn.commit()
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': f'成功获得勋章：{medal["name"]}',
                 'data': {'medal_id': value, 'medal_name': medal['name']}
@@ -565,7 +564,7 @@ class NFCService:
         except Exception as e:
             conn.rollback()
             logger.error(f"处理勋章卡片失败: {str(e)}")
-            return jsonify({
+            return json.dumps({
                 'code': 500,
                 'msg': f'处理勋章卡片失败: {str(e)}',
                 'data': None
@@ -595,13 +594,13 @@ class NFCService:
             card = cursor.fetchone()
             
             if not card:
-                return jsonify({
+                return json.dumps({
                     'code': 404,
                     'msg': '卡片不存在',
                     'data': None
                 }), 404
 
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': '获取卡片信息成功',
                 'data': dict(card)
@@ -609,7 +608,7 @@ class NFCService:
 
         except Exception as e:
             logger.error(f"获取NFC卡片信息失败: {str(e)}")
-            return jsonify({
+            return json.dumps({
                 'code': 500,
                 'msg': f'获取NFC卡片信息失败: {str(e)}',
                 'data': None

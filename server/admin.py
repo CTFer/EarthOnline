@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, render_template, session, redirect, url_for, flash, current_app
+from flask import Blueprint, request, render_template, session, redirect, url_for, flash, current_app
 from functools import wraps
 import sqlite3
 import os
@@ -137,12 +137,12 @@ def get_player(player_id):
         player = cursor.fetchone()
 
         if player is None:
-            return jsonify({'error': 'User not found'}), 404
+            return json.dumps({'error': 'User not found'}), 404
 
-        return jsonify(dict(player))
+        return json.dumps(dict(player))
     except Exception as e:
         print(f"Error in get_user: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -167,10 +167,10 @@ def get_users():
         cursor = conn.cursor()
         cursor.execute('SELECT id, username, created_at FROM users')
         users = [dict(row) for row in cursor.fetchall()]
-        return jsonify({"data": users})
+        return json.dumps({"data": users})
     except Exception as e:
         print(f"Error in get_users: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -195,10 +195,10 @@ def add_user():
         user_id = cursor.lastrowid
         conn.commit()
 
-        return jsonify({"id": user_id}), 201
+        return json.dumps({"id": user_id}), 201
     except Exception as e:
         print(f"Error in add_user: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -215,12 +215,12 @@ def get_user(user_id):
         user = cursor.fetchone()
 
         if user is None:
-            return jsonify({'error': 'User not found'}), 404
+            return json.dumps({'error': 'User not found'}), 404
 
-        return jsonify(dict(user))
+        return json.dumps(dict(user))
     except Exception as e:
         print(f"Error in get_user: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -250,10 +250,10 @@ def update_user(user_id):
             ''', (data['username'], user_id))
 
         conn.commit()
-        return jsonify({"success": True})
+        return json.dumps({"success": True})
     except Exception as e:
         print(f"Error in update_user: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -271,10 +271,10 @@ def delete_user(user_id):
         cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
 
         conn.commit()
-        return jsonify({"success": True})
+        return json.dumps({"success": True})
     except Exception as e:
         print(f"Error in delete_user: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -288,10 +288,10 @@ def get_skills():
         cursor = conn.cursor()
         cursor.execute('SELECT id, name, proficiency, description FROM skills')
         skills = [dict(row) for row in cursor.fetchall()]
-        return jsonify({"data": skills})
+        return json.dumps({"data": skills})
     except Exception as e:
         print(f"Error in get_skills: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -313,10 +313,10 @@ def add_skill():
         skill_id = cursor.lastrowid
         conn.commit()
 
-        return jsonify({"id": skill_id}), 201
+        return json.dumps({"id": skill_id}), 201
     except Exception as e:
         print(f"Error in add_skill: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -333,12 +333,12 @@ def get_skill(skill_id):
         skill = cursor.fetchone()
 
         if skill is None:
-            return jsonify({'error': 'Skill not found'}), 404
+            return json.dumps({'error': 'Skill not found'}), 404
 
-        return jsonify(dict(skill))
+        return json.dumps(dict(skill))
     except Exception as e:
         print(f"Error in get_skill: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -359,10 +359,10 @@ def update_skill(skill_id):
         ''', (data['name'], data['proficiency'], data.get('description', ''), skill_id))
 
         conn.commit()
-        return jsonify({"success": True})
+        return json.dumps({"success": True})
     except Exception as e:
         print(f"Error in update_skill: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -383,10 +383,10 @@ def delete_skill(skill_id):
         cursor.execute('DELETE FROM skills WHERE id = ?', (skill_id,))
 
         conn.commit()
-        return jsonify({"success": True})
+        return json.dumps({"success": True})
     except Exception as e:
         print(f"Error in delete_skill: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -442,11 +442,11 @@ def get_tasks():
             "count": total,
             "data": tasks
         }
-        return jsonify(response_data)
+        return json.dumps(response_data)
 
     except Exception as e:
         print(f"获取任务列表出错: {str(e)}")
-        return jsonify({
+        return json.dumps({
             "code": 1,
             "msg": f"获取任务列表失败: {str(e)}",
             "count": 0,
@@ -519,11 +519,11 @@ def get_task(task_id):
             "data": task
         }
         print(response_data)
-        return jsonify(response_data)
+        return json.dumps(response_data)
 
     except Exception as e:
         print(f"获取任务列表出错: {str(e)}")  # 错误日志
-        return jsonify({
+        return json.dumps({
             "code": 1,
             "msg": f"获取任务列表失败: {str(e)}",
             "data": []
@@ -630,7 +630,7 @@ def add_task():
         task_id = cursor.lastrowid
         conn.commit()
 
-        return jsonify({
+        return json.dumps({
             "code": 0,
             "msg": "添加任务成功",
             "data": {"id": task_id}
@@ -638,7 +638,7 @@ def add_task():
 
     except Exception as e:
         print(f"添加任务出错: {str(e)}")  # 错误日志
-        return jsonify({
+        return json.dumps({
             "code": 500,
             "msg": f"添加任务失败: {str(e)}",
             "data": None
@@ -746,7 +746,7 @@ def update_task(task_id):
         cursor.execute('SELECT * FROM task WHERE id = ?', (task_id,))
         updated_task = cursor.fetchone()
 
-        return jsonify({
+        return json.dumps({
             "code": 0,
             "msg": "更新任务成功",
             "data": dict(updated_task) if updated_task else None
@@ -754,7 +754,7 @@ def update_task(task_id):
 
     except Exception as e:
         print(f"更新任务出错: {str(e)}")  # 错误日志
-        return jsonify({
+        return json.dumps({
             "code": 500,
             "msg": f"更新任务失败: {str(e)}",
             "data": None
@@ -773,10 +773,10 @@ def delete_task(task_id):
         cursor = conn.cursor()
         cursor.execute('DELETE FROM task WHERE id = ?', (task_id,))
         conn.commit()
-        return jsonify({"success": True})
+        return json.dumps({"success": True})
     except Exception as e:
         print(f"Error in delete_task: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
     finally:
         conn.close()
 
@@ -789,7 +789,7 @@ def get_api_docs():
     """获取API文档"""
     try:
         endpoints = api_registry.get_all_endpoints()
-        return jsonify({
+        return json.dumps({
             "data": [
                 {
                     "path": endpoint.path,
@@ -804,7 +804,7 @@ def get_api_docs():
         })
     except Exception as e:
         print(f"Error in get_api_docs: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return json.dumps({'error': str(e)}), 500
 
 # 添加任务管理页面路由
 
@@ -881,7 +881,7 @@ def get_player_tasks():
 
         conn.close()
 
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '',
             'count': total,
@@ -889,7 +889,7 @@ def get_player_tasks():
         })
 
     except Exception as e:
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'count': 0,
@@ -924,7 +924,7 @@ def get_player_task(task_id):
 
         row = cursor.fetchone()
         if row is None:
-            return jsonify({
+            return json.dumps({
                 'code': 404,
                 'msg': '任务不存在',
                 'data': None
@@ -945,7 +945,7 @@ def get_player_task(task_id):
         }
 
         conn.close()
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '',
             'data': task
@@ -953,7 +953,7 @@ def get_player_task(task_id):
 
     except Exception as e:
         print("Get task error:", str(e))
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -988,14 +988,14 @@ def create_player_task():
         conn.commit()
         conn.close()
 
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '创建成功',
             'data': {'id': task_id}
         }), 201
 
     except Exception as e:
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1042,7 +1042,7 @@ def update_player_task(task_id):
 
         if cursor.rowcount == 0:
             conn.close()
-            return jsonify({
+            return json.dumps({
                 'code': 404,
                 'msg': '未找到要更新的记录',
                 'data': None
@@ -1083,7 +1083,7 @@ def update_player_task(task_id):
 
         conn.close()
         print("Updated data:", updated_data)
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '更新成功',
             'data': updated_data
@@ -1091,7 +1091,7 @@ def update_player_task(task_id):
 
     except Exception as e:
         print("Update error:", str(e))  # 错误日志
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1109,14 +1109,14 @@ def delete_player_task(task_id):
         conn.commit()
         conn.close()
 
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '删除成功',
             'data': None
         })
 
     except Exception as e:
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1168,7 +1168,7 @@ def get_medals():
 
         conn.close()
 
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '',
             'count': total,
@@ -1176,7 +1176,7 @@ def get_medals():
         })
 
     except Exception as e:
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'count': 0,
@@ -1204,7 +1204,7 @@ def get_medal(medal_id):
 
         row = cursor.fetchone()
         if row is None:
-            return jsonify({
+            return json.dumps({
                 'code': 404,
                 'msg': '勋章不存在',
                 'data': None
@@ -1220,14 +1220,14 @@ def get_medal(medal_id):
         }
 
         conn.close()
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '',
             'data': medal
         })
 
     except Exception as e:
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1259,14 +1259,14 @@ def create_medal():
         conn.commit()
         conn.close()
 
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '创建成功',
             'data': {'id': medal_id}
         }), 201
 
     except Exception as e:
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1313,7 +1313,7 @@ def update_medal(medal_id):
         if cursor.rowcount == 0:
             print(f"No rows updated for medal_id: {medal_id}")  # 添加调试信息
             conn.close()
-            return jsonify({
+            return json.dumps({
                 'code': 404,
                 'msg': '未找到要更新的勋章',
                 'data': None
@@ -1328,7 +1328,7 @@ def update_medal(medal_id):
         
         conn.close()
 
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '更新成功',
             'data': dict(updated_medal) if updated_medal else None
@@ -1336,7 +1336,7 @@ def update_medal(medal_id):
 
     except Exception as e:
         print(f"Error updating medal: {str(e)}")  # 添加调试信息
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1353,14 +1353,14 @@ def delete_medal(medal_id):
         conn.commit()
         conn.close()
 
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '删除成功',
             'data': None
         })
 
     except Exception as e:
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1407,7 +1407,7 @@ def get_nfc_cards():
         conn.close()
         print(f"[NFC] 成功获取 {len(cards)} 张卡片")
         
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '',
             'data': {
@@ -1418,7 +1418,7 @@ def get_nfc_cards():
         
     except Exception as e:
         print(f"[NFC] 获取卡片列表失败: {str(e)}")
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1437,7 +1437,7 @@ def create_nfc_card():
         for field in required_fields:
             if field not in data:
                 print(f"缺少必填字段: {field}")
-                return jsonify({
+                return json.dumps({
                     'code': 400,
                     'msg': f'缺少必填字段: {field}',
                     'data': None
@@ -1490,7 +1490,7 @@ def create_nfc_card():
         
         conn.close()
         
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '创建成功',
             'data': {'card_id': next_card_id}
@@ -1498,7 +1498,7 @@ def create_nfc_card():
         
     except Exception as e:
         print(f"创建NFC卡片失败: {str(e)}")
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1528,7 +1528,7 @@ def update_nfc_card(card_id):
             params.append(data['device'])
             
         if not update_fields:
-            return jsonify({
+            return json.dumps({
                 'code': 400,
                 'msg': '没有要更新的字段',
                 'data': None
@@ -1543,7 +1543,7 @@ def update_nfc_card(card_id):
         ''', params)
         
         if cursor.rowcount == 0:
-            return jsonify({
+            return json.dumps({
                 'code': 404,
                 'msg': '卡片不存在',
                 'data': None
@@ -1552,14 +1552,14 @@ def update_nfc_card(card_id):
         conn.commit()
         conn.close()
         
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '更新成功',
             'data': None
         })
         
     except Exception as e:
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1575,7 +1575,7 @@ def delete_nfc_card(card_id):
         cursor.execute('DELETE FROM NFC_card WHERE card_id = ?', (card_id,))
         
         if cursor.rowcount == 0:
-            return jsonify({
+            return json.dumps({
                 'code': 404,
                 'msg': '卡片不存在',
                 'data': None
@@ -1584,14 +1584,14 @@ def delete_nfc_card(card_id):
         conn.commit()
         conn.close()
         
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '删除成功',
             'data': None
         })
         
     except Exception as e:
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1603,7 +1603,7 @@ def delete_nfc_card(card_id):
 def get_nfc_hardware_status():
     """获取NFC硬件设备状态"""
     if ENV == 'prod':
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': 'NFC功能已关闭',
             'data': None
@@ -1646,7 +1646,7 @@ def get_nfc_hardware_status():
                 status['card_present'] = False
                 status['card_id'] = None
             
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': 'success',
             'data': status
@@ -1654,7 +1654,7 @@ def get_nfc_hardware_status():
         
     except Exception as e:
         print(f"[NFC Hardware] 获取设备状态失败: {str(e)}")
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': f'获取设备状态失败: {str(e)}',
             'data': None
@@ -1665,7 +1665,7 @@ def get_nfc_hardware_status():
 def read_nfc_hardware():
     """读取NFC实体卡片"""
     if ENV == 'prod':
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': 'NFC功能已关闭',
             'data': None
@@ -1674,7 +1674,7 @@ def read_nfc_hardware():
     
     nfc_device = get_nfc_device()
     if nfc_device is None:
-        return jsonify({
+        return json.dumps({
             'code': -1,
             'msg': 'NFC设备未初始化'
         })
@@ -1683,7 +1683,7 @@ def read_nfc_hardware():
         # 读取卡片数据
         card_data = nfc_device.read_all_card_data()
         if not card_data:
-            return jsonify({
+            return json.dumps({
                 'code': -1,
                 'msg': '未检测到卡片或读取失败'
             })
@@ -1694,12 +1694,12 @@ def read_nfc_hardware():
         parsed_data = nfc_device.parse_nfc_data(card_data)
         print(f"[NFC] 解析数据: {parsed_data}")
         if not parsed_data:
-            return jsonify({
+            return json.dumps({
                 'code': -1,
                 'msg': '数据解析失败'
             })
             
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': 'success',
             'data': {
@@ -1712,7 +1712,7 @@ def read_nfc_hardware():
         
     except Exception as e:
         print(f"[NFC] 读取错误: {str(e)}")
-        return jsonify({
+        return json.dumps({
             'code': -1,
             'msg': f'读卡错误: {str(e)}'
         })
@@ -1746,7 +1746,7 @@ def get_nfc_device():
 def write_nfc_hardware():
     """写入NFC实体卡片"""
     if ENV == 'prod':
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': 'NFC功能已关闭',
             'data': None
@@ -1756,14 +1756,14 @@ def write_nfc_hardware():
     nfc_device = get_nfc_device()
     if nfc_device is None:
         print("[NFC Write] 无法获取设备实例")
-        return jsonify({
+        return json.dumps({
             'code': -1,
             'msg': 'NFC设备未初始化'
         })
 
     data = request.json
     if not data or 'data' not in data:
-        return jsonify({
+        return json.dumps({
             'code': -1,
             'msg': '写入数据不能为空'
         })
@@ -1772,7 +1772,7 @@ def write_nfc_hardware():
         # 写入前检查卡片状态
         card_id = nfc_device.read_card_id()
         if not card_id:
-            return jsonify({
+            return json.dumps({
                 'code': -1,
                 'msg': '未检测到卡片'
             })
@@ -1787,14 +1787,14 @@ def write_nfc_hardware():
             # 写入后立即读取验证
             read_data = nfc_device.read_card_data_by_page()
             if not read_data:
-                return jsonify({
+                return json.dumps({
                     'code': -1,
                     'msg': '写入后验证失败：无法读取数据'
                 })
                 
             # 验证写入的数据
             if hex_data.rstrip('0').upper() in read_data.upper():
-                return jsonify({
+                return json.dumps({
                     'code': 0,
                     'msg': '写入成功',
                     'data': {
@@ -1803,19 +1803,19 @@ def write_nfc_hardware():
                     }
                 })
             else:
-                return jsonify({
+                return json.dumps({
                     'code': -1,
                     'msg': '写入验证失败：数据不匹配'
                 })
         else:
             print("[NFC] 写入失败")
-            return jsonify({
+            return json.dumps({
                 'code': -1,
                 'msg': '写入失败'
             })
     except Exception as e:
         print(f"[NFC] 写入错误: {str(e)}")
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': f'写入异常: {str(e)}',
             'data': None
@@ -1846,14 +1846,14 @@ def get_game_cards():
             })
             
         conn.close()
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '',
             'data': cards
         })
         
     except Exception as e:
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1875,7 +1875,7 @@ def get_next_card_id():
         next_id = 1 if result[0] is None else result[0] + 1
         
         print(f"[NFC] 下一个可用ID: {next_id}")
-        return jsonify({
+        return json.dumps({
             'code': 0,
             'msg': '获取成功',
             'data': {'next_id': next_id}
@@ -1883,7 +1883,7 @@ def get_next_card_id():
         
     except Exception as e:
         print(f"[NFC] 获取下一个卡片ID失败: {str(e)}")
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None
@@ -1905,14 +1905,14 @@ def get_card_status(card_id):
         
         if result:
             print(f"[NFC] 卡片状态: {result['status']}")
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': '获取成功',
                 'data': {'status': result['status']}
             })
         else:
             print(f"[NFC] 卡片不存在: {card_id}")
-            return jsonify({
+            return json.dumps({
                 'code': 404,
                 'msg': '卡片不存在',
                 'data': None
@@ -1920,7 +1920,7 @@ def get_card_status(card_id):
             
     except Exception as e:
         print(f"[NFC] 获取卡片状态失败: {str(e)}")
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': str(e),
             'data': None

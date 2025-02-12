@@ -1,5 +1,4 @@
 import sqlite3
-from flask import jsonify
 import os
 import logging
 import time
@@ -55,14 +54,14 @@ class TaskService:
                 task_dict = dict(zip(columns, row))
                 tasks.append(task_dict)
 
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': '获取可用任务成功',
                 'data': tasks
             })
 
         except sqlite3.Error as e:
-            return jsonify({
+            return json.dumps({
                 'code': 1,
                 'msg': f'获取任务失败: {str(e)}',
                 'data': None
@@ -109,14 +108,14 @@ class TaskService:
                     'icon': row[8]
                 })
 
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': '获取当前任务成功',
                 'data': tasks
             })
 
         except sqlite3.Error as e:
-            return jsonify({
+            return json.dumps({
                 'code': 1,
                 'msg': f'获取当前任务失败: {str(e)}',
                 'data': None
@@ -138,7 +137,7 @@ class TaskService:
             task = cursor.fetchone()
             
             if not task:
-                return jsonify({
+                return json.dumps({
                     'code': 1,
                     'msg': '任务不存在或未启用',
                     'data': None
@@ -151,7 +150,7 @@ class TaskService:
             ''', (player_id, task_id))
             
             if cursor.fetchone():
-                return jsonify({
+                return json.dumps({
                     'code': 1,
                     'msg': '已接受该任务',
                     'data': None
@@ -168,14 +167,14 @@ class TaskService:
             ''', (player_id, task_id, current_time, endtime))
             
             conn.commit()
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': '任务接受成功',
                 'data': None
             })
 
         except sqlite3.Error as e:
-            return jsonify({
+            return json.dumps({
                 'code': 1,
                 'msg': f'接受任务失败: {str(e)}',
                 'data': None
@@ -199,21 +198,21 @@ class TaskService:
             ''', (int(time.time()), player_id, task_id))
             
             if cursor.rowcount == 0:
-                return jsonify({
+                return json.dumps({
                     'code': 1,
                     'msg': '任务不存在或状态错误',
                     'data': None
                 })
                 
             conn.commit()
-            return jsonify({
+            return json.dumps({
                 'code': 0,
                 'msg': '任务已放弃',
                 'data': None
             })
 
         except sqlite3.Error as e:
-            return jsonify({
+            return json.dumps({
                 'code': 1,
                 'msg': f'放弃任务失败: {str(e)}',
                 'data': None

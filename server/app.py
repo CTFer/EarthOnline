@@ -16,7 +16,7 @@ import sqlite3
 import logging
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_cors import CORS
-from flask import Flask, jsonify, request, redirect, send_from_directory, make_response, render_template
+from flask import Flask, request, redirect, send_from_directory, make_response, render_template
 from shop import shop_bp  # 确保在同一目录下
 from function.player_service import player_service
 from function.task_service import task_service
@@ -141,49 +141,6 @@ def get_db_connection():
         raise
 
 
-@app.route('/api/player/<int:player_id>', methods=['GET'])
-def get_player_api(player_id):
-    """获取角色信息"""
-    print(player_id)    
-    return player_service.get_player(player_id)
-
-
-@app.route('/api/get_players', methods=['GET'])
-def get_players():
-    """获取所有玩家"""
-    return player_service.get_players()
-
-@app.route('/api/tasks/available/<int:player_id>', methods=['GET'])
-def get_available_tasks(player_id):
-    """获取可用任务列表"""
-    return task_service.get_available_tasks(player_id)
-
-# 添加获取玩家当前任务的API
-
-
-@app.route('/api/tasks/current/<int:player_id>', methods=['GET'])
-def get_current_tasks(player_id):
-    """获取用户当前未过期的任务列表"""
-    return task_service.get_current_tasks(player_id)
-
-
-@app.route('/api/tasks/accept', methods=['POST'])
-def accept_task():
-    data = request.get_json()
-    return task_service.accept_task(data['player_id'], data['task_id'])
-
-@app.route('/api/tasks/abandon', methods=['POST'])
-def abandon_task():
-    data = request.get_json()
-    return task_service.abandon_task(data['player_id'], data['task_id'])
-
-@app.route('/api/tasks/complete', methods=['POST'])
-def complete_task_api():
-    data = request.get_json()
-    return task_service.complete_task_api(data['player_id'], data['task_id'])
-
-
-
 def assign_daily_tasks():
     """分配每日任务并处理过期任务"""
     try:
@@ -278,10 +235,88 @@ def start_scheduler():
     scheduler_thread.daemon = True
     scheduler_thread.start()
 
-
+# 为所有现有路由添加日志装饰器
+app.view_functions = {
+    endpoint: log_request(func)
+    for endpoint, func in app.view_functions.items()
+}
 # 添加模板目录配置
 TEMPLATE_DIR = os.path.join(os.path.dirname(
     os.path.abspath(__file__)), 'templates')
+# WebSocket连接处理
+
+
+@socketio.on('connect')
+def handle_connect():
+    """处理WebSocket连接"""
+    print("Client connected")
+    emit('connected', {'status': 'success'})
+
+
+@socketio.on('subscribe_tasks')
+def handle_task_subscription(data):
+    """处理任务订阅"""
+    print(f"[WebSocket] Received subscription request: {data}")
+    player_id = data.get('player_id')
+    if player_id:
+        room = f'user_{player_id}'
+        join_room(room)
+        print(f"[WebSocket] User {player_id} joined room: {room}")
+        # 发送确认消息
+        emit('subscription_confirmed', {
+            'status': 'success',
+            'room': room
+        }, room=room)
+    else:
+        print(f"[WebSocket] Warning: Received subscribe_tasks without player_id")
+
+
+def broadcast_task_update(player_id, task_data):
+    """向指定用户广播任务更新"""
+    socketio.emit('task_update', task_data, room=f'user_{player_id}')
+
+@app.route('/api/player/<int:player_id>', methods=['GET'])
+def get_player_api(player_id):
+    """获取角色信息"""
+    print(player_id)    
+    return player_service.get_player(player_id)
+
+
+@app.route('/api/get_players', methods=['GET'])
+def get_players():
+    """获取所有玩家"""
+    return player_service.get_players()
+
+@app.route('/api/tasks/available/<int:player_id>', methods=['GET'])
+def get_available_tasks(player_id):
+    """获取可用任务列表"""
+    return task_service.get_available_tasks(player_id)
+
+# 添加获取玩家当前任务的API
+
+
+@app.route('/api/tasks/current/<int:player_id>', methods=['GET'])
+def get_current_tasks(player_id):
+    """获取用户当前未过期的任务列表"""
+    return task_service.get_current_tasks(player_id)
+
+
+@app.route('/api/tasks/accept', methods=['POST'])
+def accept_task():
+    data = request.get_json()
+    return task_service.accept_task(data['player_id'], data['task_id'])
+
+@app.route('/api/tasks/abandon', methods=['POST'])
+def abandon_task():
+    data = request.get_json()
+    return task_service.abandon_task(data['player_id'], data['task_id'])
+
+@app.route('/api/tasks/complete', methods=['POST'])
+def complete_task_api():
+    data = request.get_json()
+    return task_service.complete_task_api(data['player_id'], data['task_id'])
+
+
 
 
 @app.route('/record')
@@ -386,11 +421,7 @@ def clear_logs():
     return redirect('/')
 
 
-# 为所有现有路由添加日志装饰器
-app.view_functions = {
-    endpoint: log_request(func)
-    for endpoint, func in app.view_functions.items()
-}
+
 
 
 # 添加初始数据加载路由
@@ -408,39 +439,8 @@ def get_logs():
             filtered_logs = [
                 log for log in filtered_logs if path_filter in log['path']]
 
-    return jsonify(filtered_logs)
+    return json.dumps(filtered_logs)
 
-# WebSocket连接处理
-
-
-@socketio.on('connect')
-def handle_connect():
-    """处理WebSocket连接"""
-    print("Client connected")
-    emit('connected', {'status': 'success'})
-
-
-@socketio.on('subscribe_tasks')
-def handle_task_subscription(data):
-    """处理任务订阅"""
-    print(f"[WebSocket] Received subscription request: {data}")
-    player_id = data.get('player_id')
-    if player_id:
-        room = f'user_{player_id}'
-        join_room(room)
-        print(f"[WebSocket] User {player_id} joined room: {room}")
-        # 发送确认消息
-        emit('subscription_confirmed', {
-            'status': 'success',
-            'room': room
-        }, room=room)
-    else:
-        print(f"[WebSocket] Warning: Received subscribe_tasks without player_id")
-
-
-def broadcast_task_update(player_id, task_data):
-    """向指定用户广播任务更新"""
-    socketio.emit('task_update', task_data, room=f'user_{player_id}')
 
 # 如果需要自定义静态文件路由
 
@@ -471,7 +471,7 @@ def handle_nfc_card():
         if not card_id or not player_id:
             error_msg = '缺少必要参数: card_id 或 player_id'
             print(f"[NFC API Debug] 错误: {error_msg}")
-            return jsonify({
+            return json.dumps({
                 'code': 400,
                 'msg': error_msg,
                 'data': None
@@ -501,7 +501,7 @@ def handle_nfc_card():
                 'message': error_msg
             }, room=f'user_{player_id}')
 
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': error_msg,
             'data': None
@@ -520,7 +520,7 @@ def add_gps():
         try:
             latitude, longitude = map(float, location.split(','))
         except (ValueError, AttributeError):
-            return jsonify({
+            return json.dumps({
                 'code': 400,
                 'msg': '无效的位置数据格式',
                 'data': None
@@ -586,7 +586,7 @@ def add_gps():
 
     except Exception as e:
         logger.error(f"处理GPS数据失败: {str(e)}")
-        return jsonify({
+        return json.dumps({
             'code': 500,
             'msg': f'处理GPS数据失败: {str(e)}',
             'data': None
@@ -599,48 +599,8 @@ def get_gps(gps_id):
 
 @app.route('/api/gps/player/<int:player_id>', methods=['GET'])
 def get_player_gps(player_id):
-    try:
-        # 获取时间筛选参数
-        start_time = request.args.get('start_time', type=int)
-        end_time = request.args.get('end_time', type=int)
-        
-        # 获取分页参数
-        page = request.args.get('page', type=int)
-        per_page = request.args.get('per_page', type=int)
-        
-        print(f"[GPS] 获取玩家GPS记录")
-        print(f"[GPS] 玩家ID: {player_id}")
-        print(f"[GPS] 时间范围: {start_time} -> {end_time}")
-        print(f"[GPS] 分页: page={page}, per_page={per_page}")
-        
-        # 添加数据验证
-        if start_time and end_time and start_time > end_time:
-            return jsonify({
-                'code': 400,
-                'msg': '开始时间不能大于结束时间',
-                'data': None
-            }), 400
-
-        result = gps_service.get_gps_records(
-            player_id=player_id,
-            start_time=start_time,
-            end_time=end_time,
-            page=page,
-            per_page=per_page
-        )
-        
-        # 添加调试日志
-        # print(f"[GPS] 返回数据: {result.get_json() if hasattr(result, 'get_json') else result}")
-        return result
-
-    except Exception as e:
-        error_msg = f"获取玩家GPS记录失败: {str(e)}"
-        print(f"[GPS] 错误: {error_msg}")
-        return jsonify({
-            'code': 500,
-            'msg': error_msg,
-            'data': None
-        }), 500
+    """获取玩家GPS记录"""
+    return gps_service.get_player_gps(player_id)
 
 @app.route('/api/gps/<int:gps_id>', methods=['PUT'])
 def update_gps(gps_id):

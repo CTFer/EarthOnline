@@ -1,5 +1,5 @@
 vue-version/
-server/__pycache__
+__pycache__/
 earthonline/nginx.htaccess
 server/database/game.db
 main.sql

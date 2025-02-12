@@ -1,5 +1,4 @@
 import sqlite3
-from flask import jsonify
 import os
 import logging
 import time

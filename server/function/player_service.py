@@ -9,7 +9,6 @@
 # Copyright 2025 迷舍
 
 import sqlite3
-from flask import jsonify
 import os
 import logging
 
@@ -51,7 +50,7 @@ class PlayerService:
 
             if character:
                 player_data = dict(zip(columns, character))
-                return jsonify({
+                return json.dumps({
                     'code': 0,
                     'msg': '获取角色信息成功',
                     'data': {
@@ -66,7 +65,7 @@ class PlayerService:
                     }
                 })
             else:
-                return jsonify({
+                return json.dumps({
                     'code': 1,
                     'msg': '角色不存在',
                     'data': None
@@ -74,7 +73,7 @@ class PlayerService:
 
         except sqlite3.Error as e:
             print("Database error:", str(e))
-            return jsonify({
+            return json.dumps({
                 'code': 2,
                 'msg': f'数据库错误: {str(e)}',
                 'data': None
@@ -96,7 +95,7 @@ class PlayerService:
 
             players = [dict(row) for row in cursor.fetchall()]
 
-            return jsonify({
+            return json.dumps({
                 "code": 0,
                 "msg": "获取玩家列表成功",
                 "data": players
@@ -104,7 +103,7 @@ class PlayerService:
 
         except Exception as e:
             print(f"获取玩家列表出错: {str(e)}")
-            return jsonify({
+            return json.dumps({
                 "code": 1,
                 "msg": f"获取玩家列表失败: {str(e)}",
                 "data": None
@@ -128,10 +127,10 @@ class PlayerService:
             ''', (data['player_name'], data['points'], data['level'], player_id,))
 
             conn.commit()
-            return jsonify({"success": True})
+            return json.dumps({"success": True})
         except Exception as e:
             print(f"Error in update_player: {str(e)}")
-            return jsonify({'error': str(e)}), 500
+            return json.dumps({'error': str(e)}), 500
         finally:
             conn.close()
 
@@ -148,10 +147,10 @@ class PlayerService:
             cursor.execute('DELETE FROM player_data WHERE player_id = ?', (player_id,))
 
             conn.commit()
-            return jsonify({"code": 0, "msg": "删除玩家成功"})
+            return json.dumps({"code": 0, "msg": "删除玩家成功"})
         except Exception as e:
             print(f"Error in delete_player: {str(e)}")
-            return jsonify({'code': 1, 'msg': str(e)}), 500
+            return json.dumps({'code': 1, 'msg': str(e)}), 500
         finally:
             conn.close()
 
@@ -169,14 +168,14 @@ class PlayerService:
             player_id = cursor.lastrowid
             conn.commit()
 
-            return jsonify({
+            return json.dumps({
                 "code": 0,
                 "msg": "添加玩家成功",
                 "data": {"id": player_id}
             }), 201
         except Exception as e:
             print(f"Error in add_player: {str(e)}")
-            return jsonify({'code': 1, 'msg': str(e)}), 500
+            return json.dumps({'code': 1, 'msg': str(e)}), 500
         finally:
             conn.close()
 
