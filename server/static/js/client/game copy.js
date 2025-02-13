@@ -1,14 +1,16 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-08 14:41:57
- * @LastEditTime: 2025-02-13 10:57:16
+ * @LastEditTime: 2025-02-07 22:02:27
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
 
+
+// import GPSManager from '../function/GPSManager.js';
+// import AMapManager from '../function/AMapManager.js';
 import WebSocketManager from '../function/WebSocketManager.js';
 import MapSwitcher from '../function/MapSwitcher.js';
-import APIClient from './core/api.js';  // 导入默认导出的类
 
 // WebSocket连接
 const socket = io(SERVER);
@@ -26,9 +28,6 @@ class TaskManager {
         this.playerId = localStorage.getItem('playerId') || '1';
         this.loading = false;
         
-        // 初始化API客户端 - 移到前面
-        this.api = new APIClient(SERVER);
-        
         // 初始化WebSocket管理器
         this.wsManager = new WebSocketManager();
         
@@ -38,9 +37,7 @@ class TaskManager {
         this.wsManager.onNFCTaskUpdate(this.handleTaskUpdate.bind(this));
         this.wsManager.onTagsUpdate(() => this.updateWordCloud());
         
-        // 加载玩家信息 - 移到API初始化之后
         this.loadPlayerInfo();
-        
         console.log('[Debug] TaskManager 构造函数完成');
     }
 
@@ -268,7 +265,16 @@ class TaskManager {
         const taskList = document.getElementById('taskList');
         
         try {
-
+            taskList.innerHTML = `
+                <div class="swiper task-list-swiper">
+                    <div class="swiper-wrapper">
+                        <div class="swiper-slide">
+                            <div class="loading-state">加载中...</div>
+                        </div>
+                    </div>
+                    <div class="swiper-scrollbar"></div>
+                </div>
+            `;
 
             // 等待DOM更新
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -276,7 +282,8 @@ class TaskManager {
             // 重新初始化滑动组件
             await this.initSwipers();
 
-            const result = await this.api.loadAvailableTasks(this.playerId);
+            const response = await fetch(`${SERVER}/api/tasks/available/${this.playerId}`);
+            const result = await response.json();
             
             if (result.code === 0) {
                 const tasks = result.data;
@@ -295,7 +302,8 @@ class TaskManager {
                 this.showError('taskList', result.msg);
             }
         } catch (error) {
-            this.api.handleApiError(error, 'loadTasks');
+            console.error('加载任务失败:', error);
+            this.showError('taskList', '加载任务失败，请稍后重试');
         } finally {
             this.loading = false;
         }
@@ -480,7 +488,8 @@ class TaskManager {
     // 加载当前任务（仅在页面首次加载时调用）
     async loadCurrentTasks() {
         try {
-            const result = await this.api.getCurrentTasks(this.playerId);
+            const response = await fetch(`${SERVER}/api/tasks/current/${this.playerId}`);
+            const result = await response.json();
 
             if (result.code === 0) {
                 let currentTasks = result.data;
@@ -652,8 +661,19 @@ class TaskManager {
             console.log('任务ID:', taskId);
             console.log('玩家ID:', this.playerId);
             
-            const result = await this.api.acceptTask(taskId, this.playerId);
+            const response = await fetch(`${SERVER}/api/tasks/${taskId}/accept`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    player_id: this.playerId
+                })
+            });
             
+            const result = await response.json();
+            console.log('API响应:', result);
+
             if (result.code === 0) {
                 layer.msg(`成功接受任务: ${result.data.task_name}`, {icon: 1});
                 await this.refreshTasks();
@@ -672,7 +692,8 @@ class TaskManager {
                 layer.msg(result.msg, {icon: icon});
             }
         } catch (error) {
-            this.api.handleApiError(error, 'acceptTask');
+            console.error('接受任务失败:', error);
+            layer.msg('接受任务失败，请检查网络连接', {icon: 2});
         } finally {
             console.groupEnd();
         }
@@ -978,70 +999,99 @@ class TaskManager {
         return true;
     }
 
-
+    // 创建进行中的任务卡片
+    createActiveTaskCard(task) {
+        const taskTypeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
+        const currentTime = Math.floor(Date.now()/1000);
+        const progressPercent = Math.max(0, Math.min(100, 
+            ((task.endtime - currentTime) / (task.endtime - task.starttime)) * 100
+        ));
+        
+        const slide = document.createElement('div');
+        slide.className = 'swiper-slide';
+        
+        slide.innerHTML = `
+            <div class="task-card active-task" data-endtime="${task.endtime}">
+                <div class="task-header" style="background-color: ${taskTypeInfo.color}">
+                    <div class="task-icon">
+                        <i class="layui-icon ${taskTypeInfo.icon}"></i>
+                    </div>
+                    <div class="task-info">
+                        <h3 class="task-name">${task.name}</h3>
+                        <span class="task-type">${taskTypeInfo.text}</span>
+                    </div>
+                </div>
+                <div class="task-content">
+                    <div class="task-details">
+                        <p class="task-description">${task.description}</p>
+                        <div class="task-time">
+                            <i class="layui-icon layui-icon-time"></i>
+                            计算中...
+                        </div>
+                    </div>
+                    <div class="task-footer">
+                        <div class="task-rewards">
+                            <div class="reward-item">
+                                <i class="layui-icon layui-icon-diamond"></i>
+                                <span>+${task.points}</span>
+                            </div>
+                            <div class="reward-item">
+                                <i class="layui-icon layui-icon-fire"></i>
+                                <span>-${task.stamina_cost}</span>
+                            </div>
+                        </div>
+                        <button class="abandon-task" onclick="taskManager.abandonTask(${task.id})">
+                            <i class="layui-icon layui-icon-close"></i>
+                            放弃
+                        </button>
+                    </div>
+                </div>
+                <div class="task-progress-bar" style="width: ${progressPercent}%"></div>
+            </div>
+        `;
+        
+        return slide;
+    }
 
     // 添加加载角色信息的方法
     async loadPlayerInfo() {
         try {
-            if (!this.api) {
-                throw new Error('API client not initialized');
-            }
-
-            const result = await this.api.getPlayerInfo(this.playerId);
+            const response = await fetch(`${SERVER}/api/player/${this.playerId}`);
+            const result = await response.json();
             
             if (result.code === 0) {
                 const playerData = result.data;
-                this.updatePlayerUI(playerData);
+                
+                // 更新角色信息显示
+                document.getElementById('playerName').textContent = playerData.player_name;
+                document.getElementById('playerPoints').textContent = playerData.points;
+                
+                // 更新等级和经验条
+                const levelElement = document.querySelector('.level');
+                const expElement = document.querySelector('.exp');
+                if (levelElement) {
+                    levelElement.textContent = `${playerData.level}/100`;
+                }
+                if (expElement) {
+                    expElement.textContent = `${playerData.experience}/99999`;
+                }
+                
+                // 更新经验条
+                const expBarInner = document.querySelector('.exp-bar-inner');
+                if (expBarInner) {
+                    const expPercentage = (playerData.experience / 99999) * 100;
+                    expBarInner.style.width = `${Math.min(100, expPercentage)}%`;
+                }
+                
             } else {
                 console.error('加载角色信息失败:', result.msg);
-                this.showPlayerError();
+                document.getElementById('playerName').textContent = '加载失败';
+                document.getElementById('playerPoints').textContent = '0';
             }
         } catch (error) {
             console.error('加载角色信息失败:', error);
-            this.showPlayerError();
-        }
-    }
-
-    // 新增方法：更新玩家UI
-    updatePlayerUI(playerData) {
-        document.getElementById('playerName').textContent = playerData.player_name;
-        document.getElementById('playerPoints').textContent = playerData.points;
-        
-        // 更新等级和经验条
-        const levelElement = document.querySelector('.level');
-        const expElement = document.querySelector('.exp');
-        if (levelElement) {
-            levelElement.textContent = `${playerData.level}/100`;
-        }
-        if (expElement) {
-            expElement.textContent = `${playerData.experience}/99999`;
-        }
-        
-        // 更新经验条
-        const expBarInner = document.querySelector('.exp-bar-inner');
-        if (expBarInner) {
-            const expPercentage = (playerData.experience / 99999) * 100;
-            expBarInner.style.width = `${Math.min(100, expPercentage)}%`;
-        }
-    }
-
-    // 新增方法：显示玩家错误状态
-    showPlayerError() {
-        document.getElementById('playerName').textContent = '加载失败';
-        document.getElementById('playerPoints').textContent = '0';
-        
-        const levelElement = document.querySelector('.level');
-        const expElement = document.querySelector('.exp');
-        if (levelElement) {
-            levelElement.textContent = '0/100';
-        }
-        if (expElement) {
-            expElement.textContent = '0/99999';
-        }
-        
-        const expBarInner = document.querySelector('.exp-bar-inner');
-        if (expBarInner) {
-            expBarInner.style.width = '0%';
+            document.getElementById('playerName').textContent = '加载失败';
+            document.getElementById('playerPoints').textContent = '0';
         }
     }
 
@@ -1131,7 +1181,8 @@ class TaskManager {
     async updateWordCloud() {
         try {
             // TODO: 替换为实际的API调用
-            const result = await this.api.getWordCloud();
+            const response = await fetch('/api/player/tags');
+            const data = await response.json();
             
             if (window.wordCloudChart && data.success) {
                 window.wordCloudChart.setOption({
@@ -1141,7 +1192,7 @@ class TaskManager {
                 });
             }
         } catch (error) {
-            this.api.handleApiError(error, 'updateWordCloud');
+            console.error('更新文字云失败:', error);
         }
     }
 }

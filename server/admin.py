@@ -7,7 +7,7 @@ import json
 import hashlib  # 添加到文件顶部的导入
 from datetime import datetime
 import time
-from function.player_service import player_service
+from function.PlayerService import player_service
 from flask_socketio import SocketIO
 from config import ENV
 if ENV == 'local':

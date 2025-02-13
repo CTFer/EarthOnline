@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:40:28
- * @LastEditTime: 2025-02-07 18:45:26
+ * @LastEditTime: 2025-02-12 22:55:47
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -77,7 +77,7 @@
                     
                     <!-- 角色属性 -->
                     <div class="stat-group">
-                        <div class="stat-item">
+                        <!-- <div class="stat-item">
                             <span>生命值</span>
                             <div class="stat-value">
                                 <div class="stat-bar">
@@ -94,7 +94,7 @@
                                 </div>
                                 <span id="mp">9999/9999</span>
                             </div>
-                        </div>
+                        </div> -->
                     </div>
                     <div class="stat-group">
                         <!-- <div class="stat-item">
@@ -208,6 +208,14 @@
             <div class="task-list-container">
                 <div id="taskList">
                     <!-- 任务卡片将通过JS动态加载 -->
+                    <div class="swiper task-list-swiper">
+                        <div class="swiper-wrapper">
+                            <div class="swiper-slide">
+                                <div class="loading-state">加载中...</div>
+                            </div>
+                        </div>
+                        <div class="swiper-scrollbar"></div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -18,9 +18,10 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_cors import CORS
 from flask import Flask, request, redirect, send_from_directory, make_response, render_template
 from shop import shop_bp  # 确保在同一目录下
-from function.player_service import player_service
-from function.task_service import task_service
-from function.GPS_service import gps_service
+from function.PlayerService import player_service
+from function.TaskService import task_service
+from function.GPSService import gps_service
+from function.RoadmapService import roadmap_service
 from config import SERVER_IP, PORT, DEBUG,WAITRESS_CONFIG
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -609,6 +610,42 @@ def update_gps(gps_id):
     return gps_service.update_gps(gps_id, data)
 
 
+# 开发计划相关接口
+@app.route('/api/roadmap/login', methods=['POST'])
+def roadmap_login():
+    """开发计划登录"""
+    data = request.get_json()
+    return roadmap_service.roadmap_login(data)
+@app.route('/api/roadmap/check_login', methods=['GET'])
+def roadmap_check_login():
+    """开发计划检查登录"""
+    return roadmap_service.check_login()
+@app.route('/api/roadmap/logout', methods=['GET'])
+def roadmap_logout():
+    """开发计划登出"""
+    return roadmap_service.roadmap_logout()
+@app.route('/roadmap')
+def roadmap():
+    """开发计划首页"""
+    return render_template('client/roadmap.html')
+@app.route('/api/roadmap', methods=['GET'])
+def get_roadmap():
+    """获取开发计划"""
+    return roadmap_service.get_roadmap()
+@app.route('/api/roadmap/add', methods=['POST'])
+def add_roadmap():
+    """添加开发计划"""
+    data = request.get_json()
+    return roadmap_service.add_roadmap(data)
+@app.route('/api/roadmap/<int:roadmap_id>', methods=['PUT'])
+def update_roadmap(roadmap_id):
+    """更新开发计划"""
+    data = request.get_json()
+    return roadmap_service.update_roadmap(roadmap_id, data)
+@app.route('/api/roadmap/<int:roadmap_id>', methods=['DELETE'])
+def delete_roadmap(roadmap_id):
+    """删除开发计划"""
+    return roadmap_service.delete_roadmap(roadmap_id)
 
 # 添加NFC接口测试页面路由
 

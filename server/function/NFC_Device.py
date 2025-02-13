@@ -4,7 +4,6 @@ import logging
 import time
 import json
 import traceback
-from flask_socketio import emit
 from datetime import datetime
 import serial
 import serial.tools.list_ports
