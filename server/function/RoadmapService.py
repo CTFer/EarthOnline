@@ -2,9 +2,9 @@ import sqlite3
 import time
 import json
 import os
-from flask import session
+from flask import session, request
 import hashlib
-
+from config import PROD_SERVER
 class RoadmapService:
     def __init__(self):
         self.db_path = os.path.join(
@@ -12,6 +12,8 @@ class RoadmapService:
                 'database',
                 'roadmap.db'
             )
+    # 
+
     def encrypt_password(self, password):
         """使用MD5加密密码"""
         return hashlib.md5(password.encode('utf-8')).hexdigest()
@@ -75,20 +77,45 @@ class RoadmapService:
     # 以下的方法需要登录后才能使用
     def check_login(self):
         """检查是否登录"""
-        if not session.get('username'):
+        try:
+            # 检查API密钥
+            api_key = request.headers.get('X-API-Key')
+            if api_key and api_key == PROD_SERVER['API_KEY']:
+                print("[Roadmap] API key authentication successful")
+                # API密钥验证通过，返回默认用户信息
+                return json.dumps({
+                    'code': 1,  # 1 表示已登录
+                    'msg': 'API密钥验证通过',
+                    'data': {
+                        'username': 'api_user',
+                        'user_id': 1  # 默认用户ID
+                    }
+                })
+            
+            # 检查session登录
+            if not session.get('username'):
+                print("[Roadmap] Session authentication failed")
+                return json.dumps({
+                    'code': 0,  # 0 表示未登录
+                    'msg': '未登录',
+                    'data': None
+                })
+            
+            print(f"[Roadmap] Session authentication successful for user: {session.get('username')}")
             return json.dumps({
-                'code': 0,
-                'msg': '未登录',
-                'data': None
-            })
-        else:
-            return json.dumps({
-                'code': 1,
+                'code': 1,  # 1 表示已登录
                 'msg': '已登录',
                 'data': {
                     'username': session.get('username'),
                     'user_id': session.get('user_id')
                 }
+            })
+        except Exception as e:
+            print(f"[Roadmap] Login check error: {str(e)}")
+            return json.dumps({
+                'code': 0,
+                'msg': f'登录检查失败: {str(e)}',
+                'data': None
             })
 
     def get_roadmap(self):

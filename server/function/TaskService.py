@@ -35,33 +35,110 @@ class TaskService:
         try:
             conn = self.get_db()
             cursor = conn.cursor()
+            
+            # 获取玩家当前进行中的任务
+            cursor.execute('''
+                SELECT t.task_type, t.id
+                FROM player_task pt
+                JOIN task t ON pt.task_id = t.id
+                WHERE pt.player_id = ? AND pt.status = 'IN_PROGRESS'
+            ''', (player_id,))
+            current_tasks = cursor.fetchall()
+            
+            # 获取玩家已完成的任务
+            cursor.execute('''
+                SELECT t.id, t.task_type
+                FROM player_task pt
+                JOIN task t ON pt.task_id = t.id
+                WHERE pt.player_id = ? AND pt.status = 'COMPLETED'
+            ''', (player_id,))
+            completed_tasks = {row['id']: row['task_type'] for row in cursor.fetchall()}
+
+            # 获取今日已接受的日常任务
+            today_start = int(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+            cursor.execute('''
+                SELECT t.id, COUNT(*) as accept_count
+                FROM player_task pt
+                JOIN task t ON pt.task_id = t.id
+                WHERE pt.player_id = ? 
+                AND t.task_type = 'DAILY'
+                AND pt.starttime >= ?
+                GROUP BY t.id
+            ''', (player_id, today_start))
+            daily_task_counts = {row['id']: row['accept_count'] for row in cursor.fetchall()}
+
+            available_tasks = []
+            
+            # 获取所有可能的任务
             cursor.execute('''
                 SELECT 
                     t.id, t.name, t.description, t.stamina_cost,
-                    t.task_rewards, t.task_type, t.task_status, t.limit_time, t.icon
+                    t.task_rewards, t.task_type, t.task_status, t.limit_time, t.icon,
+                    t.parent_task_id, t.task_scope, t.repeatable, t.repeat_time
                 FROM task t
                 WHERE t.is_enabled = 1 
                 AND (t.task_scope = 0 OR t.task_scope = ?)
                 AND t.id NOT IN (
-                    SELECT task_id FROM player_task WHERE player_id = ?
+                    SELECT task_id 
+                    FROM player_task 
+                    WHERE player_id = ? 
+                    AND (status = 'IN_PROGRESS' OR status = 'COMPLETED')
                 )
             ''', (player_id, player_id))
-
-            tasks = []
-            columns = [description[0] for description in cursor.description]
-            rows = cursor.fetchall()
-
-            for row in rows:
-                task_dict = dict(zip(columns, row))
-                tasks.append(task_dict)
+            
+            all_tasks = cursor.fetchall()
+            
+            # 处理每个任务
+            for task in all_tasks:
+                task_dict = dict(task)
+                
+                # 根据任务类型处理
+                if task_dict['task_type'] == 'MAIN':
+                    # 主线任务处理
+                    current_main = next((t for t in current_tasks if t['task_type'] == 'MAIN'), None)
+                    
+                    if current_main:
+                        # 如果有进行中的主线任务，只显示其直接后续任务
+                        if task_dict['parent_task_id'] == current_main['id']:
+                            available_tasks.append(task_dict)
+                    elif task_dict['parent_task_id'] == 0 or task_dict['parent_task_id'] in completed_tasks:
+                        # 如果没有进行中的主线任务，显示第一个主线任务或前置任务已完成的任务
+                        available_tasks.append(task_dict)
+                        
+                elif task_dict['task_type'] == 'BRANCH':
+                    # 支线任务处理
+                    current_BRANCH_tasks = [t for t in current_tasks if t['task_type'] == 'BRANCH']
+                    
+                    # 检查是否是当前支线任务的直接后续任务
+                    is_next_BRANCH = any(task_dict['parent_task_id'] == t['id'] for t in current_BRANCH_tasks)
+                    
+                    if is_next_BRANCH:
+                        available_tasks.append(task_dict)
+                    elif task_dict['parent_task_id'] == 0 or task_dict['parent_task_id'] in completed_tasks:
+                        # 新的支线任务线或前置任务已完成
+                        available_tasks.append(task_dict)
+                        
+                elif task_dict['task_type'] == 'DAILY':
+                    # 日常任务处理
+                    task_id = task_dict['id']
+                    current_count = daily_task_counts.get(task_id, 0)
+                    
+                    if task_dict['repeatable']:
+                        # 可重复任务，检查次数限制
+                        if current_count < task_dict['repeat_time']:
+                            available_tasks.append(task_dict)
+                    elif current_count == 0:
+                        # 不可重复任务，今天还未接受过
+                        available_tasks.append(task_dict)
 
             return json.dumps({
                 'code': 0,
                 'msg': '获取可用任务成功',
-                'data': tasks
+                'data': available_tasks
             })
 
         except sqlite3.Error as e:
+            logger.error(f"获取任务失败: {str(e)}")
             return json.dumps({
                 'code': 1,
                 'msg': f'获取任务失败: {str(e)}',
@@ -69,7 +146,6 @@ class TaskService:
             }), 500
         finally:
             conn.close()
-
     def get_current_tasks(self, player_id):
         """获取用户当前未过期的任务列表"""
         try:
@@ -157,6 +233,36 @@ class TaskService:
                     'data': None
                 })
 
+            # 检查前置任务是否完成
+            if task['parent_task_id']:
+                cursor.execute('''
+                    SELECT * FROM player_task 
+                    WHERE player_id = ? AND task_id = ? AND status = 'COMPLETED'
+                ''', (player_id, task['parent_task_id']))
+                
+                if not cursor.fetchone():
+                    return json.dumps({
+                        'code': 2,
+                        'msg': '需要先完成前置任务',
+                        'data': None
+                    })
+
+            # 检查是否有进行中的主线任务
+            if task['task_type'] == 'MAIN':
+                cursor.execute('''
+                    SELECT * FROM player_task pt
+                    JOIN task t ON pt.task_id = t.id
+                    WHERE pt.player_id = ? AND t.task_type = 'MAIN' 
+                    AND pt.status = 'IN_PROGRESS'
+                ''', (player_id,))
+                
+                if cursor.fetchone():
+                    return json.dumps({
+                        'code': 3,
+                        'msg': '请先完成当前主线任务',
+                        'data': None
+                    })
+
             # 添加任务记录
             current_time = int(time.time())
             endtime = current_time + task['limit_time'] if task['limit_time'] else None
@@ -171,10 +277,15 @@ class TaskService:
             return json.dumps({
                 'code': 0,
                 'msg': '任务接受成功',
-                'data': None
+                'data': {
+                    'task_id': task_id,
+                    'player_id': player_id,
+                    'task_name': task['name']
+                }
             })
 
         except sqlite3.Error as e:
+            logger.error(f"接受任务失败: {str(e)}")
             return json.dumps({
                 'code': 1,
                 'msg': f'接受任务失败: {str(e)}',

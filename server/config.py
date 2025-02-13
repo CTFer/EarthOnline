@@ -42,3 +42,17 @@ WAITRESS_CONFIG = {
     'CLEANUP_INTERVAL': 30,     # 清理间隔（秒）
     'IDENT' : 'Game Server'      # 服务器标识
 }
+
+# 生产环境配置
+PROD_SERVER = {
+    'URL': 'http://1.95.11.164',  # 生产环境服务器地址
+    'API_KEY': '95279527',    # API认证密钥
+    'TIMEOUT': 5,                      # 请求超时时间（秒）
+    'RETRY': 3                         # 失败重试次数
+}
+
+# 需要同步的接口列表
+SYNC_ENDPOINTS = [
+    '/api/roadmap/add',
+    '/api/roadmap/<id>',  # PUT/DELETE
+]

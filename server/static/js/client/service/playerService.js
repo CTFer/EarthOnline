@@ -1,13 +1,16 @@
+import Logger from '../../utils/logger.js';
+
 class PlayerService {
-    constructor(api, eventBus) {
-        this.api = api;
+    constructor(apiClient, eventBus, store) {
+        this.api = apiClient;
         this.eventBus = eventBus;
+        this.store = store;
         this.playerId = localStorage.getItem('playerId') || '1';
         this.playerData = null;
         
         // 订阅相关事件
         this.setupEventListeners();
-        console.log('[PlayerService] Initialized with playerId:', this.playerId);
+        Logger.info('PlayerService', '初始化玩家服务');
     }
 
     setupEventListeners() {
@@ -17,25 +20,18 @@ class PlayerService {
         this.eventBus.on('nfc:identity', this.handleIdentityUpdate.bind(this));
     }
 
-    async loadPlayerInfo() {
-        console.log('[PlayerService] Loading player info');
+    async loadPlayerInfo(playerId) {
+        Logger.info('PlayerService', '加载玩家信息:', playerId);
         try {
-            if (!this.api) {
-                throw new Error('API client not initialized');
-            }
-
-            const result = await this.api.getPlayerInfo(this.playerId);
-            
-            if (result.code === 0) {
-                this.playerData = result.data;
-                this.updatePlayerUI(result.data);
-                this.eventBus.emit('player:loaded', result.data);
-                return result.data;
-            } else {
-                throw new Error(result.msg);
-            }
+            const playerInfo = await this.api.getPlayerInfo(playerId);
+            Logger.debug('PlayerService', '玩家信息加载成功:', playerInfo);
+            this.store.setState({ player: playerInfo });
+            this.playerData = playerInfo;
+            this.updatePlayerUI(playerInfo);
+            this.eventBus.emit('player:loaded', playerInfo);
+            return playerInfo;
         } catch (error) {
-            console.error('[PlayerService] Load player info failed:', error);
+            Logger.error('PlayerService', '加载玩家信息失败:', error);
             this.showPlayerError();
             this.eventBus.emit('player:error', error);
             throw error;
@@ -88,7 +84,7 @@ class PlayerService {
     async handleTaskComplete(taskData) {
         console.log('[PlayerService] Handling task complete:', taskData);
         if (taskData.points) {
-            await this.loadPlayerInfo(); // 重新加载玩家信息以更新经验值
+            await this.loadPlayerInfo(this.playerId); // 重新加载玩家信息以更新经验值
         }
     }
 
@@ -98,7 +94,7 @@ class PlayerService {
         if (data.player_id) {
             this.playerId = data.player_id;
             localStorage.setItem('playerId', data.player_id);
-            this.loadPlayerInfo();
+            this.loadPlayerInfo(data.player_id);
             this.eventBus.emit('player:identity-updated', data);
         }
     }
@@ -116,6 +112,19 @@ class PlayerService {
     // 检查玩家是否已初始化
     isInitialized() {
         return !!this.playerData;
+    }
+
+    async updatePlayerStats(stats) {
+        Logger.info('PlayerService', '更新玩家状态:', stats);
+        try {
+            const result = await this.api.updatePlayerStats(stats);
+            Logger.debug('PlayerService', '玩家状态更新成功:', result);
+            await this.loadPlayerInfo(stats.playerId);
+            return result;
+        } catch (error) {
+            Logger.error('PlayerService', '更新玩家状态失败:', error);
+            throw error;
+        }
     }
 }
 

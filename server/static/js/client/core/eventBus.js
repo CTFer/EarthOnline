@@ -7,11 +7,13 @@
  * Software: VScode
  * Copyright 2025 迷舍
  */
+import Logger from '../../utils/logger.js';
+
 // 事件总线
 class EventBus {
     constructor() {
         this.events = {};
-        console.log('[EventBus] Event bus initialized');
+        Logger.info('EventBus', '事件总线初始化');
     }
 
     on(event, callback) {
@@ -19,24 +21,24 @@ class EventBus {
             this.events[event] = [];
         }
         this.events[event].push(callback);
-        console.log(`[EventBus] Registered handler for event: ${event}`);
+        Logger.debug('EventBus', `注册事件处理器: ${event}`);
     }
 
     off(event, callback) {
         if (this.events[event]) {
             this.events[event] = this.events[event].filter(cb => cb !== callback);
-            console.log(`[EventBus] Removed handler for event: ${event}`);
+            Logger.debug('EventBus', `移除事件处理器: ${event}`);
         }
     }
 
     emit(event, data) {
-        console.log(`[EventBus] Emitting event: ${event}`, data);
+        Logger.debug('EventBus', `触发事件: ${event}`, data);
         if (this.events[event]) {
             this.events[event].forEach(callback => {
                 try {
                     callback(data);
                 } catch (error) {
-                    console.error(`[EventBus] Error in event handler for ${event}:`, error);
+                    Logger.error('EventBus', `事件处理器错误 ${event}:`, error);
                 }
             });
         }
@@ -45,7 +47,7 @@ class EventBus {
     // 清理所有事件监听
     clear() {
         this.events = {};
-        console.log('[EventBus] Cleared all event handlers');
+        Logger.info('EventBus', '清理所有事件处理器');
     }
 
     // 获取特定事件的监听器数量

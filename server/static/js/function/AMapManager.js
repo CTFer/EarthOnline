@@ -1,6 +1,9 @@
+import Logger from '../utils/logger.js';
+import { MAP_CONFIG } from '../config/config.js';
+
 class AMapManager {
     constructor() {
-        console.log('[Debug] AMapManager 构造函数开始');
+        Logger.info('AMapManager', '构造函数开始');
         this.mapInstance = null;
         this.gpsData = [];
         this.playerId = localStorage.getItem('playerId') || '1';
@@ -19,14 +22,14 @@ class AMapManager {
         
         this.initMap();
         this.initTimeFilter();
-        console.log('[Debug] AMapManager 构造函数完成');
+        Logger.info('AMapManager', '构造函数完成');
     }
 
     async initMap() {
-        console.log('[Debug] AMapManager initMap 开始');
+        Logger.info('AMapManager', 'initMap 开始');
         const container = document.getElementById('gpsMapContainer');
         if (!container) {
-            console.error('[Debug] GPS地图容器不存在');
+            Logger.error('AMapManager', 'GPS地图容器不存在');
             return;
         }
 
@@ -75,7 +78,7 @@ class AMapManager {
 
             await this.loadGPSData();
         } catch (error) {
-            console.error('[Debug] 初始化高德地图失败:', error);
+            Logger.error('AMapManager', '初始化高德地图失败:', error);
         }
     }
 
@@ -86,7 +89,7 @@ class AMapManager {
 
     updateMap() {
         if (!this.mapInstance || !this.gpsData.length) {
-            console.log('[Debug] 地图实例或GPS数据不存在，跳过更新');
+            Logger.log('AMapManager', '地图实例或GPS数据不存在，跳过更新');
             return;
         }
 
@@ -223,7 +226,7 @@ class AMapManager {
     }
 
     async loadGPSData() {
-        console.log('[Debug] 开始加载GPS数据');
+        Logger.info('AMapManager', '开始加载GPS数据');
         await this.updateMapData();
     }
 
@@ -252,7 +255,7 @@ class AMapManager {
                 }
             }
         } catch (error) {
-            console.error('加载GPS数据失败:', error);
+            Logger.error('AMapManager', '加载GPS数据失败:', error);
         }
     }
 
@@ -261,7 +264,7 @@ class AMapManager {
         
         
         if (!this.mapInstance) {
-            console.error('[AMapManager Debug] 地图实例不存在');
+            Logger.error('AMapManager', '地图实例不存在');
             return;
         }
         
@@ -325,7 +328,7 @@ class AMapManager {
             this.updateGPSInfo(gpsData);
 
         } catch (error) {
-            console.error('[AMapManager Debug] 添加GPS点位失败:', error);
+            Logger.error('AMapManager', '添加GPS点位失败:', error);
         }
     }
 
@@ -379,7 +382,7 @@ class AMapManager {
 
     // 更新GPS信息的方法
     updateGPSInfo(point) {
-        console.log('[AMapManager Debug] 更新GPS信息:', point);
+        Logger.debug('AMapManager', '更新GPS信息:', point);
         
         const speedElement = document.getElementById('currentSpeed');
         const timeElement = document.getElementById('lastUpdateTime');
@@ -387,26 +390,26 @@ class AMapManager {
         
         if (speedElement) {
             const speed = point.speed || 0;
-            console.log('[AMapManager Debug] 更新速度:', speed);
+            Logger.debug('AMapManager', '更新速度:', speed);
             speedElement.textContent = `${speed.toFixed(1)} km/h`;
         } else {
-            console.warn('[AMapManager Debug] 速度显示元素不存在');
+            Logger.warn('AMapManager', '速度显示元素不存在');
         }
         
         if (timeElement) {
             const timestamp = point.addtime || point.timestamp;
             if (timestamp) {
                 const time = new Date(timestamp * 1000);
-                console.log('[AMapManager Debug] 更新时间:', time.toLocaleString());
+                Logger.debug('AMapManager', '更新时间:', time.toLocaleString());
                 timeElement.textContent = time.toLocaleString();
             }
         } else {
-            console.warn('[AMapManager Debug] 时间显示元素不存在');
+            Logger.warn('AMapManager', '时间显示元素不存在');
         }
 
         if (batteryElement && point.battery !== undefined) {
             this.batteryLevel = point.battery;
-            console.log('[AMapManager Debug] 更新电量:', this.batteryLevel);
+            Logger.debug('AMapManager', '更新电量:', this.batteryLevel);
             batteryElement.textContent = `${this.batteryLevel}%`;
             
             const batteryIcon = batteryElement.previousElementSibling;
@@ -420,7 +423,7 @@ class AMapManager {
                 }
             }
         } else {
-            console.warn('[AMapManager Debug] 电量显示元素不存在或数据中没有电量信息');
+            Logger.debug('AMapManager', '电量显示元素不存在或数据中没有电量信息');
         }
     }
 

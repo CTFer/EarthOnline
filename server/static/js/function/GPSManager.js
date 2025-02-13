@@ -1,6 +1,9 @@
+import Logger from '../utils/logger.js';
+import { MAP_CONFIG } from '../config/config.js';
+
 class GPSManager {
     constructor() {
-        console.log('[GPSManager Debug] 初始化开始');
+        Logger.info('GPSManager', '初始化开始');
         this.mapChart = null;
         this.gpsData = [];
         this.playerId = localStorage.getItem('playerId') || '1';
@@ -13,7 +16,7 @@ class GPSManager {
         this.displayMode = 'path'; // 添加显示模式属性，默认为路径模式
         this.initMap();
         this.initTimeFilter();
-        console.log('[GPSManager Debug] 初始化完成');
+        Logger.info('GPSManager', '初始化完成');
     }
 
     initTimeFilter() {
@@ -78,13 +81,13 @@ class GPSManager {
             
             if (result.code === 0 && result.data && result.data.records) {
                 this.gpsData = result.data.records.sort((a, b) => a.addtime - b.addtime);
-                console.log('[Debug] 加载的GPS数据:', this.gpsData);
+                Logger.debug('GPSManager', '加载的GPS数据:', this.gpsData);
                 this.updateMap();
             } else {
-                console.error('加载GPS数据失败:', result.msg);
+                Logger.error('GPSManager', '加载GPS数据失败:', result.msg);
             }
         } catch (error) {
-            console.error('加载GPS数据失败:', error);
+            Logger.error('GPSManager', '加载GPS数据失败:', error);
         }
     }
 
@@ -94,11 +97,10 @@ class GPSManager {
     }
 
     async initMap() {
-        console.log('[Debug] GPSManager initMap 开始');
-        // 确保容器存在
+        Logger.info('GPSManager', 'initMap 开始');
         const container = document.getElementById('gpsMapContainer');
         if (!container) {
-            console.error('GPS地图容器不存在');
+            Logger.error('GPSManager', 'GPS地图容器不存在');
             return;
         }
 
@@ -156,7 +158,7 @@ class GPSManager {
             await this.loadGPSData();
 
         } catch (error) {
-            console.error('初始化地图失败:', error);
+            Logger.error('GPSManager', '初始化地图失败:', error);
         }
 
         // 添加地图视图变化事件监听
@@ -167,8 +169,7 @@ class GPSManager {
                 this.currentCenter = option.geo[0].center;
             }
         });
-
-        console.log('[Debug] GPSManager initMap 完成');
+        Logger.debug('GPSManager', 'GPSManager初始化地图完成');
     }
 
     // 计算GPS点的边界范围
@@ -221,9 +222,10 @@ class GPSManager {
     }
 
     updateMap() {
-        console.log('[GPSManager Debug] 开始更新地图');
+        Logger.debug('GPSManager', '开始更新地图');
+
         if (!this.mapChart || !this.gpsData.length) {
-            console.warn('[GPSManager Debug] 无地图实例或GPS数据为空');
+            Logger.warn('GPSManager', '无地图实例或GPS数据为空');
             return;
         }
 
@@ -272,10 +274,10 @@ class GPSManager {
             }
 
             this.mapChart.setOption(mapOption);
-            console.log('[GPSManager Debug] 地图更新成功');
+            Logger.debug('GPSManager', '地图更新成功');
 
         } catch (error) {
-            console.error('[GPSManager Debug] 更新地图失败:', error);
+            Logger.error('GPSManager', '更新地图失败:', error);
         }
     }
 
@@ -398,10 +400,10 @@ class GPSManager {
 
     // 修改 addNewGPSPoint 方法，添加详细调试信息
     addNewGPSPoint(gpsData) {
-        console.log('[GPSManager Debug] 添加新GPS点位:', gpsData);
+        Logger.debug('GPSManager', '添加新GPS点位:', gpsData);
         
         if (!this.mapChart) {
-            console.error('[GPSManager Debug] 地图实例不存在');
+            Logger.error('GPSManager', '地图实例不存在');
             return;
         }
         
@@ -426,24 +428,25 @@ class GPSManager {
                 battery: gpsData.battery
             };
             
-            console.log('[GPSManager Debug] 格式化的新点位数据:', newPoint);
+            Logger.debug('GPSManager', '格式化的新点位数据:', newPoint);
+
             this.gpsData.push(newPoint);
 
             // 立即更新地图显示
             this.updateMap();
             
             // 更新实时信息显示
-            console.log('[GPSManager Debug] 更新GPS信息显示');
+            Logger.debug('GPSManager', '更新GPS信息显示');
             this.updateGPSInfo(gpsData);
 
         } catch (error) {
-            console.error('[GPSManager Debug] 添加GPS点位失败:', error);
+            Logger.error('GPSManager', '添加GPS点位失败:', error);
         }
     }
 
     // 修改 updateGPSInfo 方法，优化状态更新逻辑
     updateGPSInfo(point) {
-        console.log('[GPSManager Debug] 更新GPS信息:', point);
+        Logger.debug('GPSManager', '更新GPS信息:', point);
         
         const speedElement = document.getElementById('currentSpeed');
         const timeElement = document.getElementById('lastUpdateTime');
@@ -452,7 +455,7 @@ class GPSManager {
         // 更新速度（如果有）
         if (speedElement && typeof point.speed !== 'undefined') {
             const speed = point.speed || 0;
-            console.log('[GPSManager Debug] 更新速度:', speed);
+            Logger.debug('GPSManager', '更新速度:', speed);
             speedElement.textContent = `${speed.toFixed(1)} km/h`;
         }
         
@@ -461,7 +464,7 @@ class GPSManager {
             const timestamp = point.timestamp || point.addtime;
             if (timestamp) {
                 const time = new Date(timestamp * 1000);
-                console.log('[GPSManager Debug] 更新时间:', time.toLocaleString());
+                Logger.debug('GPSManager', '更新时间:', time.toLocaleString());
                 timeElement.textContent = time.toLocaleString();
             }
         }
@@ -469,7 +472,7 @@ class GPSManager {
         // 更新电量（如果有）
         if (batteryElement && typeof point.battery !== 'undefined') {
             this.batteryLevel = point.battery;
-            console.log('[GPSManager Debug] 更新电量:', this.batteryLevel);
+            Logger.debug('GPSManager', '更新电量:', this.batteryLevel);
             batteryElement.textContent = `${this.batteryLevel}%`;
             
             const batteryIcon = batteryElement.previousElementSibling;
@@ -487,14 +490,14 @@ class GPSManager {
 
     // 添加切换显示模式的方法
     toggleDisplayMode() {
-        console.log('[GPSManager Debug] 切换显示模式');
+        Logger.debug('GPSManager', '切换显示模式');
         this.displayMode = this.displayMode === 'path' ? 'point' : 'path';
-        console.log('[GPSManager Debug] 新显示模式:', this.displayMode);
+        Logger.debug('GPSManager', '新显示模式:', this.displayMode);
         this.updateMap();
     }
 
     destroy() {
-        console.log('[GPSManager] 销毁地图实例');
+        Logger.debug('GPSManager', '销毁地图实例');
         if (this.mapChart) {
             this.mapChart.dispose();
             this.mapChart = null;

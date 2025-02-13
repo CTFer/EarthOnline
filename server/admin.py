@@ -706,7 +706,7 @@ def update_task(task_id):
                 ]
 
         cursor.execute('''
-            UPDATE tasks 
+            UPDATE task 
             SET name = ?, 
                 description = ?, 
                 task_chain_id = ?,

@@ -1,5 +1,8 @@
+import { SERVER } from '../config/config.js';
+import Logger from '../utils/logger.js';
+
 // 新建 WebSocketManager 类
-class WebSocketManager {
+export default class WebSocketManager {
     constructor() {
         console.log('[WebSocket] 初始化 WebSocketManager');
         this.socket = io(SERVER);
@@ -9,6 +12,8 @@ class WebSocketManager {
         this.tagsUpdateCallback = null;
         this.gpsUpdateCallback = null;
         this.nfcTaskUpdateCallback = null;  // 添加NFC任务更新回调
+        this.subscriptions = new Set();
+        Logger.info('WebSocket', '管理器初始化');
         this.initializeSocket();
     }
 
@@ -98,4 +103,3 @@ class WebSocketManager {
         this.nfcTaskUpdateCallback = callback;
     }
 } 
-export default WebSocketManager; 

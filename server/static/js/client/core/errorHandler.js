@@ -7,9 +7,11 @@
  * Software: VScode
  * Copyright 2025 迷舍
  */
-class ErrorHandler {
+import Logger from '../../utils/logger.js';
+
+export class ErrorHandler {
     static handle(error, context = '') {
-        console.error(`[Error][${context}]`, error);
+        Logger.error(`错误[${context}]`, error);
         
         // 统一的错误提示
         layer.msg(error.message || '操作失败，请重试', {icon: 2});
@@ -19,8 +21,7 @@ class ErrorHandler {
     }
 
     static report(error, context) {
-        // 错误上报逻辑
-        console.log('[Error] Reporting error:', {
+        Logger.error('错误上报', 'Reporting error:', {
             context,
             message: error.message,
             stack: error.stack

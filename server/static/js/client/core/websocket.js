@@ -1,20 +1,23 @@
+import Logger from '../../utils/logger.js';
+import { SERVER } from '../../config/config.js';
+
 class WebSocketManager {
-    constructor(url, eventBus) {
-        this.url = url;
+    constructor(eventBus) {
+        this.url = SERVER;
         this.eventBus = eventBus;
         this.socket = null;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
-        console.log('[WebSocket] Initializing');
+        Logger.info('WebSocket', '初始化');
     }
 
     connect() {
         try {
             this.socket = io(this.url);
             this.setupEventHandlers();
-            console.log('[WebSocket] Connected');
+            Logger.info('WebSocket', '连接成功');
         } catch (error) {
-            console.error('[WebSocket] Connection failed:', error);
+            Logger.error('WebSocket', '连接失败:', error);
             this.handleReconnect();
         }
     }
@@ -22,30 +25,30 @@ class WebSocketManager {
     setupEventHandlers() {
         // 任务相关
         this.socket.on('task_update', (data) => {
-            console.log('[WebSocket] Task update received:', data);
+            Logger.info('WebSocket', '任务更新:', data);
             this.eventBus.emit('task:update', data);
         });
 
         // NFC相关
         this.socket.on('nfc_update', (data) => {
-            console.log('[WebSocket] NFC update received:', data);
+            Logger.info('WebSocket', 'NFC更新:', data);
             this.eventBus.emit('nfc:update', data);
         });
 
         // 玩家相关
         this.socket.on('player_update', (data) => {
-            console.log('[WebSocket] Player update received:', data);
+            Logger.info('WebSocket', '玩家更新:', data);
             this.eventBus.emit('player:update', data);
         });
 
         // 连接状态
         this.socket.on('connect', () => {
-            console.log('[WebSocket] Connected');
+            Logger.info('WebSocket', '连接成功');
             this.eventBus.emit('ws:connected');
         });
 
         this.socket.on('disconnect', () => {
-            console.log('[WebSocket] Disconnected');
+            Logger.info('WebSocket', '断开连接');
             this.eventBus.emit('ws:disconnected');
             this.handleReconnect();
         });
@@ -54,7 +57,7 @@ class WebSocketManager {
     handleReconnect() {
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
-            console.log(`[WebSocket] Reconnecting... Attempt ${this.reconnectAttempts}`);
+            Logger.info('WebSocket', `尝试重新连接... 第 ${this.reconnectAttempts} 次`);
             setTimeout(() => this.connect(), 1000 * this.reconnectAttempts);
         }
     }
@@ -62,10 +65,10 @@ class WebSocketManager {
     // 发送消息方法
     emit(event, data) {
         if (this.socket && this.socket.connected) {
-            console.log(`[WebSocket] Emitting ${event}:`, data);
+            Logger.info('WebSocket', `发送消息: ${event}`, data);
             this.socket.emit(event, data);
         } else {
-            console.error('[WebSocket] Cannot emit: socket not connected');
+            Logger.error('WebSocket', '无法发送消息: socket未连接');
         }
     }
 }

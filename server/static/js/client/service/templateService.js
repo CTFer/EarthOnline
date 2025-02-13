@@ -1,26 +1,13 @@
+import Logger from '../../utils/logger.js';
+
 class TemplateService {
     constructor() {
-        console.log('[TemplateService] Initialized');
+        Logger.info('TemplateService', '初始化模板服务');
     }
 
-    // 创建活动任务卡片
-    createActiveTaskCard(task) {
-        console.log('[TemplateService] Creating active task card:', task);
-        const taskTypeInfo = this.getTaskTypeInfo(task.task_type, task.icon);
-        const currentTime = Math.floor(Date.now()/1000);
-        const progressPercent = Math.max(0, Math.min(100, 
-            ((task.endtime - currentTime) / (task.endtime - task.starttime)) * 100
-        ));
-        
-        const slide = document.createElement('div');
-        slide.className = 'swiper-slide';
-        
-        slide.innerHTML = this.getActiveTaskTemplate(task, taskTypeInfo, progressPercent);
-        return slide;
-    }
-
-    // 活动任务卡片模板
+    // 获取活动任务卡片模板
     getActiveTaskTemplate(task, taskTypeInfo, progressPercent) {
+        Logger.debug('TemplateService', '生成活动任务卡片模板:', task);
         return `
             <div class="task-card active-task" data-endtime="${task.endtime}">
                 <div class="task-header" style="background-color: ${taskTypeInfo.color}">
@@ -42,14 +29,7 @@ class TemplateService {
                     </div>
                     <div class="task-footer">
                         <div class="task-rewards">
-                            <div class="reward-item">
-                                <i class="layui-icon layui-icon-diamond"></i>
-                                <span>+${task.points}</span>
-                            </div>
-                            <div class="reward-item">
-                                <i class="layui-icon layui-icon-fire"></i>
-                                <span>-${task.stamina_cost}</span>
-                            </div>
+                            ${this.renderRewardItems(task)}
                         </div>
                         <button class="abandon-task" data-task-id="${task.id}">
                             <i class="layui-icon layui-icon-close"></i>
@@ -62,9 +42,58 @@ class TemplateService {
         `;
     }
 
+    // 获取可用任务卡片模板
+    getAvailableTaskTemplate(task, taskTypeInfo, rewards) {
+        Logger.debug('TemplateService', '生成可用任务卡片模板:', task);
+        return `
+            <div class="swiper-slide">
+                <div class="task-card" onclick="taskManager.showTaskDetails(${JSON.stringify({
+                    ...task,
+                    typeInfo: taskTypeInfo,
+                    rewards: rewards
+                }).replace(/"/g, '&quot;')})">
+                    ${this.getTaskCardContent(task, taskTypeInfo, rewards)}
+                </div>
+            </div>
+        `;
+    }
+
+    // 获取任务卡片内容模板（复用）
+    getTaskCardContent(task, taskTypeInfo, rewards) {
+        return `
+            <div class="task-header" style="background-color: ${taskTypeInfo.color}">
+                <div class="task-icon">
+                    <i class="layui-icon ${taskTypeInfo.icon}"></i>
+                </div>
+                <div class="task-info">
+                    <h3 class="task-name">${task.name}</h3>
+                    <span class="task-type">${taskTypeInfo.text}</span>
+                </div>
+            </div>
+            <div class="task-content">
+                <div class="task-details">
+                    <p class="task-description">${task.description}</p>
+                    <div class="task-time">
+                        <i class="layui-icon layui-icon-time"></i>
+                        ${task.limit_time ? `限时${Math.floor(task.limit_time/3600)}小时` : '永久'}
+                    </div>
+                </div>
+                <div class="task-footer">
+                    <div class="task-rewards">
+                        ${this.renderRewardItems(rewards, task)}
+                    </div>
+                    <button class="accept-btn" onclick="event.stopPropagation(); taskManager.acceptTask(${task.id})">
+                        <i class="layui-icon layui-icon-ok"></i>
+                        接受
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
     // 创建任务列表项
     createTaskListItem(task) {
-        console.log('[TemplateService] Creating task list item:', task);
+        Logger.debug('TemplateService', '创建任务列表项:', task);
         const taskTypeInfo = this.getTaskTypeInfo(task.task_type, task.icon);
         
         const listItem = document.createElement('div');
@@ -109,7 +138,7 @@ class TemplateService {
 
     // 创建玩家信息面板
     createPlayerInfoPanel(playerData) {
-        console.log('[TemplateService] Creating player info panel:', playerData);
+        Logger.debug('TemplateService', '创建玩家信息面板:', playerData);
         const panel = document.createElement('div');
         panel.className = 'player-info-panel';
         panel.innerHTML = this.getPlayerInfoTemplate(playerData);
@@ -141,26 +170,60 @@ class TemplateService {
         `;
     }
 
-    // 获取任务类型信息
-    getTaskTypeInfo(type, defaultIcon = '') {
-        const typeMap = {
-            DAILY: { text: '日常任务', color: '#4CAF50', icon: 'layui-icon-date' },
-            WEEKLY: { text: '每周任务', color: '#2196F3', icon: 'layui-icon-log' },
-            ACHIEVEMENT: { text: '成就任务', color: '#9C27B0', icon: 'layui-icon-trophy' },
-            EVENT: { text: '活动任务', color: '#FF9800', icon: 'layui-icon-gift' },
-            MAIN: { text: '主线任务', color: '#F44336', icon: 'layui-icon-flag' }
-        };
-
-        return typeMap[type] || { text: '未知任务', color: '#9E9E9E', icon: defaultIcon || 'layui-icon-help' };
-    }
 
     // 显示错误信息
     showError(containerId, message) {
-        console.log('[TemplateService] Showing error message:', message);
+        Logger.warn('TemplateService', '显示错误信息:', message);
         const container = document.getElementById(containerId);
         if (container) {
             container.innerHTML = `<div class="empty-tip">${message}</div>`;
         }
+    }
+
+    // 解析任务奖励
+    parseTaskRewards(taskRewards) {
+        let rewards = { points: 0, exp: 0, cards: [], medals: [] };
+        
+        try {
+            if (taskRewards) {
+                const rewardsData = typeof taskRewards === 'string' ? 
+                    JSON.parse(taskRewards) : taskRewards;
+                
+                if (rewardsData.points_rewards?.length) {
+                    rewards.exp = rewardsData.points_rewards[0]?.number || 0;
+                    rewards.points = rewardsData.points_rewards[1]?.number || 0;
+                }
+                rewards.cards = rewardsData.card_rewards || [];
+                rewards.medals = rewardsData.medal_rewards || [];
+            }
+        } catch (error) {
+            Logger.error('TemplateService', '解析任务奖励失败:', error);
+        }
+        
+        return rewards;
+    }
+
+    // 渲染奖励项
+    renderRewardItems(task) {
+        const rewards = this.parseTaskRewards(task.task_rewards);
+        return `
+            ${rewards.exp > 0 ? `
+                <div class="reward-item">
+                    <i class="layui-icon layui-icon-star"></i>
+                    <span>+${rewards.exp}</span>
+                </div>
+            ` : ''}
+            ${rewards.points > 0 ? `
+                <div class="reward-item">
+                    <i class="layui-icon layui-icon-diamond"></i>
+                    <span>+${rewards.points}</span>
+                </div>
+            ` : ''}
+            <div class="reward-item">
+                <i class="layui-icon layui-icon-fire"></i>
+                <span>-${task.stamina_cost}</span>
+            </div>
+        `;
     }
 }
 

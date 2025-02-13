@@ -1,19 +1,19 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:31
- * @LastEditTime: 2025-02-06 17:05:29
+ * @LastEditTime: 2025-02-13 21:38:38
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
  * Copyright 2025 迷舍
  */
 
-// 服务器IP地址
-const SERVER = "http://192.168.5.18/";
+// 声明配置变量
+export const SERVER = "http://192.168.5.18/";
 
 // 地图渲染配置
-const MAP_CONFIG = {
-  RENDER_TYPE: localStorage.getItem('mapType') || "ECHARTS", // 从本地存储读取上次的选择
+export const MAP_CONFIG = {
+  RENDER_TYPE: localStorage.getItem("mapType") || "ECHARTS", // 从本地存储读取上次的选择
   AMAP: {
     mapStyle: "amap://styles/dark",
     zoom: 14,
@@ -32,7 +32,7 @@ const MAP_CONFIG = {
   },
 };
 // 任务类型配置
-const TASK_TYPE_MAP = {
+export const TASK_TYPE_MAP = {
   MAIN: {
     // 主线任务
     text: "主线任务",
@@ -66,7 +66,7 @@ const TASK_TYPE_MAP = {
 };
 
 // 任务池中的任务状态配置
-const TASK_STATUS_MAP = {
+export const TASK_STATUS_MAP = {
   ACCEPT: {
     // 已接受
     text: "已接受",
@@ -94,7 +94,7 @@ const TASK_STATUS_MAP = {
 };
 
 // 用户任务表中的任务状态配置
-const PLAYER_TASK_STATUS_MAP = {
+export const PLAYER_TASK_STATUS_MAP = {
   IN_PROGRESS: {
     // 进行中
     text: "进行中",
@@ -126,3 +126,26 @@ const PLAYER_TASK_STATUS_MAP = {
     icon: "layui-icon-check",
   },
 };
+
+// 控制台日志配置
+export const LOG_CONFIG = {
+  enableConsoleLog: true, // 是否启用控制台输出
+  logLevel: "debug", // 日志级别: 'debug', 'info', 'warn', 'error'
+  allowedModules: ["GameManager", "TaskService", "templateService", "PlayerService"], // 允许输出日志的模块
+  timeFormat: true, // 是否在日志中显示时间
+  styleOutput: true, // 是否启用样式输出
+  styles: {
+    debug: "color: #9E9E9E", // 灰色
+    info: "color: #2196F3", // 蓝色
+    warn: "color: #FF9800", // 橙色
+    error: "color: #F44336", // 红色
+  },
+};
+
+// 修改导出语法为传统方式
+// window.SERVER = SERVER;
+// window.MAP_CONFIG = MAP_CONFIG;
+// window.TASK_TYPE_MAP = TASK_TYPE_MAP;
+// window.TASK_STATUS_MAP = TASK_STATUS_MAP;
+// window.PLAYER_TASK_STATUS_MAP = PLAYER_TASK_STATUS_MAP;
+// window.LOG_CONFIG = LOG_CONFIG;

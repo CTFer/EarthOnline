@@ -1,12 +1,14 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-08 11:24:25
- * @LastEditTime: 2025-01-29 17:54:45
+ * @LastEditTime: 2025-02-13 20:03:18
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
  * Copyright 2025 迷舍
  */
+import Logger from '../utils/logger.js';
+
 // Live2D 模型配置和初始化
 window.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -108,14 +110,15 @@ window.addEventListener('DOMContentLoaded', async () => {
                 texture: true,
                 baseTexture: true
             });
+            Logger.info('Live2D', '清理资源完成');
         };
 
         // 在页面卸载时清理资源
         window.addEventListener('unload', cleanup);
 
-        console.log('Live2D初始化成功');
+        Logger.info('Live2D', '初始化成功');
 
     } catch (error) {
-        console.error('Live2D初始化失败:', error);
+        Logger.error('Live2D', '初始化失败:', error);
     }
 }); 

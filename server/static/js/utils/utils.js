@@ -1,16 +1,20 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:48
- * @LastEditTime: 2025-01-15 13:18:33
+ * @LastEditTime: 2025-02-13 21:27:15
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
  * Copyright 2025 迷舍
  */
+import { TASK_TYPE_MAP } from '../config/config.js';
+import Logger from './logger.js';
+
 // 工具函数
-const gameUtils = {
+export const gameUtils = {
     // 格式化剩余时间
     formatTimeRemaining(milliseconds) {
+        Logger.debug('Utils', 'Formatting time:', milliseconds);
         if (milliseconds <= 0) {
             return '已结束';
         }
@@ -31,6 +35,7 @@ const gameUtils = {
 
     // 获取任务类型信息
     getTaskTypeInfo(taskType, icon = '') {
+        Logger.debug('Utils', 'Getting task type info:', taskType);
         const defaultIcon = 'layui-icon-flag';  // 默认图标
         
         const typeInfo = {

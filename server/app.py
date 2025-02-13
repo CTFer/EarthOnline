@@ -22,7 +22,15 @@ from function.PlayerService import player_service
 from function.TaskService import task_service
 from function.GPSService import gps_service
 from function.RoadmapService import roadmap_service
-from config import SERVER_IP, PORT, DEBUG,WAITRESS_CONFIG
+from config import (
+    SERVER_IP, 
+    PORT, 
+    DEBUG, 
+    WAITRESS_CONFIG, 
+    ENV,
+    PROD_SERVER  # 添加这行
+)
+import requests
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 app = Flask(__name__, static_folder='static')
@@ -554,7 +562,8 @@ def add_gps():
 
         # 调用 GPS 服务添加记录
         result = gps_service.add_gps(gps_data)
-        response_data = result.get_json()
+        print(f"[GPS] 添加GPS记录结果: {result}")
+        response_data = json.loads(result)
         
         # 只有在新增GPS记录时才发送 WebSocket 通知
         if (response_data['code'] == 0 and 
@@ -632,17 +641,71 @@ def roadmap():
 def get_roadmap():
     """获取开发计划"""
     return roadmap_service.get_roadmap()
+
+def sync_to_prod(methods=['POST', 'PUT', 'DELETE']):
+    """
+    装饰器：同步数据库操作到生产环境
+    :param methods: 需要同步的HTTP方法列表
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            # 获取原始响应
+            original_response = f(*args, **kwargs)
+            
+            # 只在本地环境且请求方法在指定列表中时同步
+            if ENV == 'local' and request.method in methods:
+                try:
+                    # 构建同步请求
+                    prod_url = f"{PROD_SERVER['URL']}{request.path}"
+                    prod_headers = {
+                        'Content-Type': 'application/json',
+                        'X-Sync-From': 'local',
+                        'X-API-Key': PROD_SERVER['API_KEY']
+                    }
+                    
+                    print(f"[Sync] Syncing {request.method} {request.path} to production")
+                    print(f"[Sync] Target URL: {prod_url}")
+                    
+                    # 发送同步请求
+                    sync_response = None
+                    if request.method == 'POST':
+                        sync_response = requests.post(prod_url, json=request.get_json(), headers=prod_headers)
+                    elif request.method == 'PUT':
+                        sync_response = requests.put(prod_url, json=request.get_json(), headers=prod_headers)
+                    elif request.method == 'DELETE':
+                        sync_response = requests.delete(prod_url, headers=prod_headers)
+                    
+                    print(f"[Sync] Sync completed with status code: {sync_response.status_code}")
+                    if sync_response.status_code != 200:
+                        print(f"[Sync] Error response: {sync_response.text}")
+                except Exception as e:
+                    print(f"[Sync] Error syncing to production: {str(e)}")
+                    # 同步失败不影响本地操作
+                    pass
+            
+            # 始终返回原始响应
+            return original_response
+        return wrapper
+    return decorator
+
+# 在需要同步的路由上使用装饰器
 @app.route('/api/roadmap/add', methods=['POST'])
+@sync_to_prod()
 def add_roadmap():
     """添加开发计划"""
     data = request.get_json()
     return roadmap_service.add_roadmap(data)
+
 @app.route('/api/roadmap/<int:roadmap_id>', methods=['PUT'])
+@sync_to_prod()
 def update_roadmap(roadmap_id):
     """更新开发计划"""
     data = request.get_json()
     return roadmap_service.update_roadmap(roadmap_id, data)
+
 @app.route('/api/roadmap/<int:roadmap_id>', methods=['DELETE'])
+@sync_to_prod()
 def delete_roadmap(roadmap_id):
     """删除开发计划"""
     return roadmap_service.delete_roadmap(roadmap_id)
