@@ -43,10 +43,10 @@ WAITRESS_CONFIG = {
     'IDENT' : 'Game Server'      # 服务器标识
 }
 
-# 生产环境配置
+# 生产环境配置 用于同步数据库
 PROD_SERVER = {
     'URL': 'http://1.95.11.164',  # 生产环境服务器地址
-    'API_KEY': '95279527',    # API认证密钥
+    'API_KEY': '95279527',    # API认证密钥 用于同步数据库
     'TIMEOUT': 5,                      # 请求超时时间（秒）
     'RETRY': 3                         # 失败重试次数
 }

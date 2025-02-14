@@ -186,7 +186,7 @@
         .header {
             background-color: #fff;
             box-shadow: 0 2px 4px rgba(0,0,0,.1);
-            padding: 10px 20px;
+            padding: 5px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -194,15 +194,24 @@
         }
         
         .header-title {
-            font-size: 18px;
+            font-size: 24px;
+            line-height: 50px;
             font-weight: bold;
             color: #333;
+        }
+        .header-title i{
+            font-size:42px;
+        }
+        .header-title span{
+           position: relative;
+           bottom: 5px;
         }
         
         .user-info {
             display: flex;
             align-items: center;
             gap: 10px;
+            font-size: 18px;
         }
         
         .username {
@@ -239,11 +248,9 @@
         .header {
             background-color: #fff;
             box-shadow: 0 2px 4px rgba(0,0,0,.1);
-            padding: 10px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
             transition: all 0.3s ease;
         }
 
@@ -459,6 +466,18 @@
         .dark-mode .task-actions .complete-task:hover {
             background-color: #e6510099;
         }
+
+        /* 在现有样式中添加 */
+        .task-count {
+            font-size: 14px;
+            color: #999;
+            margin-left: 5px;
+            font-weight: normal;
+        }
+        
+        .dark-mode .task-count {
+            color: #bdbdbd;
+        }
     </style>
 </head>
 
@@ -466,10 +485,10 @@
     <!-- 新增header -->
     <div class="header">
         <div class="header-title">
-            <i class="layui-icon layui-icon-template-1"></i>
-            计划管理
+            <i class="layui-icon layui-icon-list"></i>
+            <span>计划管理</span>
         </div>
-        <div class="user-info">
+        <div class="user-info"> 
             <div class="theme-switch" id="themeSwitch">
                 <i class="layui-icon layui-icon-light"></i>
             </div>
@@ -485,7 +504,7 @@
         <div class="task-board">
             <div class="task-column" data-status="PLANNED">
                 <div class="column-title">
-                    <span class="title-text">计划中</span>
+                    <span class="title-text">计划中 <span class="task-count">(0)</span></span>
                     <button class="layui-btn layui-btn-primary add-task-btn" data-status="PLANNED">
                         <i class="layui-icon">&#xe654;</i>
                     </button>
@@ -494,7 +513,7 @@
             </div>
             <div class="task-column" data-status="WORKING">
                 <div class="column-title">
-                    <span class="title-text">工作中</span>
+                    <span class="title-text">工作中 <span class="task-count">(0)</span></span>
                     <button class="layui-btn layui-btn-primary add-task-btn" data-status="WORKING">
                         <i class="layui-icon">&#xe654;</i>
                     </button>
@@ -503,7 +522,7 @@
             </div>
             <div class="task-column" data-status="COMPLETED">
                 <div class="column-title">
-                    <span class="title-text">已完成</span>
+                    <span class="title-text">已完成 <span class="task-count">(0)</span></span>
                     <button class="layui-btn layui-btn-primary add-task-btn" data-status="COMPLETED">
                         <i class="layui-icon">&#xe654;</i>
                     </button>

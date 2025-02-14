@@ -709,7 +709,16 @@ def update_roadmap(roadmap_id):
 def delete_roadmap(roadmap_id):
     """删除开发计划"""
     return roadmap_service.delete_roadmap(roadmap_id)
+@app.route('/api/roadmap/get_sync', methods=['GET'])
+def sync_roadmap():
+    """手动触发同步_仅本地环境可用"""
+    return roadmap_service.sync_from_prod()
 
+# 在生产环境添加同步数据接口
+@app.route('/api/roadmap/sync', methods=['GET'])
+def sync_roadmap_data():
+    """提供数据同步接口（仅在生产环境可用）"""
+    return roadmap_service.sync_data()
 # 添加NFC接口测试页面路由
 
 
@@ -914,4 +923,6 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Failed to start server: {str(e)}", exc_info=True)
         raise
+
+
 

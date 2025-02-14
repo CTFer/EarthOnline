@@ -4,7 +4,9 @@ import json
 import os
 from flask import session, request
 import hashlib
-from config import PROD_SERVER
+import requests
+from config import PROD_SERVER, ENV
+
 class RoadmapService:
     def __init__(self):
         self.db_path = os.path.join(
@@ -12,6 +14,8 @@ class RoadmapService:
                 'database',
                 'roadmap.db'
             )
+        # 上次同步时间
+        self.last_sync_time = 0
     # 
 
     def encrypt_password(self, password):
@@ -118,33 +122,261 @@ class RoadmapService:
                 'data': None
             })
 
+    def sync_from_prod(self):
+        """从生产环境同步数据到本地
+        
+        同步流程：
+        1. 环境检查：确保只在本地环境运行
+        2. 准备同步：构建请求头，包含API密钥和上次同步时间
+        3. 获取数据：从生产环境获取增量更新数据
+        4. 处理数据：将获取的数据更新到本地数据库
+        5. 更新时间：记录本次同步时间
+        
+        同步规则：
+        - 根据edittime判断数据是否需要更新
+        - is_deleted标记用于处理已删除的记录
+        - 使用事务确保数据一致性
+        
+        返回格式：
+        {
+            'code': 0/500,  # 0表示成功，其他表示失败
+            'msg': '处理结果说明',
+            'data': [] # 同步的数据列表
+        }
+        """
+        # 初始化数据库连接为 None
+        conn = None
+        
+        # 1. 环境检查
+        if ENV != 'local':
+            print("[Sync] 只能在本地环境同步数据")
+            return json.dumps({
+                'code': 400,
+                'msg': '只能在本地环境同步数据',
+                'data': None
+            })
+
+        try:
+            print("[Sync] 开始从生产环境同步数据...")
+            
+            # 2. 准备同步请求
+            headers = {
+                'X-API-Key': PROD_SERVER['API_KEY'],
+                'X-Sync-Time': str(self.last_sync_time)
+            }
+            
+            # 3. 从生产环境获取数据
+            sync_url = f"{PROD_SERVER['URL']}/api/roadmap/sync"
+            print(f"[Sync] Requesting updates since: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_sync_time))}")
+            print(f"[Sync] Target URL: {sync_url}")
+            
+            response = requests.get(sync_url, headers=headers, timeout=PROD_SERVER['TIMEOUT'])
+            
+            if response.status_code != 200:
+                print(f"[Sync] Failed to get data from production: {response.text}")
+                return json.dumps({
+                    'code': 500,
+                    'msg': f'同步失败: {response.text}',
+                    'data': None
+                })
+            
+            updates = response.json()
+            if not updates.get('data'):
+                print("[Sync] 没有新的更新")
+                return json.dumps({
+                    'code': 0,
+                    'msg': '没有新的更新',
+                    'data': None
+                })
+
+            print(f"[Sync] Received {len(updates['data'])} updates")
+            
+            # 4. 处理数据更新
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            update_count = 0
+            delete_count = 0
+            
+            for item in updates['data']:
+                # 检查记录是否存在
+                cursor.execute('SELECT id FROM roadmap WHERE id = ?', (item['id'],))
+                exists = cursor.fetchone()
+                
+                if exists:
+                    # 更新现有记录
+                    cursor.execute('''
+                        UPDATE roadmap 
+                        SET name = ?, 
+                            description = ?, 
+                            status = ?, 
+                            color = ?,
+                            addtime = ?,
+                            edittime = ?,
+                            "order" = ?,
+                            user_id = ?,
+                            is_deleted = ?
+                        WHERE id = ?
+                    ''', (
+                        item['name'],
+                        item['description'],
+                        item['status'],
+                        item['color'],
+                        item['addtime'],
+                        item['edittime'],
+                        item['order'],
+                        item['user_id'],
+                        item['is_deleted'],
+                        item['id']
+                    ))
+                else:
+                    # 插入新记录
+                    cursor.execute('''
+                        INSERT INTO roadmap (
+                            id, name, description, status, color,
+                            addtime, edittime, "order", user_id, is_deleted
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        item['id'],
+                        item['name'],
+                        item['description'],
+                        item['status'],
+                        item['color'],
+                        item['addtime'],
+                        item['edittime'],
+                        item['order'],
+                        item['user_id'],
+                        item['is_deleted']
+                    ))
+                
+                if item['is_deleted']:
+                    delete_count += 1
+                else:
+                    update_count += 1
+            
+            # 提交事务
+            conn.commit()
+            
+            # 5. 更新同步时间
+            self.last_sync_time = int(time.time())
+            
+            print(f"[Sync] 同步完成: {update_count} 更新, {delete_count} 删除")
+            return json.dumps({
+                'code': 0,
+                'msg': f'同步成功: {update_count} 更新, {delete_count} 删除',
+                'data': updates['data']
+            })
+            
+        except Exception as e:
+            print(f"[Sync] Error during sync: {str(e)}")
+            if conn:
+                conn.rollback()
+            return json.dumps({
+                'code': 500,
+                'msg': f'同步过程出错: {str(e)}',
+                'data': None
+            })
+        finally:
+            if conn:
+                conn.close()
+    
+    def sync_data(self):
+        """提供数据同步接口（仅在生产环境可用）"""
+        if ENV != 'prod':
+            return json.dumps({
+                'code': 403,
+                'msg': '只能在生产环境提供同步数据',
+                'data': None
+            })
+
+        try:
+            # 验证API密钥
+            api_key = request.headers.get('X-API-Key')
+            if not api_key or api_key != PROD_SERVER['API_KEY']:
+                return json.dumps({
+                    'code': 401,
+                    'msg': 'API密钥无效',
+                    'data': None
+                })
+
+            # 获取上次同步时间
+            last_sync_time = int(request.headers.get('X-Sync-Time', 0))
+            
+            # 获取数据库连接
+            conn = roadmap_service.get_db()
+            cursor = conn.cursor()
+            
+            try:
+                # 获取所有更新的数据
+                cursor.execute('''
+                    SELECT r.*, 
+                        CASE WHEN r.edittime > ? THEN 0 ELSE 1 END as is_deleted
+                    FROM roadmap r
+                    WHERE r.edittime > ?
+                    ORDER BY r.edittime ASC
+                ''', (last_sync_time, last_sync_time))
+                
+                updates = [dict(row) for row in cursor.fetchall()]
+                
+                return json.dumps({
+                    'code': 0,
+                    'msg': '获取成功',
+                    'data': updates
+                })
+                
+            finally:
+                cursor.close()
+                conn.close()
+                
+        except Exception as e:
+            print(f"[Sync] Error providing sync data: {str(e)}")
+            return json.dumps({
+                'code': 500,
+                'msg': f'获取同步数据失败: {str(e)}',
+                'data': None
+            })
+
+    def auto_sync(self):
+        """自动同步函数
+        
+        在以下情况下触发同步：
+        1. 本地环境
+        2. 距离上次同步超过5分钟
+        """
+        if ENV == 'local' and time.time() - self.last_sync_time > 30:  # 5分钟同步一次
+            print("[Sync] 自动同步触发")
+            return self.sync_from_prod()
+        return None
+
     def get_roadmap(self):
-        """获取所有开发计划"""
+        """获取所有未删除的开发计划"""
+        # 在获取数据前先尝试同步
+        if ENV == 'local':
+            self.auto_sync()
+        
         login_result = json.loads(self.check_login())
         if login_result['code'] == 0:
             return login_result
+        
         try:
             conn = self.get_db()
             cursor = conn.cursor()
             
             # 计算一年前的时间戳
             one_year_ago = int(time.time()) - (365 * 24 * 60 * 60)
-            
+            # 只获取未删除的记录
             cursor.execute('''
                 SELECT * FROM roadmap 
-                WHERE user_id = ? 
-                AND edittime > ?
-                ORDER BY "order" ASC
-            ''', (session.get('user_id'), one_year_ago))
+                WHERE is_deleted = 0  AND edittime > ?
+                ORDER BY "order" ASC, edittime DESC
+            ''', (one_year_ago,))
             
-            tasks = [dict(row) for row in cursor.fetchall()]
-            
+            roadmaps = [dict(row) for row in cursor.fetchall()]
             return json.dumps({
                 'code': 0,
                 'msg': '获取成功',
-                'data': tasks
+                'data': roadmaps
             })
-            
         except Exception as e:
             print(f"获取开发计划失败: {str(e)}")
             return json.dumps({
@@ -274,23 +506,25 @@ class RoadmapService:
                 conn.close()
 
     def delete_roadmap(self, roadmap_id):
-        """删除开发计划"""
+        """软删除开发计划"""
         try:
-            login_result = json.loads(self.check_login())
-            if login_result['code'] == 0:
-                return login_result
             conn = self.get_db()
             cursor = conn.cursor()
             
-            cursor.execute('DELETE FROM roadmap WHERE id = ? AND user_id = ?', (roadmap_id, session.get('user_id')))
-            conn.commit()
+            # 标记为已删除而不是真正删除
+            cursor.execute('''
+                UPDATE roadmap 
+                SET is_deleted = 1, 
+                    edittime = ? 
+                WHERE id = ?
+            ''', (int(time.time()), roadmap_id))
             
+            conn.commit()
             return json.dumps({
                 'code': 0,
                 'msg': '删除成功',
                 'data': None
             })
-            
         except Exception as e:
             print(f"删除开发计划失败: {str(e)}")
             if conn:
