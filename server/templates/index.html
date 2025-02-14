@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:40:28
- * @LastEditTime: 2025-02-13 21:36:30
+ * @LastEditTime: 2025-02-14 10:29:14
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -58,8 +58,9 @@
                     <!-- 文字云将通过JS动态生成 -->
                 </div>
                 <div class="character-stats">
-                    <!-- 人物形象区域 -->
+                    <!-- 人物形象区域 支持live2d和图片展示 -->
                     <div id="live2dContainer"></div>
+                    <div id="character-image"></div>
                     <!-- 角色基本信息 -->
                     <div class="character-info">
                         <div class="info-row nickname-row">
@@ -119,11 +120,11 @@
 
         <!-- 中间主内容区 -->
         <div class="main-content panel-base">
-            <!-- 上半部分：Live2D展示区 -->
+            <!-- 上半部分：轨迹展示区 -->
             <div class="main-content-top">
                 <h2 class="panel-title">
                     <i class="layui-icon layui-icon-location"></i>
-                    个人画像
+                    轨迹
                     <span class="title-decoration"></span>
                 </h2>
 

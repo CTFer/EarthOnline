@@ -1,4 +1,5 @@
 vue-version/
+earthonline/
 __pycache__/
 earthonline/nginx.htaccess
 server/database/game.db
