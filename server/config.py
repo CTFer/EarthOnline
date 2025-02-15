@@ -50,6 +50,8 @@ PROD_SERVER = {
     'TIMEOUT': 5,                      # 请求超时时间（秒）
     'RETRY': 3                         # 失败重试次数
 }
+# 同步时间 秒
+SYNC_TIME = 300
 
 # 需要同步的接口列表
 SYNC_ENDPOINTS = [

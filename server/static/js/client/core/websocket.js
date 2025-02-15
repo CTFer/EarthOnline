@@ -1,3 +1,12 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-12 20:57:21
+ * @LastEditTime: 2025-02-14 17:44:13
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2025 迷舍
+ */
 import Logger from '../../utils/logger.js';
 import { SERVER } from '../../config/config.js';
 
@@ -8,7 +17,24 @@ class WebSocketManager {
         this.socket = null;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
+        this.playerService = null;
         Logger.info('WebSocket', '初始化');
+    }
+
+    setPlayerService(playerService) {
+        this.playerService = playerService;
+        Logger.debug('WebSocket','setPlayerService');
+        this.subscribeToPlayerUpdates();
+    }
+
+    subscribeToPlayerUpdates() {
+        if (!this.playerService) return;
+        Logger.debug('WebSocket','subscribeToPlayerUpdates');
+        const playerId = this.playerService.getPlayerId();
+        this.socket.emit('subscribe', {
+            type: 'player',
+            playerId: playerId
+        });
     }
 
     connect() {
@@ -51,6 +77,14 @@ class WebSocketManager {
             Logger.info('WebSocket', '断开连接');
             this.eventBus.emit('ws:disconnected');
             this.handleReconnect();
+        });
+
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        this.eventBus.on('player:id-updated', (newId) => {
+            this.subscribeToPlayerUpdates();
         });
     }
 

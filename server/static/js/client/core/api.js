@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:01
- * @LastEditTime: 2025-02-13 23:15:29
+ * @LastEditTime: 2025-02-14 17:41:05
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -233,6 +233,14 @@ class APIClient {
     async getGameConfig() {
         Logger.info('API', '获取游戏配置');
         return this.request('/api/system/config');
+    }
+
+    async updatePlayerStats(playerId, stats) {
+        Logger.info('API', '更新玩家状态:', { playerId, stats });
+        return this.request(`/api/player/${playerId}/stats`, {
+            method: 'POST',
+            body: JSON.stringify(stats)
+        });
     }
 }
 

@@ -5,7 +5,7 @@ import os
 from flask import session, request
 import hashlib
 import requests
-from config import PROD_SERVER, ENV
+from config import PROD_SERVER, ENV,SYNC_TIME
 
 class RoadmapService:
     def __init__(self):
@@ -343,7 +343,7 @@ class RoadmapService:
         1. 本地环境
         2. 距离上次同步超过5分钟
         """
-        if ENV == 'local' and time.time() - self.last_sync_time > 30:  # 5分钟同步一次
+        if ENV == 'local' and time.time() - self.last_sync_time > SYNC_TIME:  # 5分钟同步一次
             print("[Sync] 自动同步触发")
             return self.sync_from_prod()
         return None
@@ -367,9 +367,9 @@ class RoadmapService:
             # 只获取未删除的记录
             cursor.execute('''
                 SELECT * FROM roadmap 
-                WHERE is_deleted = 0  AND edittime > ?
+                WHERE is_deleted = 0  AND edittime > ? AND user_id = ?
                 ORDER BY "order" ASC, edittime DESC
-            ''', (one_year_ago,))
+            ''', (one_year_ago,session.get('user_id')))
             
             roadmaps = [dict(row) for row in cursor.fetchall()]
             return json.dumps({

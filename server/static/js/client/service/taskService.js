@@ -2,11 +2,11 @@ import Logger from '../../utils/logger.js';
 import { gameUtils } from '../../utils/utils.js';
 
 class TaskService {
-    constructor(apiClient, eventBus, store, playerId, templateService) {
+    constructor(apiClient, eventBus, store, playerService, templateService) {
         this.api = apiClient;
-        this.playerId = playerId;
         this.eventBus = eventBus;
         this.store = store;
+        this.playerService = playerService;
         this.activeTasksSwiper = null;
         this.taskListSwiper = null;
         this.loading = false;
@@ -25,7 +25,7 @@ class TaskService {
         Logger.info('TaskService', '开始加载任务');
         this.loading = true;
         try {
-            const result = await this.api.getTaskList(this.playerId);
+            const result = await this.api.getTaskList(this.playerService.getPlayerId());
             Logger.debug('TaskService', '任务列表 API 数据:', result);
             
             if (result.code === 0) {
@@ -48,7 +48,7 @@ class TaskService {
     async loadCurrentTasks() {
         try {
             Logger.info('TaskService', '开始加载当前任务');
-            const currentTasks = await this.getCurrentTasks(this.playerId);
+            const currentTasks = await this.getCurrentTasks();
             
             if (currentTasks) {
                 Logger.debug('TaskService', '当前任务加载完成:', currentTasks);
@@ -63,10 +63,10 @@ class TaskService {
         }
     }
 
-    async getCurrentTasks(playerId) {
+    async getCurrentTasks() {
         try {
-            Logger.info('TaskService', 'Loading current tasks for player:', playerId);
-            const result = await this.api.getCurrentTasks(playerId);
+            Logger.info('TaskService', 'Loading current tasks for player:', this.playerService.getPlayerId());
+            const result = await this.api.getCurrentTasks(this.playerService.getPlayerId());
             
             if (result.code === 0) {
                 let currentTasks = result.data;
@@ -98,7 +98,8 @@ class TaskService {
         }
     }
 
-    async acceptTask(taskId, playerId) {
+    async acceptTask(taskId) {
+        const playerId = this.playerService.getPlayerId();
         Logger.info('TaskService', '接受任务:', taskId, '玩家ID:', playerId);
         try {
             if (!this.api) {
@@ -125,7 +126,7 @@ class TaskService {
     }
 
     async handleTaskComplete(taskId) {
-        console.log('[TaskService] Handling task complete:', taskId);
+        Logger.info('TaskService', '处理任务完成:', taskId);
         try {
             const result = await this.api.completeTask(taskId);
             if (result.code === 0) {
@@ -135,18 +136,18 @@ class TaskService {
                 throw new Error(result.msg);
             }
         } catch (error) {
-            console.error('[TaskService] Complete task failed:', error);
+            Logger.error('TaskService', '任务完成失败:', error);
             this.eventBus.emit('task:error', error);
         }
     }
 
     async handleNewTask(taskData) {
-        console.log('[TaskService] Handling new task:', taskData);
+        Logger.info('TaskService', '处理新任务:', taskData);
         try {
             await this.loadTasks();
             this.eventBus.emit('task:added', taskData);
         } catch (error) {
-            console.error('[TaskService] Handle new task failed:', error);
+            Logger.error('TaskService', '处理新任务失败:', error);
             this.eventBus.emit('task:error', error);
         }
     }
@@ -276,6 +277,12 @@ class TaskService {
             Logger.error("TaskService", "处理任务状态更新错误:", error);
             this.eventBus.emit('task:error', error);
         }
+    }
+
+    updatePlayerId(newId) {
+        Logger.info('TaskService', '更新玩家ID:', newId);
+        // 如果需要清理或重置任何与玩家相关的数据
+        this.store.clearTaskCache();
     }
 }
 

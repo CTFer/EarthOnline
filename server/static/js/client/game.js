@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-08 14:41:57
- * @LastEditTime: 2025-02-13 22:12:35
+ * @LastEditTime: 2025-02-15 13:03:31
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -9,7 +9,7 @@
 import { SERVER, MAP_CONFIG } from "../config/config.js";
 import WebSocketManager from "../function/WebSocketManager.js";
 import MapSwitcher from "../function/MapSwitcher.js";
-import APIClient from "./core/api.js"; // 导入默认导出的类
+import APIClient from "./core/api.js"; 
 import TemplateService from "./service/templateService.js";
 import TaskService from "./service/taskService.js";
 import EventBus from "./core/eventBus.js";
@@ -17,6 +17,8 @@ import Store from "./core/store.js";
 import Logger from "../utils/logger.js";
 import SwiperService from './service/swiperService.js';
 import { ErrorHandler } from './core/errorHandler.js';
+import WordcloudService from './service/wordcloudService.js';
+import PlayerService from './service/playerService.js';
 
 // 在文件开头声明全局变量
 let taskManager;
@@ -27,36 +29,47 @@ class GameManager {
   constructor() {
     Logger.info("GameManager", "构造函数开始");
 
-    // 初始化API客户端
+    // 1. 初始化核心组件
     this.api = new APIClient(SERVER);
-    // 初始化基础属性
-    this.activeTasksSwiper = null;
-    this.taskListSwiper = null;
-    this.playerId = localStorage.getItem("playerId") || "1";
-    this.loading = false;
-    // 初始化事件总线
     this.eventBus = new EventBus();
-
-    // 初始化Store
     this.store = new Store();
 
-    // 先创建templateService
+    // 2. 初始化 PlayerService (最先初始化)
+    this.playerService = new PlayerService(this.api, this.eventBus, this.store);
+    
+    // 3. 初始化其他依赖 PlayerService 的服务
     this.templateService = new TemplateService();
-
-    // 然后将templateService传给taskService
     this.taskService = new TaskService(
       this.api,
       this.eventBus,
       this.store,
-      this.playerId,
+      this.playerService, // 传入 playerService
       this.templateService
     );
+
+    this.wordcloudService = new WordcloudService(
+      this.api,
+      this.eventBus,
+      this.store,
+      this.playerService // 传入 playerService
+    );
+
+    // 4. 初始化其他服务
+    this.swiperService = new SwiperService();
+    
+    // 5. 设置事件监听
+    this.setupEventListeners();
+
+    // 初始化基础属性
+    this.activeTasksSwiper = null;
+    this.taskListSwiper = null;
+    this.loading = false;
 
     // 初始化WebSocket管理器
     this.wsManager = new WebSocketManager();
 
     // 设置事件监听
-    this.wsManager.subscribeToTasks(this.playerId);
+    this.wsManager.subscribeToTasks(this.playerService.getPlayerId());
     this.wsManager.onTaskUpdate(this.handleTaskStatusUpdate.bind(this));
     this.wsManager.onNFCTaskUpdate(this.handleTaskUpdate.bind(this));
     this.wsManager.onTagsUpdate(() => this.updateWordCloud());
@@ -70,15 +83,31 @@ class GameManager {
 
     // 在构造函数中调用
     this.setupDOMObserver();
-    // 设置事件监听 - 确保这行代码存在
-    this.setupEventListeners();
-
-    // 初始化swiperService
-    this.swiperService = new SwiperService();
 
     Logger.info("GameManager", "构造函数完成");
   }
-
+  // 初始化应用
+  async initializeApplication() {
+    try {
+      Logger.info("[GameManager]", "初始化应用开始");
+      
+      // 先加载任务列表
+      await this.taskService.loadTasks();
+      Logger.info("[GameManager]", "任务列表加载完成");
+      
+      // 再加载当前任务
+      await this.taskService.loadCurrentTasks();
+      Logger.info("[GameManager]", "当前任务加载完成");
+      
+      // 初始化滑动组件
+      this.swiperService.initSwipers();
+      Logger.info("[GameManager]", "初始化应用完成");
+    } catch (error) {
+      Logger.error("[GameManager]", "初始化应用失败:", error);
+      layer.msg('初始化应用失败，请刷新页面重试', {icon: 2});
+      ErrorHandler.handle(error, 'TaskManager.initializeApplication');
+    }
+  }
   // 处理NFC任务更新通知
   handleTaskUpdate(data) {
     Logger.info("GameManager", "开始处理NFC任务更新:", data);
@@ -96,8 +125,7 @@ class GameManager {
     switch (data.type) {
       case "IDENTITY":
         Logger.info("GameManager", "处理身份识别更新");
-        this.playerId = data.player_id;
-        localStorage.setItem("playerId", data.player_id);
+        this.playerService.setPlayerId(data.player_id);
         this.loadPlayerInfo();
         this.refreshTasks();
         break;
@@ -246,23 +274,6 @@ class GameManager {
     }
   }
 
-  // 获取消息图标
-  getMessageIcon(type) {
-    switch (type) {
-      case "IDENTITY":
-      case "NEW_TASK":
-      case "COMPLETE":
-        return 1; // 成功
-      case "ALREADY_COMPLETED":
-      case "CHECKING":
-        return 0; // 信息
-      case "REJECTED":
-      case "ERROR":
-        return 2; // 错误
-      default:
-        return 0; // 默认信息
-    }
-  }
 
   // 处理任务状态更新
   handleTaskStatusUpdate(data) {
@@ -456,7 +467,7 @@ class GameManager {
   async loadCurrentTasks() {
     try {
       Logger.info("[GameManager]", "加载进行中的任务");
-      const currentTasks = await this.taskService.getCurrentTasks(this.playerId);
+      const currentTasks = await this.taskService.getCurrentTasks(this.playerService.getPlayerId());
       Logger.debug("[GameManager]", "进行中任务加载完成:", currentTasks);
       this.renderCurrentTasks(currentTasks);
     } catch (error) {
@@ -570,28 +581,7 @@ class GameManager {
     }
   }
 
-  // 初始化应用
-  async initializeApplication() {
-    try {
-      Logger.info("[GameManager]", "初始化应用开始");
-      
-      // 先加载任务列表
-      await this.taskService.loadTasks();
-      Logger.info("[GameManager]", "任务列表加载完成");
-      
-      // 再加载当前任务
-      await this.taskService.loadCurrentTasks();
-      Logger.info("[GameManager]", "当前任务加载完成");
-      
-      // 初始化滑动组件
-      this.swiperService.initSwipers();
-      Logger.info("[GameManager]", "初始化应用完成");
-    } catch (error) {
-      Logger.error("[GameManager]", "初始化应用失败:", error);
-      layer.msg('初始化应用失败，请刷新页面重试', {icon: 2});
-      ErrorHandler.handle(error, 'TaskManager.initializeApplication');
-    }
-  }
+
 
   // 接受任务
   async acceptTask(taskId) {
@@ -602,7 +592,7 @@ class GameManager {
         throw new Error("任务ID不能为空");
       }
 
-      const result = await this.taskService.acceptTask(taskId, this.playerId);
+      const result = await this.taskService.acceptTask(taskId, this.playerService.getPlayerId());
       
       if (result.code === 0) {
         layer.msg(`成功接受任务: ${result.data.task_name}`, { icon: 1 });
@@ -644,7 +634,7 @@ class GameManager {
               Accept: "application/json",
             },
             body: JSON.stringify({
-              player_id: this.playerId,
+              player_id: this.playerService.getPlayerId(),
             }),
           });
 
@@ -674,7 +664,7 @@ class GameManager {
           Accept: "application/json",
         },
         body: JSON.stringify({
-          player_id: this.playerId,
+          player_id: this.playerService.getPlayerId(),
         }),
       });
 
@@ -777,7 +767,7 @@ class GameManager {
         throw new Error("API client not initialized");
       }
 
-      const result = await this.api.getPlayerInfo(this.playerId);
+      const result = await this.api.getPlayerInfo(this.playerService.getPlayerId());
 
       if (result.code === 0) {
         const playerData = result.data;
@@ -836,108 +826,21 @@ class GameManager {
   }
 
   // 初始化文字云
-  initWordCloud() {
-    Logger.info("GameManager", "初始化文字云开始");
-    const wordCloudChart = echarts.init(document.getElementById("wordCloudContainer"));
-
-    // 模拟数据
-    const testData = [
-      // 头衔（较大字体，金色）
-      { name: "尿不湿守护者", value: 100, textStyle: { color: "#ffd700", fontSize: 32 } },
-      { name: "爬行先锋", value: 90, textStyle: { color: "#ffd700", fontSize: 28 } },
-
-      // 荣誉（中等字体，银色）
-      { name: "卫生纸摧毁达人", value: 80, textStyle: { color: "#c0c0c0" } },
-      { name: "干饭小能手", value: 75, textStyle: { color: "#c0c0c0" } },
-      { name: "玩具保护使者", value: 70, textStyle: { color: "#c0c0c0" } },
-
-      // 个人标签（较小字体，青色系）
-      { name: "热心干饭", value: 60, textStyle: { color: "#8aa2c1" } },
-      { name: "推车出行", value: 55, textStyle: { color: "#8aa2c1" } },
-      { name: "吃奶能手", value: 50, textStyle: { color: "#8aa2c1" } },
-      { name: "植树达人", value: 45, textStyle: { color: "#8aa2c1" } },
-      { name: "节水卫士", value: 40, textStyle: { color: "#8aa2c1" } },
-      { name: "夜间嚎叫者", value: 35, textStyle: { color: "#8aa2c1" } },
-      { name: "米粉爱好者", value: 30, textStyle: { color: "#8aa2c1" } },
-    ];
-
-    const option = {
-      backgroundColor: "transparent",
-      tooltip: {
-        show: true,
-        formatter: function (params) {
-          return params.data.name;
-        },
-      },
-      series: [
-        {
-          type: "wordCloud",
-          shape: "circle",
-          left: "center",
-          top: "center",
-          width: "100%",
-          height: "100%",
-          right: null,
-          bottom: null,
-          sizeRange: [16, 50],
-          rotationRange: [-45, 45],
-          rotationStep: 45,
-          gridSize: 8,
-          drawOutOfBound: false,
-          layoutAnimation: true,
-          textStyle: {
-            fontFamily: "Microsoft YaHei",
-            fontWeight: "bold",
-            color: function () {
-              return "rgb(" + [Math.round(Math.random() * 160) + 60, Math.round(Math.random() * 160) + 60, Math.round(Math.random() * 160) + 60].join(",") + ")";
-            },
-          },
-          emphasis: {
-            textStyle: {
-              shadowBlur: 10,
-              shadowColor: "rgba(255, 196, 71, 0.5)",
-            },
-          },
-          data: testData,
-        },
-      ],
-    };
-
-    wordCloudChart.setOption(option);
-    Logger.info("GameManager", "文字云初始化完成");
-
-    // 响应窗口大小变化
-    window.addEventListener("resize", function () {
-      wordCloudChart.resize();
-    });
-
-    // 将图表实例存储在全局变量中，以便后续更新
-    window.wordCloudChart = wordCloudChart;
-  }
-
-  // 更新文字云数据
-  async updateWordCloud() {
-    try {
-      // TODO: 替换为实际的API调用
-      const result = await this.api.getWordCloud();
-
-      if (window.wordCloudChart && data.success) {
-        window.wordCloudChart.setOption({
-          series: [
-            {
-              data: data.tags,
-            },
-          ],
-        });
-      }
-    } catch (error) {
-      this.api.handleApiError(error, "updateWordCloud");
+  async initWordCloud() {
+    Logger.info("GameManager", "初始化文字云");
+    const container = document.getElementById("wordCloudContainer");
+    if (container) {
+        await this.wordcloudService.initWordCloud(container);
+    } else {
+        Logger.error("GameManager", "找不到文字云容器");
     }
   }
 
+
+
   // 添加事件处理方法
   handleCurrentTasksUpdated(tasks) {
-    Logger.info("[Game]", "Current tasks updated:", tasks);
+    Logger.info("[GameManager]", "Current tasks updated:", tasks);
     this.renderCurrentTasks(tasks);
   }
 
@@ -965,6 +868,21 @@ class GameManager {
     this.eventBus.on("tasks:error", (error) => {
       Logger.error("[GameManager] 任务错误事件:", error);
       layer.msg(error.message || "任务加载失败", { icon: 2 });
+    });
+
+    // 监听任务完成事件，更新文字云
+    this.eventBus.on("task:completed", () => {
+        this.wordcloudService.updateWordCloud();
+    });
+
+    // 监听玩家ID更新
+    this.eventBus.on('player:id-updated', (newId) => {
+      // 更新相关服务
+      this.wsManager.subscribeToTasks(newId);
+      this.taskService.updatePlayerId(newId);
+      // 重新加载数据
+      this.loadPlayerInfo();
+      this.taskService.loadTasks();
     });
   }
 
@@ -1039,6 +957,7 @@ class GameManager {
                 </div>`;
     }
   }
+
 }
 
 // 页面初始化代码
@@ -1047,32 +966,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   Logger.debug("GameManager", "当前地图渲染类型:", MAP_CONFIG.RENDER_TYPE);
 
   // 创建全局管理器实例
-  window.taskManager = new GameManager();
+  window.GameManager = new GameManager();
   Logger.info("GameManager", "GameManager 已创建");
 
   // 初始化应用
-  await window.taskManager.initializeApplication();
-  window.taskManager.initTaskEvents();
+  await window.GameManager.initializeApplication();
+  window.GameManager.initTaskEvents();
 
   // 加载任务数据
-  await Promise.all([window.taskManager.taskService.loadTasks(), window.taskManager.loadCurrentTasks()]);
+  await Promise.all([window.GameManager.taskService.loadTasks(), window.GameManager.loadCurrentTasks()]);
 
   // 初始化文字云
-  window.taskManager.initWordCloud();
+  await window.GameManager.initWordCloud();
 
   // 初始化地图切换器
   window.mapSwitcher = new MapSwitcher();
 
   // 设置 WebSocket 管理器并订阅 GPS 更新
-  window.mapSwitcher.setWebSocketManager(window.taskManager.wsManager);
-  window.taskManager.wsManager.subscribeToGPS(window.taskManager.playerId);
+  window.mapSwitcher.setWebSocketManager(window.GameManager.wsManager);
+  window.GameManager.wsManager.subscribeToGPS(window.GameManager.playerService.getPlayerId());
 
   Logger.info("GameManager", "页面初始化完成");
 });
 
 // 页面卸载前清理
 window.addEventListener("beforeunload", () => {
-  if (window.taskManager) {
-    window.taskManager.swiperService.destroySwipers();
+  if (window.GameManager) {
+    window.GameManager.swiperService.destroySwipers();
+    window.GameManager.wordcloudService.destroy();
   }
 });
