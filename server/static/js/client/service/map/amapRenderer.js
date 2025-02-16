@@ -374,18 +374,11 @@ class AMapRenderer {
     async updateMapData(params) {
         Logger.debug('AMapRenderer', '更新地图数据，参数:', params);
         try {
-            // 保存当前视图状态
-            this.saveViewState();
-            
-            // 更新GPS数据
             if (Array.isArray(params.gpsData)) {
                 this.gpsData = params.gpsData;
                 
                 // 清除现有标记
-                this.markers.forEach(marker => {
-                    marker.setMap(null);
-                });
-                this.markers.clear();
+                this.clearMap();
                 
                 // 添加新标记
                 for (let i = 0; i < this.gpsData.length; i++) {
@@ -398,16 +391,48 @@ class AMapRenderer {
                 } else {
                     await this.updatePathMode();
                 }
+
+                // 调整地图视图
+                if (params.bounds) {
+                    Logger.debug('AMapRenderer', '使用边界数据调整视图');
+                    const bounds = new AMap.Bounds(
+                        [params.bounds.min_x, params.bounds.min_y],
+                        [params.bounds.max_x, params.bounds.max_y]
+                    );
+                    // 使用 setFitView 自动调整视图以显示所有标记
+                    this.mapInstance.setFitView([...this.markers.values()], true, [50, 50, 50, 50]);
+                }
+                else if (params.center) {
+                    Logger.debug('AMapRenderer', '使用中心点数据调整视图');
+                    this.mapInstance.setCenter([params.center.x, params.center.y]);
+                    this.mapInstance.setZoom(this.calculateZoomLevel(params));
+                }
                 
-                // 恢复视图状态
-                this.restoreViewState();
+                Logger.debug('AMapRenderer', '地图数据更新完成');
             }
-            
-            Logger.debug('AMapRenderer', '地图数据更新完成');
         } catch (error) {
             Logger.error('AMapRenderer', '更新地图数据失败:', error);
             throw error;
         }
+    }
+
+    // 根据数据范围计算合适的缩放级别
+    calculateZoomLevel(params) {
+        if (params.bounds) {
+            const lngSpan = params.bounds.max_x - params.bounds.min_x;
+            const latSpan = params.bounds.max_y - params.bounds.min_y;
+            const maxSpan = Math.max(lngSpan, latSpan);
+            
+            if (maxSpan > 5) return 5;       // 国家级
+            else if (maxSpan > 2) return 7;   // 省级
+            else if (maxSpan > 1) return 8;   // 市级
+            else if (maxSpan > 0.5) return 9; // 区县级
+            else if (maxSpan > 0.2) return 10;// 街道级
+            else if (maxSpan > 0.1) return 11;// 小区级
+            else if (maxSpan > 0.05) return 12;// 建筑级
+            return 13;                        // 最详细级别
+        }
+        return 14; // 默认缩放级别
     }
 
     clearMap() {

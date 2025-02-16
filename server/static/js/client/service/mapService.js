@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:42
- * @LastEditTime: 2025-02-16 17:34:54
+ * @LastEditTime: 2025-02-16 18:57:50
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -413,16 +413,17 @@ class MapService {
             const playerId = localStorage.getItem('playerId') || '1';
             
             // 使用API获取GPS数据
-
             const result = await this.api.getGPSData(playerId, params);
             
-            if (result.code === 0 && result.data && result.data.records) {
+            if (result.code === 0 && result.data) {
                 // 更新渲染器数据
                 await this.currentRenderer.updateMapData({
                     timeRange: this.timeRange,
                     startTime: this.customStartTime,
                     endTime: this.customEndTime,
-                    gpsData: result.data.records.sort((a, b) => a.addtime - b.addtime)
+                    gpsData: result.data.records.sort((a, b) => a.addtime - b.addtime),
+                    center: result.data.center,
+                    bounds: result.data.bounds
                 });
                 Logger.debug('MapService', '地图数据更新完成');
             } else {

@@ -240,7 +240,7 @@ class GPSService:
         }
 
     def get_master_GPS_data(self, player_id, start_time=None, end_time=None, optimization_level=1):
-        """获取优化后的GPS主数据"""
+        """获取优化后的GPS主数据，并计算中心点和覆盖范围"""
         try:
             conn = self.get_db()
             cursor = conn.cursor()
@@ -267,10 +267,35 @@ class GPSService:
             original_count = len(data)
             print(f"[GPS] 原始数据条数: {original_count}")
 
-            # 如果数据量小于阈值，直接返回
+            # 如果没有数据，返回空结果
+            if not data:
+                return {
+                    'data': [],
+                    'center': None,
+                    'bounds': None,
+                    'stats': None
+                }
+
+            # 计算中心点和边界
+            x_coords = [float(row['x']) for row in data]
+            y_coords = [float(row['y']) for row in data]
+            
+            center = {
+                'x': sum(x_coords) / len(x_coords),
+                'y': sum(y_coords) / len(y_coords)
+            }
+            
+            bounds = {
+                'min_x': min(x_coords),
+                'max_x': max(x_coords),
+                'min_y': min(y_coords),
+                'max_y': max(y_coords)
+            }
+
+            # 如果数据量小于阈值，直接返回原始数据
             if original_count <= GPS_CONFIG['SAMPLING_THRESHOLD']:
                 print(f"[GPS] 数据量未超过阈值，返回原始数据: {original_count}条")
-                return [{
+                formatted_data = [{
                     'id': row['id'],
                     'x': float(row['x']),
                     'y': float(row['y']),
@@ -278,6 +303,13 @@ class GPSService:
                     'accuracy': float(row['accuracy'] or 0),
                     'addtime': row['addtime']
                 } for row in data]
+                
+                return {
+                    'data': formatted_data,
+                    'center': center,
+                    'bounds': bounds,
+                    'stats': self.analyze_gps_data(formatted_data)
+                }
 
             # 分析数据特征
             stats = self.analyze_gps_data([dict(row) for row in data])
@@ -385,13 +417,25 @@ class GPSService:
             print(f"[GPS] 优化后数据条数: {optimized_count}")
             print(f"[GPS] 优化率: {((original_count - optimized_count) / original_count * 100):.2f}%")
             
-            return optimized_data
+            print(f"[GPS] 优化后数据条数: {len(optimized_data)}")
+                
+            return {
+                    'data': optimized_data,
+                    'center': center,
+                    'bounds': bounds,
+                    'stats': stats
+                }
 
         except Exception as e:
-            logger.error(f"获取GPS主数据失败: {str(e)}")
-            return []
-        finally:
-            conn.close()
+            error_msg = f"获取GPS主数据失败: {str(e)}"
+            print(f"[GPS] 错误: {error_msg}")
+            return {
+                'data': [],
+                'center': None,
+                'bounds': None,
+                'stats': None,
+                'error': error_msg
+            }
 
     def get_gps_records_origin(self, player_id=None, start_time=None, end_time=None, page=None, per_page=None):
         """原始的GPS记录获取函数，支持分页"""
@@ -470,26 +514,29 @@ class GPSService:
             # 获取优化后的数据
             records = self.get_master_GPS_data(player_id, start_time, end_time)
             # 如果记录数为0，则返回测试的38条数据 2月16日
-            if len(records) == 0:
+            if len(records['data']) == 0:
                 records = self.get_master_GPS_data(player_id, 1739635190, 1739721600)
                 print(f"[GPS Service] 获取到2月16日测试的38条数据")
-            print(f"[GPS Service] 获取到原始记录数: {len(records)}")
+            print(f"[GPS Service] 获取到原始记录数: {len(records['data'])}")
 
             # 如果需要分页
             if page is not None and per_page is not None:
-                total = len(records)
+                total = len(records['data'])
                 start_idx = (page - 1) * per_page
                 end_idx = start_idx + per_page
-                records = records[start_idx:end_idx]
-                print(f"[GPS Service] 分页后记录数: {len(records)}")
+                records['data'] = records['data'][start_idx:end_idx]
+                print(f"[GPS Service] 分页后记录数: {len(records['data'])}")
             else:
-                total = len(records)
+                total = len(records['data'])
 
             response = {
                 'code': 0,
                 'msg': '获取GPS记录成功',
                 'data': {
-                    'records': records,
+                    'records': records['data'],
+                    'center': records['center'],
+                    'bounds': records['bounds'],
+                    'stats': records['stats'],
                     'total': total
                 }
             }

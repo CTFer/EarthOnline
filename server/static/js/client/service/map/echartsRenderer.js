@@ -504,35 +504,73 @@ class EchartsRenderer {
         Logger.debug('EchartsRenderer', '更新地图数据，参数:', params);
         
         try {
-            // 如果没有传入参数，使用默认值
-            if (!params) {
-                params = {
-                    timeRange: this.timeRange || 'today',
-                    startTime: this.customStartTime,
-                    endTime: this.customEndTime,
-                    gpsData: []
-                };
-            }
-            
-            // 保存时间范围设置
-            this.timeRange = params.timeRange;
-            this.customStartTime = params.startTime;
-            this.customEndTime = params.endTime;
-            
             // 更新GPS数据
             if (Array.isArray(params.gpsData)) {
                 this.gpsData = params.gpsData;
-                await this.updateMap();
-                Logger.debug('EchartsRenderer', '地图数据更新完成');
-            } else {
-                Logger.warn('EchartsRenderer', '无效的GPS数据');
-                this.gpsData = [];
-                await this.updateMap();
+                
+                // 计算视图参数
+                let viewParams = {};
+                
+                // 优先使用边界数据
+                if (params.bounds) {
+                    Logger.debug('EchartsRenderer', '使用边界数据调整视图');
+                    const center = [
+                        (params.bounds.min_x + params.bounds.max_x) / 2,
+                        (params.bounds.min_y + params.bounds.max_y) / 2
+                    ];
+                    const zoom = this.calculateZoomLevel(params.bounds);
+                    viewParams = { center, zoom };
+                }
+                // 其次使用中心点数据
+                else if (params.center) {
+                    Logger.debug('EchartsRenderer', '使用中心点数据调整视图');
+                    viewParams = {
+                        center: [params.center.x, params.center.y],
+                        zoom: 8
+                    };
+                }
+
+                // 更新地图显示
+                const option = {
+                    geo: {
+                        ...this.getInitialOption().geo,
+                        center: viewParams.center,
+                        zoom: viewParams.zoom
+                    },
+                    series: this.displayMode === 'path' ? 
+                        this.createPathSeries() : 
+                        this.createPointSeries()
+                };
+
+                this.mapChart.setOption(option, true);  // 使用 true 强制更新
+                Logger.debug('EchartsRenderer', '地图视图已更新', viewParams);
             }
         } catch (error) {
             Logger.error('EchartsRenderer', '更新地图数据失败:', error);
             throw error;
         }
+    }
+
+    // 根据边界计算合适的缩放级别
+    calculateZoomLevel(bounds) {
+        // 计算经纬度跨度
+        const lngSpan = bounds.max_x - bounds.min_x;
+        const latSpan = bounds.max_y - bounds.min_y;
+        
+        // 根据跨度计算合适的缩放级别
+        const maxSpan = Math.max(lngSpan, latSpan);
+        let zoom = 12; // 默认缩放级别
+        
+        if (maxSpan > 5) zoom = 5;      // 国家级
+        else if (maxSpan > 2) zoom = 7;  // 省级
+        else if (maxSpan > 1) zoom = 8;  // 市级
+        else if (maxSpan > 0.5) zoom = 9;// 区县级
+        else if (maxSpan > 0.2) zoom = 10;// 街道级
+        else if (maxSpan > 0.1) zoom = 11;// 小区级
+        else if (maxSpan > 0.05) zoom = 12;// 建筑级
+        else zoom = 13;                   // 最详细级别
+        
+        return zoom;
     }
 }
 

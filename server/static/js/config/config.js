@@ -138,7 +138,7 @@ export const LOG_CONFIG = {
   enableConsoleLog: true, // 是否启用控制台输出
   logLevel: "debug", // 日志级别: 'debug', 'info', 'warn', 'error'
   // allowedModules: ["GameManager", "TaskService", "templateService", "PlayerService",'MapService','AMapRenderer','EchartsRenderer'], // 允许输出日志的模块 为空输出全部模块
-  allowedModules: ['GameManager','MapService','AMapRenderer','EchartsRenderer'], // 允许输出日志的模块
+  allowedModules: ['GameManager','MapService','AMapRenderer','EchartsRenderer','API'], // 允许输出日志的模块
   alwaysError: true, // 是否总是输出error级别的日志
   timeFormat: true, // 是否在日志中显示时间
   styleOutput: true, // 是否启用样式输出
