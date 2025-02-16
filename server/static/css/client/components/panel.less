@@ -1,0 +1,223 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-15 15:30:30
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 面板组件样式
+ */
+
+ @import "../base/variables.less";
+@import "../base/mixins.less";
+@import "./swiper.less";
+
+// 通用面板样式
+.panel-base {
+  background: rgba(13, 27, 45, 0.95);
+  border: 1px solid @border-color;
+  border-radius: @border-radius-lg;
+  height: calc(100vh - 40px);
+  min-height: 600px;
+  position: relative;
+  background: @secondary-color;
+  border-radius: @border-radius-lg;
+  .card-shadow();
+  overflow: hidden;
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 196, 71, 0.5), transparent);
+  }
+}
+
+// 通用面板标题
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: @primary-color;
+  margin: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid @border-color;
+  font-size: 18px;
+  position: relative;
+
+  i {
+    font-size: 20px;
+  }
+
+  .title-decoration {
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 30%;
+    height: 2px;
+    background: linear-gradient(90deg, @primary-color, transparent);
+  }
+}
+// 右侧任务面板
+.task-panel {
+    .panel-title {
+      color: @primary-color;
+      margin: 20px 20px 15px 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid @border-color;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+  
+    // 任务列表容器
+    .task-list-container {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      margin: 0 0 20px 0;
+      overflow: hidden;
+      height: calc(100vh - 40px);
+      .task-list-swiper();
+    }
+  
+    // 任务列表滚动区域
+    #taskList {
+      overflow-y: scroll;
+      // padding: 0 20px;
+      height: calc(100vh - 120px);
+      // 自定义滚动条样式
+    }
+  
+    // 任务卡片基础样式
+    .task-card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 15px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s ease;
+      margin-bottom: 12px;
+      position: relative;
+      min-height: 120px;
+  
+      &:last-child {
+        margin-bottom: 20px;
+      }
+      &:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 196, 71, 0.3);
+        transform: translateY(-2px);
+      }
+  
+      // 任务图标容器
+      .task-icon-container {
+        width: 56px;
+        height: 56px;
+        background: rgba(13, 27, 45, 0.5);
+        border-radius: 10px;
+        .flex-center();
+        justify-content: center;
+        border: 1px solid rgba(138, 162, 193, 0.2);
+  
+        i {
+          font-size: 28px;
+          transition: transform @transition-duration ease;
+        }
+      }
+  
+      &:hover .task-icon-container i {
+        transform: scale(1.1);
+      }
+  
+      // 任务内容区域
+      .task-main-content {
+        width: 100%;
+        overflow: hidden;
+      }
+  
+      // 任务卡片头部
+      .task-header {
+        .flex-between();
+        margin-bottom: 12px;
+      }
+  
+      .task-type {
+        font-size: 12px;
+        font-weight: 500;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+  
+      .task-name {
+        font-size: 18px;
+        font-weight: bolder;
+        color: @text-color;
+        margin: 0 0 8px 0;
+      }
+  
+      .task-description {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.7);
+        margin: 0 0 12px 0;
+        line-height: 1.5;
+      }
+  
+      // 任务奖励
+      .task-rewards {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 10px;
+      }
+  
+      .reward-exp,
+      .reward-stamina {
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+  
+      // 任务进度
+      .task-progress {
+        .flex-center();
+        gap: 10px;
+      }
+  
+      .progress-bar {
+        flex: 1;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+  
+      .progress-inner {
+        height: 100%;
+        background: linear-gradient(90deg, #4caf50, #8bc34a);
+        border-radius: 3px;
+        transition: width @transition-duration ease;
+      }
+  
+      .progress-text {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+  
+      // 过期任务样式
+      &.expired {
+        opacity: 0.6;
+  
+        &::after {
+          content: "已过期";
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%) rotate(-15deg);
+          background: rgba(255, 0, 0, 0.8);
+          padding: 5px 15px;
+          border-radius: 4px;
+          font-weight: bold;
+        }
+      }
+    }
+  }

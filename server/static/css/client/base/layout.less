@@ -1,0 +1,96 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-15 15:30:30
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 布局相关样式
+ */
+
+@import "./variables.less";
+@import "./mixins.less";
+
+// 基础布局
+body {
+  margin: 0;
+  padding: 20px;
+  background: linear-gradient(135deg, #0c1d35 0%, #0a1422 100%);
+  color: @text-color;
+  font-family: "Microsoft YaHei", Arial, sans-serif;
+}
+
+// 全局布局
+.game-container {
+  display: grid;
+  grid-template-columns: 380px 1fr 400px;
+  gap: @spacing-md;
+  padding: @spacing-md;
+  min-height: 100vh;
+  position: relative;
+  height: 100vh;
+  box-sizing: border-box;
+  @media screen and (max-width: 1200px) {
+    grid-template-columns: 250px 1fr 250px;
+  }
+
+  @media screen and (max-width: 992px) {
+    grid-template-columns: 1fr;
+
+    .character-panel,
+    .task-panel {
+      display: none;
+    }
+  }
+}
+
+// 主内容区域
+.main-content {
+  flex: 1;
+  min-width: 800px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 40px);
+
+  &-top {
+    flex: 3;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  &-bottom {
+    flex: 2;
+    padding: 20px;
+    background: @background-color;
+    border-top: 1px solid @secondary-color;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+// 响应式布局补充
+@media screen and (max-width: 768px) {
+  .task-card {
+    .task-header {
+      flex-direction: column;
+      align-items: flex-start;
+
+      .task-icon {
+        margin-bottom: @spacing-sm;
+      }
+    }
+
+    .task-content {
+      .task-rewards {
+        flex-wrap: wrap;
+      }
+    }
+  }
+
+  .notification {
+    width: 90%;
+    left: 5%;
+    right: 5%;
+  }
+} 

@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-13 19:10:14
- * @LastEditTime: 2025-02-13 19:52:29
+ * @LastEditTime: 2025-02-16 15:51:38
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -45,11 +45,31 @@ class Logger {
         const currentLevel = LOG_LEVELS[level];
         const configLevel = LOG_LEVELS[LOG_CONFIG.logLevel];
         if (currentLevel < configLevel) return;
-
+        
+        const formattedArgs = this.formatMessage(module, level, ...args);
+        
+        // 如果是error级别的日志，无论模块是否在白名单中都要输出
+        if (level === 'error' && LOG_CONFIG.alwaysError) {
+            if (LOG_CONFIG.styleOutput) {
+                console.log(`%c${formattedArgs[0]}`, formattedArgs[1], ...formattedArgs.slice(2));
+            } else {
+                console.log(...formattedArgs);
+            }
+            return;
+        }
+        
+        // 如果允许的模块为空，输出全部模块的日志
+        if (LOG_CONFIG.allowedModules.length === 0) {
+            if (LOG_CONFIG.styleOutput) {
+                console.log(`%c${formattedArgs[0]}`, formattedArgs[1], ...formattedArgs.slice(2));
+            } else {
+                console.log(...formattedArgs);
+            }
+            return;
+        }
+        
         // 检查模块白名单
         if (!LOG_CONFIG.allowedModules.includes(module)) return;
-
-        const formattedArgs = this.formatMessage(module, level, ...args);
         
         if (LOG_CONFIG.styleOutput) {
             console.log(`%c${formattedArgs[0]}`, formattedArgs[1], ...formattedArgs.slice(2));

@@ -284,6 +284,36 @@ class TaskService {
         // 如果需要清理或重置任何与玩家相关的数据
         this.store.clearTaskCache();
     }
+
+    async updateTaskStatus(taskData) {
+        Logger.debug('TaskService', '更新任务状态:', taskData);
+        
+        try {
+            // 更新本地任务状态
+            const currentTasks = this.store.state.currentTasks || [];
+            const taskIndex = currentTasks.findIndex(t => t.id === taskData.id);
+            
+            if (taskIndex !== -1) {
+                currentTasks[taskIndex] = {
+                    ...currentTasks[taskIndex],
+                    ...taskData
+                };
+                
+                // 更新 store
+                this.store.setState({
+                    currentTasks: currentTasks
+                });
+                
+                // 发送任务更新事件
+                this.eventBus.emit('task:updated', taskData);
+            }
+            
+            Logger.debug('TaskService', '任务状态更新完成');
+        } catch (error) {
+            Logger.error('TaskService', '更新任务状态失败:', error);
+            throw error;
+        }
+    }
 }
 
 export default TaskService;

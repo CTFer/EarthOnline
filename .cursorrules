@@ -49,3 +49,5 @@
 
     在整个过程中，始终参考[Python官方文档](https://docs.python.org/)，确保使用最新的Python开发最佳实践。
     使用layui框架时，始终参考[layui官方文档](https://layui.dev/docs/)，确保使用最新的layui开发最佳实践。
+    使用swiper时，始终参考[swiper官方文档](https://swiperjs.com/swiper-api/)，确保使用最新的swiper开发最佳实践。
+    使用echarts时，始终参考[echarts官方文档](https://echarts.apache.org/zh/api.html#echarts)，确保使用最新的echarts开发最佳实践。

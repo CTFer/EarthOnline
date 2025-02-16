@@ -1,0 +1,118 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-15 15:31:30
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 工具类样式
+ */
+
+@import "./variables.less";
+@import "./mixins.less";
+
+// 工具类
+.hidden {
+  display: none !important;
+}
+
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.clickable {
+  cursor: pointer;
+  .transition-base();
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+// 状态徽章
+.status-badge {
+  &.success {
+    background: rgba(80, 200, 120, 0.2);
+    color: #50c878;
+  }
+
+  &.warning {
+    background: rgba(255, 184, 0, 0.2);
+    color: #ffb800;
+  }
+
+  &.error {
+    background: rgba(255, 77, 79, 0.2);
+    color: #ff4d4f;
+  }
+}
+
+// 自定义滚动条样式
+.custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(13, 27, 45, 0.5);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(138, 162, 193, 0.3);
+    border-radius: 3px;
+
+    &:hover {
+      background: rgba(138, 162, 193, 0.5);
+    }
+  }
+}
+
+// 全局滚动条样式
+::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(13, 27, 45, 0.5);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(138, 162, 193, 0.3);
+  border-radius: 3px;
+
+  &:hover {
+    background: rgba(138, 162, 193, 0.5);
+  }
+}
+
+// Mixins
+.flex-center {
+  display: flex;
+  align-items: center;
+}
+
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-base {
+  background: @background-color;
+  border: 1px solid @secondary-color;
+  border-radius: @border-radius-base;
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, rgba(255, 196, 71, 0.8), rgba(255, 196, 71, 0.2) 50%, rgba(255, 196, 71, 0) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+} 

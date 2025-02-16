@@ -13,7 +13,8 @@ class Store {
     constructor() {
         this.state = {
             player: null,
-            tasks: [],
+            currentTasks: [],
+            availableTasks: [],
             loading: false
         };
         this.listeners = [];

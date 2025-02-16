@@ -147,8 +147,11 @@ class GPSService:
         try:
             # 获取时间筛选参数
             start_time = request.args.get('start_time', type=int)
+            print(f"[GPS] 获取开始时间: {start_time}")
+            print(f"[GPS] 时间戳转换为时间: {datetime.fromtimestamp(start_time)}")
             end_time = request.args.get('end_time', type=int)
-            
+            print(f"[GPS] 获取结束时间: {end_time}")
+            print(f"[GPS] 时间戳转换为时间: {datetime.fromtimestamp(end_time)}")
             # 获取分页参数
             page = request.args.get('page', type=int)
             per_page = request.args.get('per_page', type=int)
@@ -466,6 +469,10 @@ class GPSService:
 
             # 获取优化后的数据
             records = self.get_master_GPS_data(player_id, start_time, end_time)
+            # 如果记录数为0，则返回测试的38条数据 2月16日
+            if len(records) == 0:
+                records = self.get_master_GPS_data(player_id, 1739635190, 1739721600)
+                print(f"[GPS Service] 获取到2月16日测试的38条数据")
             print(f"[GPS Service] 获取到原始记录数: {len(records)}")
 
             # 如果需要分页

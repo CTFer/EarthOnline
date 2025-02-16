@@ -1,13 +1,13 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-12 16:39:10
- * @LastEditTime: 2025-02-15 13:11:14
+ * @LastEditTime: 2025-02-15 16:14:49
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
  * Copyright 2025 迷舍
 -->
-# EarthOnline 
+# EarthOnline
 
 这是一个基于python开发的养成类网页游戏，这款游戏结合现实世界，玩家通过在游戏中完成任务，获得现实世界的奖励。玩家与系统之间通过NFC卡片进行交互，系统通过NFC卡片获取玩家信息，并根据玩家信息进行游戏任务的分配。
 
@@ -33,8 +33,6 @@
 
 ## 📁 项目结构
 
-
-
 技术栈：
 
 - 后端：Python + Flask
@@ -43,16 +41,17 @@
 - 动画：Live2D
 - 数据库：SQLite
 
-
 ## 💻 开发指南
 
 ### 代码规范
+
 - 使用 Black 格式化 Python 代码
 - 遵循 PEP 8 Python 代码规范
 - 所有函数必须包含类型注解
 - 关键函数必须包含文档字符串
 
 ### Git 提交规范
+
 ```
 feat: 新功能
 fix: 修复问题
@@ -84,4 +83,4 @@ chore: 构建过程或辅助工具的变动
 
 - 项目主页: [GitHub](https://github.com/yourusername/earthonline)
 - 问题反馈: [Issues](https://github.com/yourusername/earthonline/issues)
-- 邮件联系: 775639471@qq.com
+- 邮件联系: <775639471@qq.com>

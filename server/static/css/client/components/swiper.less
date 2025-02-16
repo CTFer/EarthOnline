@@ -1,0 +1,128 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-15 15:21:30
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 轮播组件样式
+ */
+
+@import "../base/variables.less";
+@import "../base/mixins.less";
+
+// Swiper基础样式
+.swiper-container {
+  width: 100%;
+  height: 100%;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+  list-style: none;
+  padding: 0;
+  z-index: 1;
+}
+
+// 进行中任务列表
+.active-tasks-wrapper {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+
+  .swiper {
+    width: 100%;
+    height: 100%;
+  }
+
+  // 自定义导航按钮样式
+  .swiper-button-prev,
+  .swiper-button-next {
+    color: @primary-color;
+    &:after {
+      font-size: 20px;
+    }
+  }
+  .swiper-scrollbar {
+    background: rgba(0, 0, 0, 0.1);
+    height: 4px;
+    border-radius: 4px;
+  }
+  .swiper-scrollbar:hover {
+    height: 8px;
+    &.swiper-scrollbar-drag {
+      background: #ffc447;
+      height: 8px;
+    }
+  }
+  .swiper-scrollbar-drag {
+    background: linear-gradient(90deg, #ffc447, #ffd47a);
+    border-radius: 4px;
+    height: 100%;
+    transition: background-color 0.3s ease;
+  }
+
+  .swiper-scrollbar-drag:active {
+    background: #ffc447;
+    height: 16px;
+  }
+  // 自定义分页器样式
+  .swiper-pagination {
+    .swiper-pagination-bullet {
+      background: @text-color-secondary;
+      opacity: 0.5;
+
+      &-active {
+        background: @primary-color;
+        opacity: 1;
+      }
+    }
+  }
+}
+
+// 任务列表轮播
+.task-list-swiper() {
+  height: 100%;
+  max-height: calc(100vh - 200px); // 调整合适的高度
+
+  .swiper-wrapper {
+    // 允许内容自然增长
+    height: auto;
+  }
+
+  .swiper-slide {
+    height: auto; // 允许每个slide根据内容自适应高度
+
+    // 确保最后一个slide有底部间距
+    &:last-child {
+      margin-bottom: 20px;
+    }
+  }
+      
+  .swiper-scrollbar {
+    width: 4px;
+    right: 2px;
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.1);
+    
+    &-drag {
+        background: var(--theme-color);
+        border-radius: 2px;
+        cursor: pointer;
+    }
+}
+}
+// 自定义滚动条样式
+.swiper-scrollbar {
+  right: 2px;
+  width: 4px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+
+  &-drag {
+    background: linear-gradient(90deg, @primary-color, rgba(255, 196, 71, 0.5));
+    border-radius: 4px;
+    width: 100%;
+    transition: all @transition-duration ease;
+
+    &:hover {
+      background: @primary-color;
+    }
+  }
+}

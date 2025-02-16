@@ -1,3 +1,10 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-15 14:07:30
+ * @LastEditTime: 2025-02-16 14:00:45
+ * @LastEditors: 一根鱼骨棒
+ * @Description: WebSocket通信管理器
+ */
 import { SERVER } from '../config/config.js';
 import Logger from '../utils/logger.js';
 
@@ -5,6 +12,7 @@ import Logger from '../utils/logger.js';
 export default class WebSocketManager {
     constructor() {
         Logger.info('WebSocket', '初始化 WebSocketManager');
+        Logger.debug('WebSocketManager', 'SERVER地址:', SERVER);
         this.socket = io(SERVER);
         this.statusDot = document.querySelector('.status-dot');
         this.statusText = document.querySelector('.status-text');
@@ -78,10 +86,12 @@ export default class WebSocketManager {
     }
 
     onTaskUpdate(callback) {
+        Logger.debug('WebSocketManager', '注册任务更新回调');
         this.taskUpdateCallback = callback;
     }
 
     onTagsUpdate(callback) {
+        Logger.debug('WebSocketManager', '注册标签更新回调');
         this.tagsUpdateCallback = callback;
     }
 
@@ -99,7 +109,7 @@ export default class WebSocketManager {
 
     // 添加NFC任务更新回调注册方法
     onNFCTaskUpdate(callback) {
-        Logger.info('WebSocket', '注册NFC任务更新回调');
+        Logger.debug('WebSocketManager', '注册NFC任务更新回调');
         this.nfcTaskUpdateCallback = callback;
     }
 } 

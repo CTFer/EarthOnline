@@ -1,0 +1,24 @@
+@import "../base/variables.less";
+@import "../base/mixins.less";
+.word-cloud-container {
+    flex:1;
+    min-height: 200px;
+    background: rgba(13, 27, 45, 0.6);
+    border-radius: @border-radius-base;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: radial-gradient(circle at center, 
+                                rgba(255, 196, 71, 0.05) 0%,
+                                rgba(13, 27, 45, 0) 70%);
+        pointer-events: none;
+    }
+  }

@@ -1,0 +1,70 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-15 15:26:30
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 加载状态组件样式
+ */
+
+@import "../base/variables.less";
+@import "../base/mixins.less";
+
+// 加载状态
+.loading {
+  position: relative;
+  min-height: 200px;
+  .flex-center();
+
+  &::after {
+    content: "";
+    width: 40px;
+    height: 40px;
+    border: 3px solid @border-color;
+    border-top-color: @primary-color;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+}
+
+// 加载状态变体
+.loading-state {
+  .flex-center();
+  justify-content: center;
+  padding: 20px;
+  color: @text-color-secondary;
+
+  .loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid transparent;
+    border-top-color: @primary-color;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+}
+
+// 空状态提示
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: @text-color-secondary;
+
+  i {
+    font-size: 48px;
+    margin-bottom: 15px;
+    opacity: 0.5;
+  }
+
+  p {
+    font-size: 14px;
+    margin: 0;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+} 

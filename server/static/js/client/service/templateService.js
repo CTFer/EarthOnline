@@ -47,7 +47,7 @@ class TemplateService {
         Logger.debug('TemplateService', '生成可用任务卡片模板:', task);
         return `
             <div class="swiper-slide">
-                <div class="task-card" onclick="taskManager.showTaskDetails(${JSON.stringify({
+                <div class="task-card" onclick="GameManager.uiService.showTaskDetails(${JSON.stringify({
                     ...task,
                     typeInfo: taskTypeInfo,
                     rewards: rewards
@@ -82,7 +82,7 @@ class TemplateService {
                     <div class="task-rewards">
                         ${this.renderRewardItems(rewards, task)}
                     </div>
-                    <button class="accept-btn" onclick="event.stopPropagation(); taskManager.acceptTask(${task.id})">
+                    <button class="accept-btn" onclick="event.stopPropagation(); GameManager.acceptTask(${task.id})">
                         <i class="layui-icon layui-icon-ok"></i>
                         接受
                     </button>

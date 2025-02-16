@@ -1,6 +1,8 @@
 vue-version/
 earthonline/
 __pycache__/
+server/static/css/client/components/*.css
+server/static/css/client/base/*.css
 earthonline/nginx.htaccess
 server/database/game.db
 main.sql

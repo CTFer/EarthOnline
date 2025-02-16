@@ -1,0 +1,225 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-15 15:23:30
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 地图组件样式
+ */
+
+@import "../base/variables.less";
+@import "../base/mixins.less";
+
+.gps-map-container {
+  flex: 1;
+  min-height: 300px;
+  background: rgba(13, 27, 45, 0.6);
+  border-radius: @border-radius-base;
+  // padding: 20px;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at center, rgba(255, 196, 71, 0.05) 0%, rgba(13, 27, 45, 0) 70%);
+    pointer-events: none;
+  }
+}
+
+.map-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 15px;
+  background: rgba(13, 27, 45, 0.6);
+  border-radius: @border-radius-base;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+
+    // 时间筛选样式
+    &.time-filter {
+      flex: 2;
+
+      .layui-icon {
+        color: @primary-color;
+      }
+
+      .time-range-select {
+        background: @secondary-color;
+        color: @text-color;
+        border: 1px solid @border-color;
+        padding: 5px 10px;
+        border-radius: @border-radius-sm;
+        outline: none;
+        transition: all 0.3s ease;
+
+        &:hover,
+        &:focus {
+          border-color: @primary-color;
+        }
+      }
+    }
+
+    // 状态信息样式
+    &.status-info {
+      flex: 2;
+      justify-content: center;
+
+      .info-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 10px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: @border-radius-sm;
+        border: 1px solid @border-color;
+
+        .layui-icon {
+          color: @primary-color;
+        }
+
+        span {
+          color: @text-color;
+          font-size: 14px;
+        }
+
+        // 电池状态特殊样式
+        &.battery-status {
+          .layui-icon {
+            transition: color 0.3s ease;
+
+            &.low {
+              color: @danger-color;
+            }
+
+            &.medium {
+              color: @warning-color;
+            }
+
+            &.full {
+              color: @success-color;
+            }
+          }
+        }
+      }
+    }
+
+    // 控制按钮样式
+    &.map-controls-buttons {
+      flex: 1;
+      justify-content: flex-end;
+
+      .control-btn {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 12px;
+        background: @primary-color;
+        border: none;
+        border-radius: @border-radius-sm;
+        color: @secondary-color;
+        cursor: pointer;
+        transition: all 0.3s ease;
+
+        &:hover {
+          opacity: 0.9;
+        }
+
+        .layui-icon {
+          font-size: 16px;
+        }
+
+        span {
+          font-size: 14px;
+        }
+      }
+    }
+  }
+}
+
+// 自定义时间范围样式
+.custom-date-range {
+  position: relative;
+  top: 100%;
+  left: 0;
+  background: rgba(13, 27, 45, 0.9);
+  padding: 10px;
+  border-radius: @border-radius-sm;
+  border: 1px solid @border-color;
+  z-index: 1000;
+
+  .date-input {
+    background: @secondary-color;
+    border: 1px solid @border-color;
+    color: @text-color;
+    padding: 4px 8px;
+    border-radius: @border-radius-sm;
+    margin: 0 5px;
+
+    &:hover,
+    &:focus {
+      border-color: @primary-color;
+    }
+  }
+
+  .apply-btn {
+    background: @primary-color;
+    color: @secondary-color;
+    border: none;
+    padding: 4px 12px;
+    border-radius: @border-radius-sm;
+    cursor: pointer;
+    margin-left: 10px;
+    transition: all 0.3s ease;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+}
+// 自定义标记点样式
+.custom-marker {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 25px;
+  color: #fff;
+  font-size: 12px;
+  
+  &.point-mode {
+      background-color: #1890ff;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  
+  &.path-mode {
+      background-color: #ffc447;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      
+      &.start {
+          background-color: #52c41a;
+      }
+      
+      &.end {
+          background-color: #f5222d;
+      }
+  }
+  
+  .marker-label {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+  }
+} 

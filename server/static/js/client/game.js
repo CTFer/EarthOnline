@@ -1,14 +1,23 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-01-29 16:43:22
+ * @LastEditTime: 2025-02-16 14:37:34
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2025 迷舍
+ */
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-08 14:41:57
- * @LastEditTime: 2025-02-15 13:03:31
+ * @LastEditTime: 2025-02-16 14:36:45
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
 
 import { SERVER, MAP_CONFIG } from "../config/config.js";
-import WebSocketManager from "../function/WebSocketManager.js";
-import MapSwitcher from "../function/MapSwitcher.js";
+import WebSocketManager from "../function/WebSocketManager.js"; 
+// import WebSocketManager from "./core/websocketManager.js";//TODO: 存在BUG 页面卡死
 import APIClient from "./core/api.js"; 
 import TemplateService from "./service/templateService.js";
 import TaskService from "./service/taskService.js";
@@ -19,12 +28,15 @@ import SwiperService from './service/swiperService.js';
 import { ErrorHandler } from './core/errorHandler.js';
 import WordcloudService from './service/wordcloudService.js';
 import PlayerService from './service/playerService.js';
+import NFCService from './service/nfcService.js';
+import MapService from './service/mapService.js';
+import UIService from './service/uiService.js';
+import AudioService from './service/audioService.js';
 
 // 在文件开头声明全局变量
 let taskManager;
-let gpsManager;
 
-// 游戏管理类
+// 游戏管理类，程序入口
 class GameManager {
   constructor() {
     Logger.info("GameManager", "构造函数开始");
@@ -56,6 +68,7 @@ class GameManager {
 
     // 4. 初始化其他服务
     this.swiperService = new SwiperService();
+    this.mapService = new MapService(this.api, this.eventBus, this.store);
     
     // 5. 设置事件监听
     this.setupEventListeners();
@@ -66,13 +79,30 @@ class GameManager {
     this.loading = false;
 
     // 初始化WebSocket管理器
-    this.wsManager = new WebSocketManager();
-
-    // 设置事件监听
-    this.wsManager.subscribeToTasks(this.playerService.getPlayerId());
-    this.wsManager.onTaskUpdate(this.handleTaskStatusUpdate.bind(this));
-    this.wsManager.onNFCTaskUpdate(this.handleTaskUpdate.bind(this));
-    this.wsManager.onTagsUpdate(() => this.updateWordCloud());
+    try {
+      Logger.info("GameManager", "开始初始化WebSocket管理器");
+      this.wsManager = new WebSocketManager();
+      
+      const playerId = this.playerService.getPlayerId();
+      Logger.debug("GameManager", "当前玩家ID:", playerId);
+      
+      if (playerId) {
+        Logger.info("GameManager", "开始设置WebSocket事件监听");
+        this.wsManager.subscribeToTasks(playerId);
+        this.wsManager.onTaskUpdate(this.handleTaskStatusUpdate.bind(this));
+        this.wsManager.onNFCTaskUpdate(this.handleTaskUpdate.bind(this));
+        this.wsManager.onTagsUpdate(() => {
+          Logger.debug("GameManager", "触发词云更新");
+          this.updateWordCloud();
+        });
+        Logger.info("GameManager", "WebSocket事件监听设置完成");
+      } else {
+        Logger.warn("GameManager", "玩家ID未设置，WebSocket订阅将在ID可用时进行");
+      }
+    } catch (error) {
+      Logger.error("GameManager", "WebSocket管理器初始化失败:", error);
+      layer.msg("WebSocket连接失败，部分功能可能不可用", {icon: 2});
+    }
 
     // 加载玩家信息 - 移到API初始化之后
     this.loadPlayerInfo();
@@ -83,6 +113,18 @@ class GameManager {
 
     // 在构造函数中调用
     this.setupDOMObserver();
+
+    // 添加新的服务初始化
+    this.nfcService = new NFCService(this.api, this.eventBus, this.store);
+    this.uiService = new UIService(this.eventBus, this.store, this.templateService);
+
+    // 添加音频服务
+    this.audioService = new AudioService();
+    
+    // 初始化音频
+    this.audioService.init().catch(error => {
+      Logger.warn("GameManager", "音频初始化失败，继续无声模式:", error);
+    });
 
     Logger.info("GameManager", "构造函数完成");
   }
@@ -105,7 +147,7 @@ class GameManager {
     } catch (error) {
       Logger.error("[GameManager]", "初始化应用失败:", error);
       layer.msg('初始化应用失败，请刷新页面重试', {icon: 2});
-      ErrorHandler.handle(error, 'TaskManager.initializeApplication');
+      ErrorHandler.handle(error, 'GameManager.initializeApplication');
     }
   }
   // 处理NFC任务更新通知
@@ -114,7 +156,7 @@ class GameManager {
 
     if (!data || !data.type) {
       Logger.error("GameManager", "无效的任务更新数据:", data);
-      this.showNotification({
+      this.uiService.showNotification({
         type: "ERROR",
         message: "收到无效的任务更新",
       });
@@ -154,25 +196,13 @@ class GameManager {
     }
 
     Logger.debug("GameManager", "准备显示通知:", data);
-    this.showNotification(data);
+    this.uiService.showNotification(data);
     Logger.debug("GameManager", "通知显示完成");
   }
 
   // 播放任务相关音效
   playTaskSound(type) {
-    const audio = new Audio();
-    switch (type) {
-      case "NEW_TASK":
-        audio.src = "/static/sounds/new_task.mp3";
-        break;
-      case "COMPLETE":
-        audio.src = "/static/sounds/complete.mp3";
-        break;
-      case "CHECK":
-        audio.src = "/static/sounds/check.mp3";
-        break;
-    }
-    audio.play().catch((e) => Logger.error("GameManager", "音效播放失败:", e));
+    this.audioService.playSound(type);
   }
 
   // 播放错误音效
@@ -181,128 +211,17 @@ class GameManager {
     audio.play().catch((e) => Logger.error("GameManager", "音效播放失败:", e));
   }
 
-  // 显示通知
-  showNotification(data) {
-    Logger.info("GameManager", "开始显示通知:", data);
-    const typeInfo = data.task?.task_type ? gameUtils.getTaskTypeInfo(data.task.task_type) : { color: "#009688", icon: "layui-icon-notice", text: "系统消息" };
-
-    try {
-      layer.open({
-        type: 1,
-        title: false,
-        closeBtn: true,
-        shadeClose: true,
-        area: ["500px", "auto"],
-        skin: "layui-layer-nobg",
-        content: `
-                    <div class="task-notification">
-                        <div class="task-header">
-                            <div class="task-icon" style="color: ${typeInfo.color}">
-                                <i class="layui-icon ${typeInfo.icon}"></i>
-                            </div>
-                            <div class="task-title">
-                                <h3>${data.task?.name || "系统消息"}</h3>
-                                <small>${typeInfo.text}</small>
-                            </div>
-                        </div>
-                        ${
-                          data.task?.description
-                            ? `
-                            <div class="task-description">${data.task.description}</div>
-                        `
-                            : ""
-                        }
-                        <div class="task-status">
-                            <span class="status-badge" style="background: ${this.getStatusColor(data.type)}">
-                                ${this.getStatusText(data.type)}
-                            </span>
-                            <span class="task-message">${data.message || this.getDefaultMessage(data.type)}</span>
-                        </div>
-                        ${
-                          data.task?.rewards
-                            ? `
-                            <div class="task-rewards">
-                                <div class="reward-item">
-                                    <i class="layui-icon layui-icon-diamond"></i>
-                                    <span>经验 +${data.task.points || 0}</span>
-                                </div>
-                                <div class="reward-item">
-                                    <i class="layui-icon layui-icon-dollar"></i>
-                                    <span>奖励 ${data.task.rewards}</span>
-                                </div>
-                            </div>
-                        `
-                            : ""
-                        }
-                        ${
-                          data.timestamp
-                            ? `
-                            <div class="task-time">
-                                打卡时间: ${new Date(data.timestamp * 1000).toLocaleString()}
-                            </div>
-                        `
-                            : ""
-                        }
-                    </div>
-                `,
-      });
-      Logger.info("GameManager", "通知显示成功");
-    } catch (error) {
-      Logger.error("GameManager", "显示通知失败:", error);
-    }
-  }
-
-  // 获取默认消息
-  getDefaultMessage(type) {
-    switch (type) {
-      case "IDENTITY":
-        return "身份识别成功";
-      case "NEW_TASK":
-        return "新任务已添加";
-      case "COMPLETE":
-        return "任务完成";
-      case "ALREADY_COMPLETED":
-        return "该任务已完成";
-      case "CHECKING":
-        return "任务正在审核中";
-      case "REJECTED":
-        return "任务被驳回";
-      case "ERROR":
-        return "任务处理出错";
-      default:
-        return "收到任务更新";
-    }
-  }
-
-
-  // 处理任务状态更新
-  handleTaskStatusUpdate(data) {
-    Logger.info("TaskManager", "处理任务状态更新:", data);
-
-    if (!data || !data.id) {
-        Logger.error("TaskManager", "无效的任务状态更新数据");
-        return;
-    }
-
-    try {
-        // 通过事件总线发送任务状态更新事件
-        this.eventBus.emit('task:status:update', data);
-    } catch (error) {
-        Logger.error("TaskManager", "处理任务状态更新错误:", error);
-    }
-  }
-
   // 修改loadTasks方法，使用taskService
   async loadTasks() {
     try {
-      Logger.info("[Game]", "加载任务");
-      // 使用 TaskService 加载任务
       const tasks = await this.taskService.loadTasks();
-      // 渲染任务列表
-      this.renderTasks(tasks);
+      this.uiService.renderTaskList(tasks);
     } catch (error) {
-      Logger.error("[Game]", "加载任务失败:", error);
-      layer.msg("加载任务失败", { icon: 2 });
+      Logger.error("GameManager", "加载任务失败:", error);
+      this.uiService.showNotification({
+        type: 'ERROR',
+        message: '加载任务失败'
+      });
     }
   }
 
@@ -341,126 +260,6 @@ class GameManager {
 
     Logger.info("[Game]", "初始化任务滑动组件");
     this.taskService.initTaskSwipers();
-  }
-
-  // 显示任务详情
-  showTaskDetails(taskData) {
-    const { typeInfo, rewards } = taskData;
-    Logger.debug(typeInfo);
-    layui.use("layer", function () {
-      const layer = layui.layer;
-
-      layer.open({
-        type: 1,
-        title: false,
-        closeBtn: 1,
-        shadeClose: true,
-        skin: "task-detail-layer",
-        area: ["600px", "auto"],
-        content: `
-                    <div class="task-detail-popup">
-                        <div class="task-detail-header" style="background-color: ${typeInfo.color}">
-                            <div class="task-type-badge" style="background: ${typeInfo.color}; color: ${typeInfo.color}">
-                                <i class="layui-icon ${typeInfo.icon}"></i>
-                                <span>${typeInfo.text}</span>
-                            </div>
-                            <h2 class="task-name">${taskData.name}</h2>
-                        </div>
-                        <div class="task-detail-content">
-                            <div class="detail-section">
-                                <h3>任务描述</h3>
-                                <p>${taskData.description}</p>
-                            </div>
-                            
-                            <div class="detail-section">
-                                <h3>任务信息</h3>
-                                <div class="info-grid">
-                                    <div class="info-item">
-                                        <span class="label">任务范围</span>
-                                        <span class="value">${taskData.task_scope || "无限制"}</span>
-                                    </div>
-                                    <div class="info-item">
-                                        <span class="label">体力消耗</span>
-                                        <span class="value">${taskData.stamina_cost}</span>
-                                    </div>
-                                    <div class="info-item">
-                                        <span class="label">时间限制</span>
-                                        <span class="value">${taskData.limit_time ? `${Math.floor(taskData.limit_time / 3600)}小时` : "无限制"}</span>
-                                    </div>
-                                    <div class="info-item">
-                                        <span class="label">可重复次数</span>
-                                        <span class="value">${taskData.repeat_time || (taskData.repeatable ? "无限" : "1")}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="detail-section">
-                                <h3>任务奖励</h3>
-                                <div class="rewards-grid">
-                                    ${
-                                      rewards.exp > 0
-                                        ? `
-                                        <div class="reward-detail">
-                                            <i class="layui-icon layui-icon-star"></i>
-                                            <span>${rewards.exp} 经验</span>
-                                        </div>
-                                    `
-                                        : ""
-                                    }
-                                    ${
-                                      rewards.points > 0
-                                        ? `
-                                        <div class="reward-detail">
-                                            <i class="layui-icon layui-icon-diamond"></i>
-                                            <span>${rewards.points} 积分</span>
-                                        </div>
-                                    `
-                                        : ""
-                                    }
-                                    ${
-                                      rewards.cards.length > 0
-                                        ? `
-                                        <div class="reward-detail">
-                                            <i class="layui-icon layui-icon-picture"></i>
-                                            <span>${rewards.cards.length}张卡片</span>
-                                        </div>
-                                    `
-                                        : ""
-                                    }
-                                    ${
-                                      rewards.medals.length > 0
-                                        ? `
-                                        <div class="reward-detail">
-                                            <i class="layui-icon layui-icon-medal"></i>
-                                            <span>${rewards.medals.length}枚勋章</span>
-                                        </div>
-                                    `
-                                        : ""
-                                    }
-                                </div>
-                            </div>
-                            
-                            ${
-                              taskData.parent_task_id
-                                ? `
-                                <div class="detail-section">
-                                    <h3>前置任务</h3>
-                                    <p>需要完成任务ID: ${taskData.parent_task_id}</p>
-                                </div>
-                            `
-                                : ""
-                            }
-                        </div>
-                        <div class="task-detail-footer">
-                            <button class="accept-task-btn" onclick="taskManager.acceptTask(${taskData.id}); layer.closeAll();">
-                                <i class="layui-icon layui-icon-ok"></i>
-                                接受任务
-                            </button>
-                        </div>
-                    </div>
-                `,
-      });
-    });
   }
 
   // 修改 loadCurrentTasks 方法
@@ -530,8 +329,6 @@ class GameManager {
     }
   }
 
-
-
   // 添加事件监听器初始化方法
   initTaskEvents() {
     document.addEventListener("click", (e) => {
@@ -581,8 +378,6 @@ class GameManager {
     }
   }
 
-
-
   // 接受任务
   async acceptTask(taskId) {
     try {
@@ -614,7 +409,7 @@ class GameManager {
     } catch (error) {
       Logger.error("[GameManager]", "接受任务失败:", error);
       layer.msg("网络请求失败，请检查连接", { icon: 2 });
-      ErrorHandler.handle(error, 'TaskManager.acceptTask');
+      ErrorHandler.handle(error, 'GameManager.acceptTask');
     }
   }
 
@@ -836,8 +631,6 @@ class GameManager {
     }
   }
 
-
-
   // 添加事件处理方法
   handleCurrentTasksUpdated(tasks) {
     Logger.info("[GameManager]", "Current tasks updated:", tasks);
@@ -884,6 +677,11 @@ class GameManager {
       this.loadPlayerInfo();
       this.taskService.loadTasks();
     });
+
+    // 添加地图相关事件监听
+    this.eventBus.on('map:renderer:changed', (type) => {
+      Logger.info('GameManager', `地图渲染器已切换到: ${type}`);
+    });
   }
 
   setupDOMObserver() {
@@ -908,7 +706,7 @@ class GameManager {
 
   handleDOMChanges(target) {
     // 处理 DOM 变化的逻辑
-    Logger.debug("GameManager", "DOM changed:", target);
+    // Logger.debug("GameManager", "DOM changed:", target);
     // ... 其他处理逻辑 ...
   }
 
@@ -958,6 +756,61 @@ class GameManager {
     }
   }
 
+  // 删除原有的 showTaskDetails 方法，改为调用 UIService
+  handleTaskClick(taskData) {
+    Logger.debug("GameManager", "处理任务点击:", taskData);
+    this.uiService.showTaskDetails(taskData);
+  }
+
+  // 添加回任务状态更新处理方法
+  handleTaskStatusUpdate(data) {
+    Logger.info("GameManager", "处理任务状态更新:", data);
+
+    if (!data || !data.id) {
+      Logger.error("GameManager", "无效的任务状态更新数据");
+      this.uiService.showNotification({
+        type: 'ERROR',
+        message: '收到无效的任务状态更新'
+      });
+      return;
+    }
+
+    try {
+      // 更新任务状态
+      this.taskService.updateTaskStatus(data);
+      
+      // 显示状态更新通知
+      this.uiService.showNotification({
+        type: data.status,
+        message: `任务状态更新: ${this.getStatusText(data.status)}`
+      });
+
+      // 如果任务完成，播放音效
+      if (data.status === 'COMPLETE') {
+        this.playTaskSound('COMPLETE');
+      }
+
+      // 刷新任务列表
+      this.loadCurrentTasks();
+      
+      Logger.debug("GameManager", "任务状态更新处理完成");
+    } catch (error) {
+      Logger.error("GameManager", "处理任务状态更新错误:", error);
+      this.uiService.showNotification({
+        type: 'ERROR',
+        message: '处理任务状态更新失败'
+      });
+    }
+  }
+
+  // 修改销毁方法
+  destroy() {
+    this.swiperService.destroySwipers();
+    this.wordcloudService.destroy();
+    this.audioService.destroy();
+    this.wsManager.disconnect();
+    Logger.info("GameManager", "资源清理完成");
+  }
 }
 
 // 页面初始化代码
@@ -979,11 +832,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 初始化文字云
   await window.GameManager.initWordCloud();
 
-  // 初始化地图切换器
-  window.mapSwitcher = new MapSwitcher();
+  // 初始化地图
+  await window.GameManager.mapService.initMap();
 
   // 设置 WebSocket 管理器并订阅 GPS 更新
-  window.mapSwitcher.setWebSocketManager(window.GameManager.wsManager);
+  window.GameManager.mapService.setWebSocketManager(window.GameManager.wsManager);
   window.GameManager.wsManager.subscribeToGPS(window.GameManager.playerService.getPlayerId());
 
   Logger.info("GameManager", "页面初始化完成");
@@ -992,7 +845,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 // 页面卸载前清理
 window.addEventListener("beforeunload", () => {
   if (window.GameManager) {
-    window.GameManager.swiperService.destroySwipers();
-    window.GameManager.wordcloudService.destroy();
+    window.GameManager.destroy();
   }
 });

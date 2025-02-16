@@ -1,0 +1,33 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-15 15:15:30
+ * @LastEditors: 一根鱼骨棒
+ * @Description: Live2D组件样式
+ */
+
+@import "../base/variables.less";
+@import "../base/mixins.less";
+
+// Live2D容器
+#live2dContainer {
+    height: 300px;
+    width: 100%;
+    background: rgba(13, 27, 45, 0.4);
+    border-radius: @border-radius-base;
+    margin: 15px;
+    position: relative;
+    overflow: hidden;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100px;
+      background: linear-gradient(to top, 
+                                rgba(13, 27, 45, 1),
+                                rgba(13, 27, 45, 0.5));
+      pointer-events: none;
+    }
+  }

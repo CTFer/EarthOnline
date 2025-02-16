@@ -1,0 +1,105 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-15 15:28:30
+ * @LastEditors: 一根鱼骨棒
+ * @Description: Layui组件自定义样式
+ */
+
+@import "../base/variables.less";
+@import "../base/mixins.less";
+
+// Layui 自定义样式覆盖
+.layui-layer {
+  background: @background-color !important;
+  border: 1px solid @secondary-color !important;
+  border-radius: @border-radius-lg !important;
+
+  .layui-layer-title {
+    background: rgba(30, 49, 72, 0.6) !important;
+    color: @text-color !important;
+    border-bottom: 1px solid @secondary-color !important;
+  }
+
+  .layui-layer-content {
+    color: @text-color !important;
+  }
+
+  .layui-layer-btn {
+    border-top: 1px solid @secondary-color !important;
+
+    a {
+      background: rgba(255, 255, 255, 0.1) !important;
+      border: 1px solid @secondary-color !important;
+      color: @text-color !important;
+      transition: all @transition-duration;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.2) !important;
+      }
+
+      &.layui-layer-btn0 {
+        background: @primary-color !important;
+        border-color: @primary-color !important;
+        color: #000 !important;
+
+        &:hover {
+          background: lighten(@primary-color, 10%) !important;
+        }
+      }
+    }
+  }
+}
+
+// 自定义关闭按钮
+.layui-layer-nobg {
+  .layui-layer-close {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: @text-color;
+    font-weight: 300;
+    transition: all @transition-duration;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: rotate(90deg);
+    }
+  }
+}
+
+// 弹窗动画效果
+.layui-anim {
+  &.layui-anim-00 {
+    animation-duration: @transition-duration;
+  }
+}
+
+// 自定义选项卡样式
+.custom-tab {
+  .layui-tab-title {
+    border-bottom: 1px solid @border-color;
+    padding: 0 20px;
+
+    li {
+      color: @text-color-secondary;
+      padding: 0 15px;
+      transition: all @transition-duration;
+
+      &:hover {
+        color: lighten(@text-color-secondary, 10%);
+      }
+
+      &.layui-this {
+        color: @primary-color;
+        &::after {
+          border: none;
+          border-radius: 0;
+          border-bottom: 2px solid @primary-color;
+        }
+      }
+    }
+  }
+
+  .layui-tab-content {
+    padding: 20px;
+  }
+} 

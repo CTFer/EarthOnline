@@ -444,9 +444,9 @@ def get_logs():
     if method_filter:
         filtered_logs = [
             log for log in filtered_logs if log['method'] == method_filter]
-        if path_filter:
-            filtered_logs = [
-                log for log in filtered_logs if path_filter in log['path']]
+    if path_filter:
+        filtered_logs = [
+            log for log in filtered_logs if path_filter in log['path']]
 
     return json.dumps(filtered_logs)
 
@@ -874,7 +874,7 @@ def setup_logging():
     )
     return logging.getLogger(__name__)
 
-# 在应用启动时调用
+    # 在应用启动时调用
 if __name__ == '__main__':
     logger = setup_logging()
     logger.info("Starting server initialization...")
@@ -892,13 +892,13 @@ if __name__ == '__main__':
             # 开发环境：使用 eventlet（支持热重载和WebSocket）
             logger.info("Starting development server with eventlet...")
             socketio.run(
-                app,
+            app,
                 host=SERVER_IP,
                 port=PORT,
-                debug=True,
-                use_reloader=True,
-                log_output=True
-            )
+            debug=True,
+            use_reloader=True,
+            log_output=True
+        )
         else:
             # 生产环境：使用 waitress
             from waitress import serve

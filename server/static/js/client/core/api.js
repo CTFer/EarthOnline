@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:01
- * @LastEditTime: 2025-02-14 17:41:05
+ * @LastEditTime: 2025-02-16 16:06:57
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -57,7 +57,11 @@ class APIClient {
             body: JSON.stringify({ player_id: playerId, task_id: taskId })
         });
     }
-
+    // 使用API获取GPS数据
+    async getGPSData(playerId, params) {
+        Logger.info('API', '获取GPS数据:', playerId, params);
+        return this.request(`/api/gps/player/${playerId}?${params.toString()}`);
+    }
     async abandonTask(taskId, playerId) {
         Logger.info('API', '放弃任务:', taskId, 'for player:', playerId);
         return this.request(`/api/tasks/${taskId}/abandon`, {

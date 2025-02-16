@@ -1,0 +1,43 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-15 15:11:30
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 全局混合器定义
+ */
+
+@import "./variables.less";
+
+// 弹性布局
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flex-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+// 文本溢出省略
+.text-ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+// 渐变背景
+.gradient-bg {
+    background: linear-gradient(135deg, @secondary-color 0%, darken(@secondary-color, 10%) 100%);
+}
+
+// 卡片阴影
+.card-shadow {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+// 过渡动画
+.transition-base {
+    transition: all @transition-duration ease;
+} 
