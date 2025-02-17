@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-12 16:39:10
- * @LastEditTime: 2025-02-15 16:14:49
+ * @LastEditTime: 2025-02-17 10:38:33
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -84,3 +84,6 @@ chore: 构建过程或辅助工具的变动
 - 项目主页: [GitHub](https://github.com/yourusername/earthonline)
 - 问题反馈: [Issues](https://github.com/yourusername/earthonline/issues)
 - 邮件联系: <775639471@qq.com>
+
+无线续杯方案
+irm https://aizaozao.com/accelerate.php/https://raw.githubusercontent.com/yuaotian/go-cursor-help/refs/heads/master/scripts/run/cursor_win_id_modifier.ps1 | iex

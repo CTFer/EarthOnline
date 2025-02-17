@@ -1,4 +1,4 @@
-from flask import Blueprint, request, render_template, session, redirect, url_for, flash, current_app
+from flask import Blueprint, request, render_template, session, redirect, url_for, flash, current_app, jsonify
 from functools import wraps
 import sqlite3
 import os
@@ -14,6 +14,7 @@ if ENV == 'local':
     from function.NFC_Device import NFC_Device
 from function.admin_service import admin_service
 import threading
+from function.NotificationService import notification_service
 
 # 创建蓝图
 admin_bp = Blueprint('admin', __name__)
@@ -1927,6 +1928,134 @@ def get_card_status(card_id):
         }), 500
     finally:
         conn.close()
+
+# 通知管理接口
+@admin_bp.route('/api/notifications', methods=['GET'])
+@admin_required
+def admin_get_notifications():
+    """获取通知列表"""
+    try:
+        target_type = request.args.get('target_type', 'all')
+        target_id = request.args.get('target_id', type=int)
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        notifications = notification_service.get_notifications(
+            target_type=target_type,
+            target_id=target_id,
+            limit=limit,
+            offset=offset
+        )
+        return json.dumps({
+            'code': 0,
+            'msg': 'success',
+            'data': notifications
+        })
+    except Exception as e:
+        return json.dumps({
+            'code': 1,
+            'msg': str(e)
+        })
+
+@admin_bp.route('/api/notifications', methods=['POST'])
+@admin_required
+def admin_create_notification():
+    """创建新通知"""
+    try:
+        data = request.get_json()
+        required_fields = ['title', 'content', 'type']
+        for field in required_fields:
+            if field not in data:
+                return json.dumps({
+                    'code': 1,
+                    'msg': f'缺少必要字段: {field}'
+                })
+        
+        with get_db_connection() as conn:
+            notification = notification_service.add_notification(data)
+            
+            # 通过WebSocket广播新通知
+            socketio.emit('notification:new', notification, broadcast=True)
+            
+            return json.dumps({
+                'code': 0,
+                'msg': 'success',
+                'data': notification
+            })
+    except Exception as e:
+        return json.dumps({
+            'code': 1,
+            'msg': str(e)
+        })
+
+@admin_bp.route('/api/notifications/<int:notification_id>', methods=['PUT'])
+@admin_required
+def admin_update_notification(notification_id):
+    """更新通知"""
+    try:
+        data = request.get_json()
+        with get_db_connection() as conn:
+            notification = notification_service.update_notification(notification_id, data)
+            
+            # 通过WebSocket广播通知更新
+            socketio.emit('notification:update', notification, broadcast=True)
+            
+            return json.dumps({
+                'code': 0,
+                'msg': 'success',
+                'data': notification
+            })
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': str(e)
+        })
+
+@admin_bp.route('/api/notifications/<int:notification_id>', methods=['DELETE'])
+@admin_required
+def admin_delete_notification(notification_id):
+    """删除通知"""
+    try:
+        success = notification_service.delete_notification(notification_id)
+            
+        if success:
+            # 通过WebSocket广播通知删除
+            socketio.emit('notification:delete', {'id': notification_id}, broadcast=True)
+            
+            return jsonify({
+                'code': 0,
+                'msg': 'success'
+            })
+        else:
+            return jsonify({
+                'code': 1,
+                'msg': '删除失败'
+            })
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': str(e)
+        })
+
+@admin_bp.route('/api/notifications/cleanup', methods=['POST'])
+@admin_required
+def admin_cleanup_notifications():
+    """清理过期通知"""
+    try:
+        count = notification_service.cleanup_expired_notifications()
+            
+        return json.dumps({
+            'code': 0,
+            'msg': 'success',
+            'data': {
+                'cleaned_count': count
+            }
+        })
+    except Exception as e:
+        return json.dumps({
+            'code': 1,
+            'msg': str(e)
+        })
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

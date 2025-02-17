@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:40:28
- * @LastEditTime: 2025-02-16 15:05:41
+ * @LastEditTime: 2025-02-17 16:44:59
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -122,11 +122,11 @@
         <div class="main-content panel-base">
             <!-- 上半部分：轨迹展示区 -->
             <div class="main-content-top">
-                <h2 class="panel-title">
+                <!-- <h2 class="panel-title">
                     <i class="layui-icon layui-icon-location"></i>
                     轨迹
                     <span class="title-decoration"></span>
-                </h2>
+                </h2> -->
 
                 <!-- 在GPS地图容器上方添加时间筛选 -->
                 <div class="map-controls">
@@ -200,6 +200,64 @@
 
         <!-- 右侧任务列表 -->
         <div class="task-panel panel-base">
+            <!-- 添加通知面板 -->
+            <div class="notification-section">
+                <h2 class="panel-title">
+                    <i class="layui-icon layui-icon-notice"></i>
+                    通知
+                    <span class="title-decoration"></span>
+                </h2>
+                <div class="notification-container">
+                    <div class="notification-list">
+                        <!-- 测试通知数据 -->
+                        <div class="notification-item success">
+                            <div class="notification-header">
+                                <div class="notification-title">
+                                    <i class="layui-icon layui-icon-ok-circle notification-icon success"></i>
+                                    任务完成
+                                </div>
+                                <span class="notification-time">10:30</span>
+                            </div>
+                            <div class="notification-content">恭喜你完成了"探索神秘遗迹"任务！获得500积分奖励。</div>
+                        </div>
+                        
+                        <div class="notification-item warning">
+                            <div class="notification-header">
+                                <div class="notification-title">
+                                    <i class="layui-icon layui-icon-tips notification-icon warning"></i>
+                                    任务提醒
+                                </div>
+                                <span class="notification-time">09:15</span>
+                            </div>
+                            <div class="notification-content">"寻找失落的宝藏"任务即将到期，请尽快完成。</div>
+                        </div>
+                        
+                        <div class="notification-item info">
+                            <div class="notification-header">
+                                <div class="notification-title">
+                                    <i class="layui-icon layui-icon-notice notification-icon info"></i>
+                                    系统公告
+                                </div>
+                                <span class="notification-time">08:00</span>
+                            </div>
+                            <div class="notification-content">服务器将于今晚22:00进行例行维护，预计持续2小时。</div>
+                        </div>
+                        
+                        <div class="notification-item error">
+                            <div class="notification-header">
+                                <div class="notification-title">
+                                    <i class="layui-icon layui-icon-close-fill notification-icon error"></i>
+                                    任务失败
+                                </div>
+                                <span class="notification-time">昨天</span>
+                            </div>
+                            <div class="notification-content">"穿越时空"任务未能在规定时间内完成，任务已自动取消。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 任务列表部分 -->
             <h2 class="panel-title">
                 <i class="layui-icon layui-icon-flag"></i>
                 可用任务
@@ -207,7 +265,6 @@
             </h2>
             <div class="task-list-container">
                 <div id="taskList">
-                    <!-- 任务卡片将通过JS动态加载 -->
                     <div class="swiper task-list-swiper">
                         <div class="swiper-wrapper">
                             <div class="swiper-slide">
@@ -231,7 +288,6 @@
     <script src="/static/js/swiper-bundle.min.js"></script>
     <script src="/static/layui/layui.js"></script>
     <script src="/static/js/socket.io.js"></script>
-    <script type="module" src="/static/js/client/live2d-config.js"></script>
     <script src="/static/js/echarts-wordcloud.min.js"></script>
     <script type="module" src="/static/js/client/game.js?v=1.0.1" id="mainJs"></script>
     <script>

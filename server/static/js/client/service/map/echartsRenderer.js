@@ -5,7 +5,7 @@
  * @Description: Echarts地图渲染器
  */
 import Logger from '../../../utils/logger.js';
-import { MAP_CONFIG } from '../../../config/config.js';
+import { ECHARTS_CONFIG, MARKER_STYLE, PATH_STYLE } from '../../config/mapConfig.js';
 
 class EchartsRenderer {
     constructor(apiClient) {
@@ -34,13 +34,21 @@ class EchartsRenderer {
             // 初始化Echarts实例
             this.mapChart = echarts.init(container);
             
-            // 加载中国地图数据
+            // 先加载地图数据
+            Logger.debug('EchartsRenderer', '加载地图数据');
             const chinaJson = await this.loadMapData();
+            
+            // 注册地图数据
+            Logger.debug('EchartsRenderer', '注册地图数据');
             echarts.registerMap('china', chinaJson);
 
+            // 等待一帧以确保地图数据已注册
+            await new Promise(resolve => setTimeout(resolve, 0));
+
             // 设置初始配置
+            Logger.debug('EchartsRenderer', '设置初始配置');
             const option = this.getInitialOption();
-            this.mapChart.setOption(option);
+            this.mapChart.setOption(option, true);
 
             // 添加事件监听
             this.setupEventListeners();
@@ -59,7 +67,14 @@ class EchartsRenderer {
         Logger.debug('EchartsRenderer', '加载地图数据');
         try {
             const response = await fetch('/static/js/china.json');
-            return await response.json();
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            if (!data || !data.features) {
+                throw new Error('无效的地图数据格式');
+            }
+            return data;
         } catch (error) {
             Logger.error('EchartsRenderer', '加载地图数据失败:', error);
             throw error;
@@ -68,25 +83,10 @@ class EchartsRenderer {
 
     getInitialOption() {
         return {
-            backgroundColor: 'transparent',
+            ...ECHARTS_CONFIG,
             geo: {
-                map: 'china',
-                roam: true,
-                label: {
-                    show: true,
-                    color: '#8aa2c1',
-                    fontSize: 10
-                },
-                itemStyle: {
-                    areaColor: '#15273f',
-                    borderColor: '#1e3148',
-                    borderWidth: 1
-                },
-                emphasis: {
-                    itemStyle: {
-                        areaColor: '#2a4a7c'
-                    }
-                }
+                ...ECHARTS_CONFIG.geo,
+                map: 'china'  // 添加地图类型
             },
             series: []
         };
@@ -161,20 +161,7 @@ class EchartsRenderer {
                 time: new Date(point.addtime * 1000).toLocaleString(),
                 speed: point.speed || 0
             })),
-            symbol: 'circle',
-            symbolSize: 8,
-            itemStyle: {
-                color: '#ffc447',
-                borderColor: '#fff',
-                borderWidth: 1
-            },
-            label: {
-                show: true,
-                position: 'top',
-                formatter: (params) => `${params.dataIndex + 1}`,
-                color: '#fff',
-                fontSize: 10
-            }
+            ...MARKER_STYLE.point
         };
 
         // 起点标记
@@ -185,13 +172,7 @@ class EchartsRenderer {
             data: [{
                 name: '起点',
                 value: [parseFloat(this.gpsData[0].x), parseFloat(this.gpsData[0].y)],
-                symbol: 'pin',
-                symbolSize: 12,
-                itemStyle: {
-                    color: '#4CAF50',
-                    borderColor: '#fff',
-                    borderWidth: 2
-                },
+                ...MARKER_STYLE.start,
                 label: {
                     show: true,
                     position: 'top',
@@ -213,13 +194,7 @@ class EchartsRenderer {
                     parseFloat(this.gpsData[this.gpsData.length - 1].x),
                     parseFloat(this.gpsData[this.gpsData.length - 1].y)
                 ],
-                symbol: 'pin',
-                symbolSize: 12,
-                itemStyle: {
-                    color: '#F44336',
-                    borderColor: '#fff',
-                    borderWidth: 2
-                },
+                ...MARKER_STYLE.end,
                 label: {
                     show: true,
                     position: 'top',
@@ -255,21 +230,8 @@ class EchartsRenderer {
                 data: [{
                     coords: pathData
                 }],
-                lineStyle: {
-                    color: '#ffc447',
-                    width: 3,
-                    opacity: 0.8,
-                    type: 'solid',
-                    join: 'round',
-                    cap: 'round'
-                },
-                effect: {
-                    show: true,
-                    period: 6,
-                    trailLength: 0.7,
-                    color: '#fff',
-                    symbolSize: 3
-                },
+                lineStyle: PATH_STYLE.lineStyle,
+                effect: PATH_STYLE.effect,
                 zlevel: 1
             },
             // 路径点
@@ -277,38 +239,28 @@ class EchartsRenderer {
                 name: '路径点',
                 type: 'scatter',
                 coordinateSystem: 'geo',
-                symbol: 'circle',
-                symbolSize: 6,
+                ...MARKER_STYLE.point,
                 data: pathData.map((coord, index) => ({
                     name: `位置 ${index + 1}`,
                     value: coord
-                })),
-                itemStyle: {
-                    color: '#ffc447',
-                    borderColor: '#fff',
-                    borderWidth: 1
-                }
+                }))
             },
             // 起点
             {
                 name: '起点',
                 type: 'scatter',
                 coordinateSystem: 'geo',
-                symbol: 'pin',
-                symbolSize: 30,
+                ...MARKER_STYLE.start,
                 data: [{
                     name: '起点',
                     value: pathData[0],
-                    itemStyle: {
-                        color: '#4CAF50'
+                    label: {
+                        show: true,
+                        position: 'top',
+                        formatter: '起点',
+                        color: '#fff'
                     }
                 }],
-                label: {
-                    show: true,
-                    position: 'top',
-                    formatter: '起点',
-                    color: '#fff'
-                },
                 zlevel: 2
             },
             // 终点
@@ -316,21 +268,17 @@ class EchartsRenderer {
                 name: '终点',
                 type: 'scatter',
                 coordinateSystem: 'geo',
-                symbol: 'pin',
-                symbolSize: 30,
+                ...MARKER_STYLE.end,
                 data: [{
                     name: '终点',
                     value: pathData[pathData.length - 1],
-                    itemStyle: {
-                        color: '#F44336'
+                    label: {
+                        show: true,
+                        position: 'top',
+                        formatter: '终点',
+                        color: '#fff'
                     }
                 }],
-                label: {
-                    show: true,
-                    position: 'top',
-                    formatter: '终点',
-                    color: '#fff'
-                },
                 zlevel: 2
             }
         ];
@@ -350,7 +298,7 @@ class EchartsRenderer {
         if (this.mapChart && this.currentZoom && this.currentCenter) {
             const option = this.mapChart.getOption();
             option.geo[0].zoom = this.currentZoom;
-            option.geo[0].center = this.currentCenter;
+            option.geo.center = this.currentCenter;
             this.mapChart.setOption(option);
         }
     }

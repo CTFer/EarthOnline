@@ -314,6 +314,95 @@ class TaskService {
             throw error;
         }
     }
+
+    /**
+     * 放弃任务
+     * @param {string} taskId 任务ID
+     * @param {string} playerId 玩家ID
+     * @returns {Promise<Object>} 放弃任务的结果
+     */
+    async abandonTask(taskId, playerId) {
+        Logger.info("TaskService", "开始放弃任务:", taskId);
+        
+        try {
+            const response = await this.api.post(`/api/tasks/${taskId}/abandon`, {
+                player_id: playerId
+            });
+            
+            Logger.info("TaskService", "放弃任务成功:", taskId);
+            return response;
+        } catch (error) {
+            Logger.error("TaskService", "放弃任务失败:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * 完成任务
+     * @param {string} taskId 任务ID
+     * @param {string} playerId 玩家ID
+     * @returns {Promise<Object>} 完成任务的结果
+     */
+    async completeTask(taskId, playerId) {
+        Logger.info("TaskService", "开始完成任务:", taskId);
+        
+        try {
+            const response = await this.api.post(`/api/tasks/${taskId}/complete`, {
+                player_id: playerId
+            });
+            
+            if (response.code === 0) {
+                // 更新本地任务状态
+                this.updateTaskStatus({
+                    id: taskId,
+                    status: 'COMPLETE',
+                    points: response.data.points
+                });
+                
+                // 触发任务完成事件
+                this.eventBus.emit('task:status:updated', {
+                    taskId,
+                    status: 'COMPLETE',
+                    points: response.data.points
+                });
+            }
+            
+            Logger.info("TaskService", "完成任务成功:", taskId);
+            return response;
+        } catch (error) {
+            Logger.error("TaskService", "完成任务失败:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * 更新任务状态
+     * @param {Object} data 任务状态数据
+     */
+    updateTaskStatus(data) {
+        Logger.info("TaskService", "更新任务状态:", data);
+        
+        try {
+            const tasks = this.store.get('currentTasks') || [];
+            const taskIndex = tasks.findIndex(t => t.id === data.id);
+            
+            if (taskIndex !== -1) {
+                tasks[taskIndex] = {
+                    ...tasks[taskIndex],
+                    status: data.status,
+                    points: data.points
+                };
+                
+                this.store.set('currentTasks', tasks);
+                this.eventBus.emit('tasks:updated', tasks);
+            }
+            
+            Logger.debug("TaskService", "任务状态更新完成");
+        } catch (error) {
+            Logger.error("TaskService", "更新任务状态失败:", error);
+            throw error;
+        }
+    }
 }
 
 export default TaskService;

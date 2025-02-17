@@ -16,7 +16,7 @@ import sqlite3
 import logging
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_cors import CORS
-from flask import Flask, request, redirect, send_from_directory, make_response, render_template
+from flask import Flask, request, redirect, send_from_directory, make_response, render_template, jsonify
 from shop import shop_bp  # 确保在同一目录下
 from function.PlayerService import player_service
 from function.TaskService import task_service
@@ -31,6 +31,8 @@ from config import (
     PROD_SERVER  # 添加这行
 )
 import requests
+from function.NotificationService import notification_service
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 app = Flask(__name__, static_folder='static')
@@ -923,6 +925,122 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Failed to start server: {str(e)}", exc_info=True)
         raise
+
+# 通知相关接口
+@app.route('/api/notifications', methods=['GET'])
+def get_notifications():
+    """获取通知列表"""
+    try:
+        target_type = request.args.get('target_type', 'all')
+        target_id = request.args.get('target_id', type=int)
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        with get_db_connection() as conn:
+            notifications = notification_service.get_notifications(
+                target_type=target_type,
+                target_id=target_id,
+                limit=limit,
+                offset=offset
+            )
+            
+        return jsonify({
+            'code': 0,
+            'msg': 'success',
+            'data': notifications
+        })
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': str(e)
+        })
+
+@app.route('/api/notifications/<int:notification_id>', methods=['GET'])
+def get_notification(notification_id):
+    """获取单个通知"""
+    try:
+        notification = notification_service.get_notification(notification_id)
+        
+        if not notification:
+            return jsonify({
+                'code': 1,
+                'msg': '通知不存在'
+            })
+        
+        return jsonify({
+            'code': 0,
+            'msg': 'success',
+            'data': notification
+        })
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': str(e)
+        })
+
+@app.route('/api/notifications/<int:notification_id>/read', methods=['POST'])
+def mark_notification_as_read(notification_id):
+    """标记通知为已读"""
+    try:
+        success = notification_service.mark_as_read(notification_id)
+        
+        if success:
+            return jsonify({
+                'code': 0,
+                'msg': 'success'
+            })
+        else:
+            return jsonify({
+                'code': 1,
+                'msg': '标记失败'
+            })
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': str(e)
+        })
+
+@app.route('/api/notifications/unread/count', methods=['GET'])
+def get_unread_notifications_count():
+    """获取未读通知数量"""
+    try:
+        target_type = request.args.get('target_type', 'all')
+        target_id = request.args.get('target_id', type=int)
+        
+        count = notification_service.get_unread_count(
+            target_type=target_type,
+            target_id=target_id
+        )
+        
+        return jsonify({
+            'code': 0,
+            'msg': 'success',
+            'data': count
+        })
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': str(e)
+        })
+
+# WebSocket通知事件
+@socketio.on('notification:read')
+def handle_notification_read(data):
+    """处理通知已读事件"""
+    try:
+        notification_id = data.get('notification_id')
+        if not notification_id:
+            return
+        
+        notification_service.mark_as_read(notification_id)
+        
+        # 广播通知状态更新
+        emit('notification:update', {
+            'id': notification_id,
+            'is_read': True
+        }, broadcast=True)
+    except Exception as e:
+        Logger.error('WebSocket', f'处理通知已读事件失败: {str(e)}')
 
 
 

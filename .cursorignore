@@ -1,0 +1,6 @@
+server\static\js\live2d
+server\static\js\echarts.min.js
+server\static\js\echarts-wordcloud.min.js
+server\static\js\crypto-js.min.js
+server\static\js\client\game copy.js
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)

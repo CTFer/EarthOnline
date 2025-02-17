@@ -5,7 +5,7 @@
  * @Description: 高德地图渲染器
  */
 import Logger from '../../../utils/logger.js';
-import { MAP_CONFIG } from '../../../config/config.js';
+import { AMAP_CONFIG, MARKER_STYLE, PATH_STYLE } from '../../config/mapConfig.js';
 
 class AMapRenderer {
     constructor(apiClient) {
@@ -30,7 +30,7 @@ class AMapRenderer {
         if (typeof AMap === 'undefined') {
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script');
-                script.src = `https://webapi.amap.com/maps?v=2.0&key=${MAP_CONFIG.AMAP.key}&plugin=AMap.Scale,AMap.ToolBar`;
+                script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_CONFIG.key}&plugin=AMap.Scale,AMap.ToolBar`;
                 script.async = true;
                 script.onload = resolve;
                 script.onerror = reject;
@@ -47,10 +47,10 @@ class AMapRenderer {
         }
 
         try {
-            // 初始化地图
+            // 使用配置初始化地图
             this.mapInstance = new AMap.Map(container, {
-                ...MAP_CONFIG.AMAP,
-                center: [116.397428, 39.90923]
+                ...AMAP_CONFIG,
+                center: [116.397428, 39.90923]  // 默认中心点
             });
 
             // 等待地图加载完成
@@ -149,17 +149,17 @@ class AMapRenderer {
         Logger.debug('AMapRenderer', '更新轨迹显示模式');
         const path = Array.from(this.markers.values()).map(m => m.getPosition());
         
-        // 更新或创建路径线
+        // 使用配置中的路径样式
         if (this.pathLine) {
             this.pathLine.setPath(path);
         } else {
             this.pathLine = new AMap.Polyline({
                 path: path,
-                strokeColor: '#ffc447',
-                strokeWeight: 3,
-                strokeOpacity: 0.8,
+                strokeColor: PATH_STYLE.lineStyle.color,
+                strokeWeight: PATH_STYLE.lineStyle.width,
+                strokeOpacity: PATH_STYLE.lineStyle.opacity,
                 showDir: true,
-                lineJoin: 'round'
+                lineJoin: PATH_STYLE.lineStyle.join
             });
             this.mapInstance.add(this.pathLine);
         }
