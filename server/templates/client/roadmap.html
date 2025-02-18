@@ -6,6 +6,7 @@
     <title>计划管理</title>
     <!-- 引入 Layui CSS -->
     <link rel="stylesheet" href="/static/layui/css/layui.css" />
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon_roadmap.svg">
     <style>
       ::-webkit-scrollbar {
         width: 6px;
@@ -236,7 +237,7 @@
       }
       .header-title span {
         position: relative;
-        bottom: 5px;
+        bottom: 2px;
       }
 
       .user-info {
@@ -516,8 +517,11 @@
     <!-- 新增header -->
     <div class="header">
       <div class="header-title">
-        <i class="layui-icon layui-icon-list"></i>
-        <span>计划管理</span>
+        <!-- <i class="layui-icon layui-icon-list"></i> -->
+        <i>
+          <img src="/static/img/logo_roadmap.svg" alt="logo" style=" height:100%;">
+        </i>
+        <!-- <span>计划管理</span> -->
       </div>
       <div class="user-info">
         <div class="theme-switch" id="themeSwitch">

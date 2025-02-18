@@ -23,6 +23,9 @@ class AMapRenderer {
         this.customStartTime = null;
         this.customEndTime = null;
         this.displayMode = 'path'; // 默认为轨迹模式
+        
+        // 初始化时记录显示模式
+        Logger.info('AMapRenderer', '初始化显示模式: path');
     }
 
     async loadAMapScript() {
@@ -64,6 +67,9 @@ class AMapRenderer {
             // 加载控件
             await this.loadControls();
 
+            // 初始化卫星图层
+            await this.initSatelliteLayer();
+
             // 初始化时间筛选器
             this.initTimeFilter();
 
@@ -95,6 +101,82 @@ class AMapRenderer {
                 resolve();
             });
         });
+    }
+
+    /**
+     * 初始化卫星图层
+     * @private
+     */
+    async initSatelliteLayer() {
+        Logger.debug('AMapRenderer', '初始化卫星图层');
+        try {
+            // 创建卫星图层
+            this.satelliteLayer = new AMap.TileLayer.Satellite({
+                ...AMAP_CONFIG.satellite
+            });
+
+            // 创建路网图层
+            this.roadNetLayer = new AMap.TileLayer.RoadNet({
+                ...AMAP_CONFIG.roadNet
+            });
+
+            // 根据配置添加图层
+            if (AMAP_CONFIG.satellite.visible) {
+                this.mapInstance.add([this.satelliteLayer]);
+                if (AMAP_CONFIG.roadNet.visible) {
+                    this.mapInstance.add([this.roadNetLayer]);
+                }
+            }
+
+            Logger.info('AMapRenderer', '卫星图层初始化完成');
+        } catch (error) {
+            Logger.error('AMapRenderer', '初始化卫星图层失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 切换卫星图层显示状态
+     * @param {boolean} showSatellite - 是否显示卫星图层
+     * @param {boolean} showRoadNet - 是否显示路网图层
+     */
+    toggleSatelliteLayer(showSatellite, showRoadNet = true) {
+        Logger.debug('AMapRenderer', `切换卫星图层: satellite=${showSatellite}, roadNet=${showRoadNet}`);
+        try {
+            if (showSatellite) {
+                this.mapInstance.add([this.satelliteLayer]);
+                if (showRoadNet) {
+                    this.mapInstance.add([this.roadNetLayer]);
+                } else {
+                    this.mapInstance.remove([this.roadNetLayer]);
+                }
+            } else {
+                this.mapInstance.remove([this.satelliteLayer, this.roadNetLayer]);
+            }
+            Logger.info('AMapRenderer', '卫星图层切换完成');
+        } catch (error) {
+            Logger.error('AMapRenderer', '切换卫星图层失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 设置卫星图层透明度
+     * @param {number} opacity - 透明度值 (0-1)
+     * @param {boolean} isRoadNet - 是否设置路网图层
+     */
+    setSatelliteLayerOpacity(opacity, isRoadNet = false) {
+        Logger.debug('AMapRenderer', `设置图层透明度: ${opacity}, isRoadNet=${isRoadNet}`);
+        try {
+            const layer = isRoadNet ? this.roadNetLayer : this.satelliteLayer;
+            if (layer) {
+                layer.setOpacity(opacity);
+                Logger.info('AMapRenderer', '图层透明度设置完成');
+            }
+        } catch (error) {
+            Logger.error('AMapRenderer', '设置图层透明度失败:', error);
+            throw error;
+        }
     }
 
     async updatePosition(gpsData) {
@@ -197,7 +279,7 @@ class AMapRenderer {
         const marker = new AMap.Marker({
             map: this.mapInstance,
             position: [parseFloat(gpsData.x), parseFloat(gpsData.y)],
-            content: this.createMarkerContent(index),
+            content: '',
             offset: new AMap.Pixel(-13, -30)
         });
 
@@ -297,6 +379,14 @@ class AMapRenderer {
     destroy() {
         Logger.info('AMapRenderer', '销毁高德地图实例');
         this.clearMap();
+        if (this.satelliteLayer) {
+            this.mapInstance.remove([this.satelliteLayer]);
+            this.satelliteLayer = null;
+        }
+        if (this.roadNetLayer) {
+            this.mapInstance.remove([this.roadNetLayer]);
+            this.roadNetLayer = null;
+        }
         if (this.mapInstance) {
             this.mapInstance.destroy();
             this.mapInstance = null;

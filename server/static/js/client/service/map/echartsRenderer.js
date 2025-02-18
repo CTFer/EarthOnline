@@ -15,12 +15,15 @@ class EchartsRenderer {
         this.gpsData = [];
         this.currentZoom = null;
         this.currentCenter = null;
-        this.displayMode = 'point';
+        this.displayMode = 'path';  // 默认为轨迹模式
         this.batteryLevel = 100;
         // 添加时间筛选相关属性
         this.timeRange = 'today';
         this.customStartTime = null;
         this.customEndTime = null;
+        
+        // 初始化时记录显示模式
+        Logger.info('EchartsRenderer', '初始化显示模式: path');
     }
 
     async initializeMap() {

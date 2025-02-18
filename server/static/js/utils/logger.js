@@ -38,38 +38,36 @@ class Logger {
         return [`${timeStr}${moduleStr}${levelStr}`, ...args];
     }
 
-    static log(module, level, ...args) {
-        if (!LOG_CONFIG.enableConsoleLog) return;
+    static shouldLog(module, level) {
+        // 检查是否启用日志
+        if (!LOG_CONFIG.enableConsoleLog) return false;
 
         // 检查日志级别
         const currentLevel = LOG_LEVELS[level];
         const configLevel = LOG_LEVELS[LOG_CONFIG.logLevel];
-        if (currentLevel < configLevel) return;
+        if (currentLevel < configLevel) return false;
+
+        // 如果是error级别且alwaysError为true，始终输出
+        if (level === 'error' && LOG_CONFIG.alwaysError) return true;
+
+        // 检查白名单（优先级高于黑名单）
+        if (LOG_CONFIG.allowedModules.length > 0) {
+            return LOG_CONFIG.allowedModules.includes(module);
+        }
+
+        // 检查黑名单
+        if (LOG_CONFIG.blockedModules && LOG_CONFIG.blockedModules.includes(module)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    static log(module, level, ...args) {
+        // 使用新的shouldLog方法检查是否应该输出日志
+        if (!this.shouldLog(module, level)) return;
         
         const formattedArgs = this.formatMessage(module, level, ...args);
-        
-        // 如果是error级别的日志，无论模块是否在白名单中都要输出
-        if (level === 'error' && LOG_CONFIG.alwaysError) {
-            if (LOG_CONFIG.styleOutput) {
-                console.log(`%c${formattedArgs[0]}`, formattedArgs[1], ...formattedArgs.slice(2));
-            } else {
-                console.log(...formattedArgs);
-            }
-            return;
-        }
-        
-        // 如果允许的模块为空，输出全部模块的日志
-        if (LOG_CONFIG.allowedModules.length === 0) {
-            if (LOG_CONFIG.styleOutput) {
-                console.log(`%c${formattedArgs[0]}`, formattedArgs[1], ...formattedArgs.slice(2));
-            } else {
-                console.log(...formattedArgs);
-            }
-            return;
-        }
-        
-        // 检查模块白名单
-        if (!LOG_CONFIG.allowedModules.includes(module)) return;
         
         if (LOG_CONFIG.styleOutput) {
             console.log(`%c${formattedArgs[0]}`, formattedArgs[1], ...formattedArgs.slice(2));

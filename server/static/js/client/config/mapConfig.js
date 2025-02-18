@@ -21,6 +21,18 @@ export const AMAP_CONFIG = {
     mapStyle: 'amap://styles/dark',  // 地图样式
     pitch: 0,                    // 俯仰角度
 
+    // 卫星图层配置
+    satellite: {
+        visible: true,           // 是否默认显示卫星图层
+        opacity: 1,              // 卫星图层透明度
+        zIndex: 4,               // 图层叠加顺序
+    },
+    roadNet: {
+        visible: false,           // 是否默认显示路网图层
+        opacity: 1,              // 路网图层透明度
+        zIndex: 5,               // 图层叠加顺序
+    },
+
     // 安全配置
     securityJsCode: 'a64ba8d506a1154e41b9ca50a6113c55',  // 安全密钥
     key: '16de1da59d44d6967f9a6bf5248963c5',            // API密钥

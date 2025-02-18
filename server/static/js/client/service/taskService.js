@@ -1,5 +1,10 @@
 import Logger from '../../utils/logger.js';
 import { gameUtils } from '../../utils/utils.js';
+import { 
+    TASK_EVENTS,
+    UI_EVENTS,
+    AUDIO_EVENTS 
+} from "../config/events.js";
 
 class TaskService {
     constructor(apiClient, eventBus, store, playerService, templateService) {
@@ -11,12 +16,26 @@ class TaskService {
         this.taskListSwiper = null;
         this.loading = false;
         this.templateService = templateService;
+        this.processingTasks = new Set(); // 添加任务处理状态集合
         Logger.info('TaskService', '初始化任务服务');
         
-        // 订阅相关事件
-        this.eventBus.on('task:complete', this.handleTaskComplete.bind(this));
-        this.eventBus.on('task:new', this.handleNewTask.bind(this));
-        this.eventBus.on('task:status:update', this.handleTaskStatusUpdate.bind(this));
+        // 初始化事件监听
+        this.initEvents();
+    }
+
+    /**
+     * 初始化事件监听
+     * @private
+     */
+    initEvents() {
+        Logger.debug('TaskService', '初始化事件监听');
+        
+        // 任务相关事件监听
+        this.eventBus.on(TASK_EVENTS.COMPLETED, this.handleTaskComplete.bind(this));
+        this.eventBus.on(TASK_EVENTS.STATUS_UPDATED, this.handleTaskStatusUpdate.bind(this));
+        this.eventBus.on(TASK_EVENTS.ABANDONED, this.handleTaskAbandoned.bind(this));
+        
+        Logger.info('TaskService', '事件监听初始化完成');
     }
 
     async loadTasks() {
@@ -30,15 +49,17 @@ class TaskService {
             
             if (result.code === 0) {
                 this.store.setState({ taskList: result.data });
-                Logger.debug('TaskService', 'Emitting tasks:loaded event with data:', result.data);
-                this.eventBus.emit('tasks:loaded', result.data);
+                Logger.debug('TaskService', '任务列表加载完成:', result.data);
                 return result.data;
             } else {
                 throw new Error(result.msg);
             }
         } catch (error) {
             Logger.error('TaskService', '加载任务列表失败:', error);
-            this.eventBus.emit('tasks:error', error);
+            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+                type: 'ERROR',
+                message: '加载任务列表失败'
+            });
             throw error;
         } finally {
             this.loading = false;
@@ -100,27 +121,27 @@ class TaskService {
 
     async acceptTask(taskId) {
         const playerId = this.playerService.getPlayerId();
-        Logger.info('TaskService', '接受任务:', taskId, '玩家ID:', playerId);
+        Logger.info("TaskService", `接受任务: ${taskId} 玩家ID: ${playerId}`);
+        
         try {
-            if (!this.api) {
-                throw new Error('API client not initialized');
-            }
-
-            const result = await this.api.acceptTask(taskId, playerId);
-            Logger.debug('TaskService', '接受任务响应:', result);
+            const response = await this.api.acceptTask(taskId, playerId);
+            Logger.debug("TaskService", "接受任务响应:", response);
             
-            if (result.code === 0) {
-                Logger.info('TaskService', '任务接受成功:', result.data);
-                this.eventBus.emit('task:accepted', result.data);
-                // 重新加载当前任务列表
-                await this.loadCurrentTasks();
-                return result;
-            } else {
-                throw new Error(result.msg || '接受任务失败');
-            }
+            // 更新任务状态
+            const taskStatus = {
+                id: taskId,
+                status: 'ACCEPTED'
+            };
+            
+            await this.updateTaskStatus(taskStatus);
+            await this.loadCurrentTasks();
+            
+            // 触发任务状态更新事件
+            this.eventBus.emit(TASK_EVENTS.STATUS_UPDATED, taskStatus);
+            
+            return response;
         } catch (error) {
-            Logger.error('TaskService', '接受任务失败:', error);
-            this.eventBus.emit('task:error', error);
+            Logger.error("TaskService", "接受任务失败:", error);
             throw error;
         }
     }
@@ -130,25 +151,100 @@ class TaskService {
         try {
             const result = await this.api.completeTask(taskId);
             if (result.code === 0) {
-                this.eventBus.emit('task:completed', result.data);
+                // 发送任务完成事件
+                this.eventBus.emit(TASK_EVENTS.COMPLETED, {
+                    taskId,
+                    rewards: result.data.rewards,
+                    message: result.data.message
+                });
+                
+                // 播放完成音效
+                this.eventBus.emit(AUDIO_EVENTS.PLAY, 'COMPLETE');
+                
+                // 显示完成通知
+                this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+                    type: 'SUCCESS',
+                    message: `任务完成！获得 ${result.data.rewards.points} 点经验`
+                });
+                
+                // 直接加载任务列表，不触发额外事件
                 await this.loadTasks();
             } else {
                 throw new Error(result.msg);
             }
         } catch (error) {
             Logger.error('TaskService', '任务完成失败:', error);
-            this.eventBus.emit('task:error', error);
+            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+                type: 'ERROR',
+                message: '任务完成失败'
+            });
+            this.eventBus.emit(AUDIO_EVENTS.PLAY, 'ERROR');
         }
     }
 
-    async handleNewTask(taskData) {
-        Logger.info('TaskService', '处理新任务:', taskData);
+    async handleTaskStatusUpdate(data) {
+        Logger.info('TaskService', '处理任务状态更新:', data);
         try {
-            await this.loadTasks();
-            this.eventBus.emit('task:added', taskData);
+            // 如果是列表更新，直接返回避免循环
+            if (data.type === 'LIST_UPDATED') {
+                return;
+            }
+            
+            await this.updateTaskStatus(data);
+            // 只在特定状态下重新加载任务
+            if (['COMPLETED', 'ABANDONED', 'ACCEPTED'].includes(data.status)) {
+                await Promise.all([
+                    this.loadTasks(),
+                    this.loadCurrentTasks()
+                ]);
+            }
         } catch (error) {
-            Logger.error('TaskService', '处理新任务失败:', error);
-            this.eventBus.emit('task:error', error);
+            Logger.error('TaskService', '处理任务状态更新失败:', error);
+            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+                type: 'ERROR',
+                message: '更新任务状态失败'
+            });
+        }
+    }
+
+    async handleTaskAbandoned(data) {
+        Logger.info('TaskService', '处理任务放弃:', data);
+        try {
+            const result = await this.api.abandonTask(data.taskId, data.playerId);
+            if (result.code === 0) {
+                // 更新任务状态
+                await this.updateTaskStatus({
+                    id: data.taskId,
+                    status: 'ABANDONED'
+                });
+                
+                // 发送状态更新事件
+                this.eventBus.emit(TASK_EVENTS.STATUS_UPDATED, {
+                    taskId: data.taskId,
+                    status: 'ABANDONED'
+                });
+                
+                // 播放放弃音效
+                this.eventBus.emit(AUDIO_EVENTS.PLAY, 'ABANDON');
+                
+                // 显示放弃通知
+                this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+                    type: 'SUCCESS',
+                    message: '任务已放弃'
+                });
+                
+                // 重新加载任务列表
+                await this.loadTasks();
+            } else {
+                throw new Error(result.msg);
+            }
+        } catch (error) {
+            Logger.error('TaskService', '放弃任务失败:', error);
+            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+                type: 'ERROR',
+                message: '放弃任务失败'
+            });
+            this.eventBus.emit(AUDIO_EVENTS.PLAY, 'ERROR');
         }
     }
 
@@ -234,55 +330,31 @@ class TaskService {
         return this.templateService.getAvailableTaskTemplate(task, taskTypeInfo, rewards);
     }
 
-    // 处理任务状态更新
-    handleTaskStatusUpdate(data) {
-        Logger.info("TaskService", "处理任务状态更新:", data);
-
-        try {
-            const container = document.querySelector(".active-tasks-swiper .swiper-wrapper");
-            if (!container) {
-                Logger.warn("TaskService", "任务容器未找到");
-                return;
-            }
-
-            // 根据任务状态更新UI
-            if (data.status === "COMPLETED" || data.status === "ABANDONED") {
-                Logger.info("TaskService", `移除任务 ${data.id} (${data.status})`);
-                const taskCard = container.querySelector(`[data-task-id="${data.id}"]`);
-                if (taskCard) {
-                    const slideElement = taskCard.closest('.swiper-slide');
-                    if (slideElement) {
-                        slideElement.remove();
-                    }
-                }
-            } else {
-                Logger.info("TaskService", `更新任务 ${data.id} 状态为 ${data.status}`);
-                const taskCard = container.querySelector(`[data-task-id="${data.id}"]`);
-                if (taskCard) {
-                    const slideElement = taskCard.closest('.swiper-slide');
-                    if (slideElement) {
-                        const newSlide = this.createActiveTaskCard(data);
-                        slideElement.replaceWith(newSlide);
-                    }
-                }
-            }
-
-            // 刷新Swiper
-            this.initTaskSwipers();
-            
-            // 发送任务状态更新完成事件
-            this.eventBus.emit('task:status:updated', data);
-            
-        } catch (error) {
-            Logger.error("TaskService", "处理任务状态更新错误:", error);
-            this.eventBus.emit('task:error', error);
-        }
-    }
-
+    /**
+     * 更新玩家ID并清理任务缓存
+     * @param {string} newId - 新的玩家ID
+     * @returns {Promise} 返回一个Promise表示操作完成
+     */
     updatePlayerId(newId) {
-        Logger.info('TaskService', '更新玩家ID:', newId);
-        // 如果需要清理或重置任何与玩家相关的数据
-        this.store.clearTaskCache();
+        return new Promise((resolve, reject) => {
+            try {
+                Logger.debug("TaskService", "清理任务缓存，玩家ID更新为:", newId);
+                
+                // 清理任务缓存
+                this.store.setState({
+                    taskList: [],
+                    currentTasks: []
+                });
+                
+                // 更新存储的玩家ID
+                this._playerId = newId;
+                
+                resolve();
+            } catch (error) {
+                Logger.error("TaskService", "清理任务缓存失败:", error);
+                reject(error);
+            }
+        });
     }
 
     async updateTaskStatus(taskData) {
@@ -311,95 +383,6 @@ class TaskService {
             Logger.debug('TaskService', '任务状态更新完成');
         } catch (error) {
             Logger.error('TaskService', '更新任务状态失败:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * 放弃任务
-     * @param {string} taskId 任务ID
-     * @param {string} playerId 玩家ID
-     * @returns {Promise<Object>} 放弃任务的结果
-     */
-    async abandonTask(taskId, playerId) {
-        Logger.info("TaskService", "开始放弃任务:", taskId);
-        
-        try {
-            const response = await this.api.post(`/api/tasks/${taskId}/abandon`, {
-                player_id: playerId
-            });
-            
-            Logger.info("TaskService", "放弃任务成功:", taskId);
-            return response;
-        } catch (error) {
-            Logger.error("TaskService", "放弃任务失败:", error);
-            throw error;
-        }
-    }
-
-    /**
-     * 完成任务
-     * @param {string} taskId 任务ID
-     * @param {string} playerId 玩家ID
-     * @returns {Promise<Object>} 完成任务的结果
-     */
-    async completeTask(taskId, playerId) {
-        Logger.info("TaskService", "开始完成任务:", taskId);
-        
-        try {
-            const response = await this.api.post(`/api/tasks/${taskId}/complete`, {
-                player_id: playerId
-            });
-            
-            if (response.code === 0) {
-                // 更新本地任务状态
-                this.updateTaskStatus({
-                    id: taskId,
-                    status: 'COMPLETE',
-                    points: response.data.points
-                });
-                
-                // 触发任务完成事件
-                this.eventBus.emit('task:status:updated', {
-                    taskId,
-                    status: 'COMPLETE',
-                    points: response.data.points
-                });
-            }
-            
-            Logger.info("TaskService", "完成任务成功:", taskId);
-            return response;
-        } catch (error) {
-            Logger.error("TaskService", "完成任务失败:", error);
-            throw error;
-        }
-    }
-
-    /**
-     * 更新任务状态
-     * @param {Object} data 任务状态数据
-     */
-    updateTaskStatus(data) {
-        Logger.info("TaskService", "更新任务状态:", data);
-        
-        try {
-            const tasks = this.store.get('currentTasks') || [];
-            const taskIndex = tasks.findIndex(t => t.id === data.id);
-            
-            if (taskIndex !== -1) {
-                tasks[taskIndex] = {
-                    ...tasks[taskIndex],
-                    status: data.status,
-                    points: data.points
-                };
-                
-                this.store.set('currentTasks', tasks);
-                this.eventBus.emit('tasks:updated', tasks);
-            }
-            
-            Logger.debug("TaskService", "任务状态更新完成");
-        } catch (error) {
-            Logger.error("TaskService", "更新任务状态失败:", error);
             throw error;
         }
     }

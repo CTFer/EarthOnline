@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:54
- * @LastEditTime: 2025-02-12 22:53:16
+ * @LastEditTime: 2025-02-18 12:25:27
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -32,7 +32,16 @@ class EventBus {
     }
 
     emit(event, data) {
-        Logger.debug('EventBus', `触发事件: ${event}`, data);
+        // 获取调用栈信息
+        const stack = new Error().stack;
+        const caller = stack.split('\n')[2].trim();
+        
+        Logger.debug('EventBus', `触发事件: ${event}, 来源: ${caller}`, {
+            event,
+            data,
+            caller
+        });
+        
         if (this.events[event]) {
             this.events[event].forEach(callback => {
                 try {

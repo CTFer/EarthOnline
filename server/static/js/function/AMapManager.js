@@ -1,6 +1,6 @@
 import Logger from '../utils/logger.js';
 import { MAP_CONFIG } from '../config/config.js';
-
+// 已弃用
 class AMapManager {
     constructor() {
         Logger.info('AMapManager', '构造函数开始');

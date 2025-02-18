@@ -188,6 +188,7 @@ layui.use(["jquery", "layer", "form", "laytpl"], function () {
             $("#currentUser").text(data.data.username);
             loadTasks();
             layer.msg("登录成功", { icon: 1 });
+            localStorage.setItem("Roadmap_PlayerId", data.data.user_id);
           } else {
             layer.msg("登录失败: " + data.msg, { icon: 2 });
           }
@@ -533,6 +534,7 @@ layui.use(["jquery", "layer", "form", "laytpl"], function () {
 
     openTaskForm("添加任务", { status }, function (formData) {
       formData.status = status;
+      formData.playerId = localStorage.getItem("Roadmap_PlayerId");
       $.ajax({
         url: "/api/roadmap/add",
         method: "POST",

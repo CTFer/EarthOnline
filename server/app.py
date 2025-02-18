@@ -314,13 +314,81 @@ def get_current_tasks(player_id):
 
 @app.route('/api/tasks/accept', methods=['POST'])
 def accept_task():
-    data = request.get_json()
-    return task_service.accept_task(data['player_id'], data['task_id'])
+    """接受任务接口"""
+    try:
+        data = request.get_json()
+        logger.info(f"[TaskAPI] 收到接受任务请求: {data}")
+        
+        # 验证请求数据
+        if not data:
+            logger.error("[TaskAPI] 请求数据为空")
+            return jsonify({
+                'code': 1,
+                'msg': '无效的请求数据'
+            })
+            
+        # 检查必要字段
+        required_fields = ['player_id', 'task_id']
+        for field in required_fields:
+            if field not in data:
+                logger.error(f"[TaskAPI] 缺少必要字段: {field}")
+                return jsonify({
+                    'code': 1,
+                    'msg': f'缺少必要参数: {field}'
+                })
+        
+        # 调用任务服务
+        logger.debug(f"[TaskAPI] 开始处理任务接受请求 - 玩家ID: {data['player_id']}, 任务ID: {data['task_id']}")
+        result = task_service.accept_task(data['player_id'], data['task_id'])
+        logger.info(f"[TaskAPI] 任务接受处理完成: {result}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"[TaskAPI] 处理任务接受请求时发生错误: {str(e)}", exc_info=True)
+        return jsonify({
+            'code': 1,
+            'msg': f'处理任务请求失败: {str(e)}'
+        })
 
 @app.route('/api/tasks/abandon', methods=['POST'])
 def abandon_task():
-    data = request.get_json()
-    return task_service.abandon_task(data['player_id'], data['task_id'])
+    """放弃任务接口"""
+    try:
+        data = request.get_json()
+        logger.info(f"[TaskAPI] 收到放弃任务请求: {data}")
+        
+        # 验证请求数据
+        if not data:
+            logger.error("[TaskAPI] 请求数据为空")
+            return jsonify({
+                'code': 1,
+                'msg': '无效的请求数据'
+            })
+            
+        # 检查必要字段
+        required_fields = ['player_id', 'task_id']
+        for field in required_fields:
+            if field not in data:
+                logger.error(f"[TaskAPI] 缺少必要字段: {field}")
+                return jsonify({
+                    'code': 1,
+                    'msg': f'缺少必要参数: {field}'
+                })
+        
+        # 调用任务服务
+        logger.debug(f"[TaskAPI] 开始处理任务放弃请求 - 玩家ID: {data['player_id']}, 任务ID: {data['task_id']}")
+        result = task_service.abandon_task(data['player_id'], data['task_id'])
+        logger.info(f"[TaskAPI] 任务放弃处理完成: {result}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"[TaskAPI] 处理任务放弃请求时发生错误: {str(e)}", exc_info=True)
+        return jsonify({
+            'code': 1,
+            'msg': f'处理任务请求失败: {str(e)}'
+        })
 
 @app.route('/api/tasks/complete', methods=['POST'])
 def complete_task_api():
@@ -722,210 +790,9 @@ def sync_roadmap_data():
     """提供数据同步接口（仅在生产环境可用）"""
     return roadmap_service.sync_data()
 # 添加NFC接口测试页面路由
-
-
 @app.route('/nfc_test')
 def nfc_test():
     return render_template('nfc_test.html')
-
-def complete_task(cursor, player_id, task_id, task_info, current_time):
-    """
-    完成任务并处理奖励
-    
-    Args:
-        cursor: 数据库游标
-        player_id: 玩家ID
-        task_id: 任务ID
-        task_info: 任务信息字典
-        current_time: 当前时间戳
-    
-    Returns:
-        tuple: (success, message, rewards_summary)
-        - success: 布尔值，表示是否成功
-        - message: 字符串，处理结果消息
-        - rewards_summary: 字典，奖励处理摘要
-    """
-    try:
-        # 1. 更新任务状态
-        cursor.execute('''
-            UPDATE player_task 
-            SET status = 'COMPLETE', 
-                complete_time = ?
-            WHERE player_id = ? AND task_id = ?
-        ''', (current_time, player_id, task_id))
-        
-        rewards = task_info.get('rewards', {})
-        rewards_summary = {
-            'points': 0,
-            'exp': 0,
-            'cards': [],
-            'medals': []
-        }
-        
-        # 2. 处理积分和经验奖励
-        if rewards.get('points', 0) > 0:
-            # 获取当前积分
-            cursor.execute('SELECT points FROM player_data WHERE player_id = ?', (player_id,))
-            current_points = cursor.fetchone()['points']
-            new_points = current_points + rewards['points']
-            
-            # 更新玩家积分
-            cursor.execute('''
-                UPDATE player_data 
-                SET points = ? 
-                WHERE player_id = ?
-            ''', (new_points, player_id))
-            
-            # 记录积分变动
-            cursor.execute('''
-                INSERT INTO points_record (
-                    player_id, number, addtime, total
-                ) VALUES (?, ?, ?, ?)
-            ''', (player_id, rewards['points'], current_time, new_points))
-            
-            rewards_summary['points'] = rewards['points']
-        
-        if rewards.get('exp', 0) > 0:
-            # 获取当前经验
-            cursor.execute('SELECT experience FROM player_data WHERE player_id = ?', (player_id,))
-            current_exp = cursor.fetchone()['experience']
-            new_exp = current_exp + rewards['exp']
-            
-            # 更新玩家经验
-            cursor.execute('''
-                UPDATE player_data 
-                SET experience = ? 
-                WHERE player_id = ?
-            ''', (new_exp, player_id))
-            
-            # 记录经验变动
-            cursor.execute('''
-                INSERT INTO exp_record (
-                    player_id, number, addtime, total
-                ) VALUES (?, ?, ?, ?)
-            ''', (player_id, rewards['exp'], current_time, new_exp))
-            
-            rewards_summary['exp'] = rewards['exp']
-        
-        # 3. 处理卡片奖励
-        for card in rewards.get('cards', []):
-            card_id = card.get('id')
-            if not card_id:
-                continue
-                
-            cursor.execute('''
-                SELECT * FROM player_game_card 
-                WHERE player_id = ? AND game_card_id = ?
-            ''', (player_id, card_id))
-            existing_card = cursor.fetchone()
-            
-            if existing_card:
-                # 更新卡片数量
-                cursor.execute('''
-                    UPDATE player_game_card 
-                    SET number = number + 1,
-                        timestamp = ?
-                    WHERE player_id = ? AND game_card_id = ?
-                ''', (current_time, player_id, card_id))
-            else:
-                # 添加新卡片
-                cursor.execute('''
-                    INSERT INTO player_game_card (
-                        player_id, game_card_id, number, timestamp
-                    ) VALUES (?, ?, 1, ?)
-                ''', (player_id, card_id, current_time))
-            
-            rewards_summary['cards'].append(card_id)
-        
-        # 4. 处理勋章奖励
-        for medal in rewards.get('medals', []):
-            medal_id = medal.get('id')
-            if not medal_id:
-                continue
-                
-            cursor.execute('''
-                SELECT * FROM player_medal 
-                WHERE player_id = ? AND medal_id = ?
-            ''', (player_id, medal_id))
-            
-            if not cursor.fetchone():
-                cursor.execute('''
-                    INSERT INTO player_medal (
-                        player_id, medal_id, addtime
-                    ) VALUES (?, ?, ?)
-                ''', (player_id, medal_id, current_time))
-                
-                rewards_summary['medals'].append(medal_id)
-        
-        return True, "任务完成，奖励已发放", rewards_summary
-        
-    except Exception as e:
-        print(f"完成任务时出错: {str(e)}")
-        raise
-
-def setup_logging():
-    """配置日志系统"""
-    log_level = logging.DEBUG if DEBUG else logging.INFO
-    logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler('server.log')
-        ]
-    )
-    return logging.getLogger(__name__)
-
-    # 在应用启动时调用
-if __name__ == '__main__':
-    logger = setup_logging()
-    logger.info("Starting server initialization...")
-    
-    try:
-        start_scheduler()
-        logger.info("Scheduler started successfully")
-    except Exception as e:
-        logger.error(f"Failed to start scheduler: {str(e)}", exc_info=True)
-    
-    logger.info(f"Server configuration - IP: {SERVER_IP}, Port: {PORT}, Debug: {DEBUG}")
-    
-    try:
-        if DEBUG:
-            # 开发环境：使用 eventlet（支持热重载和WebSocket）
-            logger.info("Starting development server with eventlet...")
-            socketio.run(
-            app,
-                host=SERVER_IP,
-                port=PORT,
-            debug=True,
-            use_reloader=True,
-            log_output=True
-        )
-        else:
-            # 生产环境：使用 waitress
-            from waitress import serve
-            from paste.translogger import TransLogger
-            
-            logger.info("Starting production server with waitress...")
-            # 使用 TransLogger 记录访问日志
-            app_logged = TransLogger(app)
-            
-            # 配置 waitress
-            serve(
-                app_logged,
-                host=SERVER_IP,
-                port=PORT,
-                threads=WAITRESS_CONFIG['THREADS'],               
-                connection_limit=WAITRESS_CONFIG['CONNECTION_LIMIT'],   
-                channel_timeout=WAITRESS_CONFIG['TIMEOUT'],      
-                cleanup_interval=WAITRESS_CONFIG['CLEANUP_INTERVAL'],     
-                ident=WAITRESS_CONFIG['IDENT']      
-            )
-            
-    except Exception as e:
-        logger.error(f"Failed to start server: {str(e)}", exc_info=True)
-        raise
-
 # 通知相关接口
 @app.route('/api/notifications', methods=['GET'])
 def get_notifications():
@@ -1041,6 +908,71 @@ def handle_notification_read(data):
         }, broadcast=True)
     except Exception as e:
         Logger.error('WebSocket', f'处理通知已读事件失败: {str(e)}')
+
+
+def setup_logging():
+    """配置日志系统"""
+    log_level = logging.DEBUG if DEBUG else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('server.log')
+        ]
+    )
+    return logging.getLogger(__name__)
+
+    # 在应用启动时调用
+if __name__ == '__main__':
+    logger = setup_logging()
+    logger.info("Starting server initialization...")
+    
+    try:
+        start_scheduler()
+        logger.info("Scheduler started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {str(e)}", exc_info=True)
+    
+    logger.info(f"Server configuration - IP: {SERVER_IP}, Port: {PORT}, Debug: {DEBUG}")
+    
+    try:
+        if DEBUG:
+            # 开发环境：使用 eventlet（支持热重载和WebSocket）
+            logger.info("Starting development server with eventlet...")
+            socketio.run(
+            app,
+                host=SERVER_IP,
+                port=PORT,
+            debug=True,
+            use_reloader=True,
+            log_output=True
+        )
+        else:
+            # 生产环境：使用 waitress
+            from waitress import serve
+            from paste.translogger import TransLogger
+            
+            logger.info("Starting production server with waitress...")
+            # 使用 TransLogger 记录访问日志
+            app_logged = TransLogger(app)
+            
+            # 配置 waitress
+            serve(
+                app_logged,
+                host=SERVER_IP,
+                port=PORT,
+                threads=WAITRESS_CONFIG['THREADS'],               
+                connection_limit=WAITRESS_CONFIG['CONNECTION_LIMIT'],   
+                channel_timeout=WAITRESS_CONFIG['TIMEOUT'],      
+                cleanup_interval=WAITRESS_CONFIG['CLEANUP_INTERVAL'],     
+                ident=WAITRESS_CONFIG['IDENT']      
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to start server: {str(e)}", exc_info=True)
+        raise
+
 
 
 

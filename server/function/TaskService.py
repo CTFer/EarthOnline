@@ -300,19 +300,44 @@ class TaskService:
             conn = self.get_db()
             cursor = conn.cursor()
             
+            # 首先检查任务是否存在且属于该玩家
+            cursor.execute('''
+                SELECT status 
+                FROM player_task 
+                WHERE player_id = ? AND id = ?
+            ''', (player_id, task_id))
+            
+            task = cursor.fetchone()
+            if not task:
+                return json.dumps({
+                    'code': 1,
+                    'msg': '任务不存在或不属于该玩家',
+                    'data': None
+                })
+            
+            # 检查任务状态是否为进行中
+            if task['status'] != 'IN_PROGRESS':
+                return json.dumps({
+                    'code': 1,
+                    'msg': '只能放弃进行中的任务',
+                    'data': None
+                })
+            
+            # 更新任务状态
             cursor.execute('''
                 UPDATE player_task 
                 SET status = 'ABANDONED', 
                     complete_time = ? 
                 WHERE player_id = ? 
-                AND task_id = ? 
+                AND id = ? 
                 AND status = 'IN_PROGRESS'
             ''', (int(time.time()), player_id, task_id))
             
             if cursor.rowcount == 0:
+                conn.rollback()
                 return json.dumps({
                     'code': 1,
-                    'msg': '任务不存在或状态错误',
+                    'msg': '放弃任务失败，请重试',
                     'data': None
                 })
                 
@@ -324,13 +349,17 @@ class TaskService:
             })
 
         except sqlite3.Error as e:
+            if conn:
+                conn.rollback()
+            logger.error(f"放弃任务失败: {str(e)}")
             return json.dumps({
                 'code': 1,
                 'msg': f'放弃任务失败: {str(e)}',
                 'data': None
             }), 500
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     def is_main_quest(self, task_id):
         """判断是否为主线任务"""

@@ -1,6 +1,6 @@
 import Logger from '../utils/logger.js';
 import { MAP_CONFIG } from '../config/config.js';
-
+// 已弃用
 class GPSManager {
     constructor() {
         Logger.info('GPSManager', '初始化开始');

@@ -91,7 +91,7 @@ class RoadmapService:
                     'code': 1,  # 1 表示已登录
                     'msg': 'API密钥验证通过',
                     'data': {
-                        'username': 'api_user',
+                        'username': 'emanon',
                         'user_id': 1  # 默认用户ID
                     }
                 })
@@ -415,7 +415,7 @@ class RoadmapService:
                 data.get('color', '#ffffff'),
                 current_time,
                 current_time,
-                max_order + 1,
+                0,
                 session.get('user_id')
             ))
             

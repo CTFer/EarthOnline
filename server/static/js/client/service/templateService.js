@@ -172,14 +172,17 @@ class TemplateService {
     }
 
 
-    // 显示错误信息
-    showError(containerId, message) {
-        Logger.warn('TemplateService', '显示错误信息:', message);
-        const container = document.getElementById(containerId);
-        if (container) {
-            container.innerHTML = `<div class="empty-tip">${message}</div>`;
-        }
+  /** 
+   *显示错误信息
+   * @param {string} containerId 容器ID
+   * @param {string} message 错误信息
+   */
+   showError(containerId, message) {
+    const container = document.getElementById(containerId);
+    if (container) {
+      container.innerHTML = `<div class="empty-tip">${message}</div>`;
     }
+  }
 
     // 解析任务奖励
     parseTaskRewards(taskRewards) {
@@ -237,7 +240,6 @@ class TemplateService {
         
         try {
             const typeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
-            const rewards = this.parseTaskRewards(task.task_rewards);
             
             return `
                 <div class="swiper-slide" role="group">
@@ -256,7 +258,7 @@ class TemplateService {
                                 <div class="task-rewards">
                                     ${this.renderRewardItems(task)}
                                 </div>
-                                <button class="accept-btn" onclick="event.stopPropagation();">
+                                <button class="accept-btn" data-task-id="${task.id}">
                                     <i class="layui-icon layui-icon-ok"></i>
                                     接受
                                 </button>

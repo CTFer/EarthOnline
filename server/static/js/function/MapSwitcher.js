@@ -1,6 +1,6 @@
 import Logger from '../utils/logger.js';
 import { MAP_CONFIG } from '../config/config.js';
-
+// 已弃用
 export default class MapSwitcher {
     constructor() {
         Logger.info('MapSwitcher', '初始化开始');
