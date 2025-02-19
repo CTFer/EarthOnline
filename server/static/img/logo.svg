@@ -1,0 +1,82 @@
+<svg width="800" height="200" viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg">
+    <!-- 渐变定义 -->
+    <defs>
+        <!-- 地球渐变 -->
+        <linearGradient id="earthGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#738AFF;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#66F;stop-opacity:1" />
+        </linearGradient>
+        <!-- 文字渐变 -->
+        <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#FFDF40;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#FFBE40;stop-opacity:1" />
+        </linearGradient>
+        <!-- 装饰光环渐变 -->
+        <linearGradient id="haloGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#A0E65C;stop-opacity:0.6" />
+            <stop offset="50%" style="stop-color:#79CC52;stop-opacity:0.3" />
+            <stop offset="100%" style="stop-color:#A0E65C;stop-opacity:0.6" />
+        </linearGradient>
+    </defs>
+
+    <!-- 背景装饰 - 星星点缀 -->
+    <g fill="#FFFFFF" opacity="0.3">
+        <circle cx="50" cy="50" r="1" />
+        <circle cx="150" cy="30" r="1.5" />
+        <circle cx="700" cy="40" r="1" />
+        <circle cx="650" cy="150" r="1.5" />
+        <circle cx="750" cy="100" r="1" />
+    </g>
+
+    <!-- 光环效果 -->
+    <ellipse cx="400" cy="100" rx="350" ry="30" 
+             fill="url(#haloGradient)" opacity="0.2" />
+
+    <!-- 原始地球图标组 -->
+    <g transform="translate(50, 20) scale(0.3)">
+        <!-- 地球主体 -->
+        <path d="m437.519 225.405s-60.702 173.963-69.129 180.315c-38.817 29.259-85.85 45.09-135.32 45.09-80.124 0-150.338-41.587-190.527-104.805l1.541-105.364-28.554-74.641c4.239-15.615 10.152-30.687 17.65-45l18.614-15.001.276-14.999c41.271-55.364 106.658-91 181-91 20.993 0 41.547 2.851 61.22 8.369z" fill="#738aff"/>
+        <path d="m437.52 225.41s-60.7 173.96-69.13 180.31c-38.82 29.26-85.85 45.09-135.32 45.09v-450.81c20.99 0 41.55 2.85 61.22 8.37z" fill="#66f"/>
+        <path d="m188.29 196c0 16.413-13.294 30-30 30h-44.9c-16.57 0-30 13.43-30 30 0 16.413 13.294 30 30 30h14.9c16.57 0 30 13.43 30 30 0 16.413-13.294 30-30 30h-85.74c-22.72-35.73-34.89-77.23-34.89-120.59 0-20.35 2.68-40.29 7.87-59.41h142.76c16.57 0 30 13.43 30 30z" fill="#a0e65c"/>
+        <path d="m458.47 225.41c0 72.577-34.113 138.153-90.08 180.31v-119.72c0-16.57-13.43-30-30-30h-60.1c-16.736 0-30-13.617-30-30 0-16.57 13.43-30 30-30h60c16.736 0 30-13.617 30-30 0-16.57-13.43-30-30-30h-14c-16.57 0-30-13.43-30-30v-97.63c93.241 26.158 164.18 112.214 164.18 217.04z" fill="#79cc52"/>
+        <path d="m143.29 106c0 8.28-6.72 15-15 15h-95.11c5.46-10.43 11.77-20.46 18.89-30h76.22c8.28 0 15 6.72 15 15z" fill="#a0e65c"/>
+        <path d="m225.435 469.966 17.951-107.704c4.353-26.118 26.951-45.262 53.43-45.262h135.703c26.49 0 49.094 19.159 53.434 45.291l17.89 107.701c3.654 21.995-13.31 42.009-35.606 42.009-13.671 0-26.169-7.724-32.284-19.952l-22.523-45.049h-97.5l-23.011 45.895c-5.872 11.711-17.844 19.105-30.945 19.105h-.816c-22.417 0-39.39-20.03-35.723-42.034z" fill="#ffdf40"/>
+        <path d="m468.24 512c-13.675 0-26.163-7.716-32.29-19.95l-22.52-45.05h-48.79v-130h67.88c26.49 0 49.09 19.16 53.43 45.29l17.89 107.7c3.66 22-13.31 42.01-35.6 42.01z" fill="#ffbe40"/>
+        <circle cx="319.576" cy="384.5" fill="#544473" r="15"/>
+        <circle cx="409.576" cy="384.5" fill="#413559" r="15"/>
+    </g>
+
+    <!-- 艺术字: 地球 Online -->
+    <g transform="translate(200, 100)">
+        <!-- 地球 -->
+        <text font-family="Microsoft YaHei" font-size="60" font-weight="bold" fill="url(#textGradient)">
+            地球
+        </text>
+        <!-- Online -->
+        <text x="130" y="0" font-family="Arial" font-size="58" font-weight="bold" fill="url(#textGradient)" 
+              style="letter-spacing: 2px;">
+            Online
+        </text>
+    </g>
+
+    <!-- 装饰性轨道 -->
+    <g transform="translate(200, 120)" stroke="url(#earthGradient)" fill="none">
+        <path d="M0,0 Q300,50 600,0" stroke-width="2" opacity="0.3"/>
+        <path d="M50,20 Q300,60 550,20" stroke-width="1.5" opacity="0.2"/>
+    </g>
+
+    <!-- 点缀装饰 -->
+    <g fill="#A0E65C" opacity="0.4">
+        <circle cx="180" cy="90" r="2">
+            <animate attributeName="opacity" values="0.4;0.8;0.4" dur="2s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="720" cy="90" r="2">
+            <animate attributeName="opacity" values="0.4;0.8;0.4" dur="2s" repeatCount="indefinite"/>
+        </circle>
+    </g>
+
+    <!-- 光晕效果 -->
+    <!-- <circle cx="400" cy="100" r="300" fill="url(#haloGradient)" opacity="0.1">
+        <animate attributeName="opacity" values="0.1;0.2;0.1" dur="3s" repeatCount="indefinite"/>
+    </circle> -->
+</svg> 

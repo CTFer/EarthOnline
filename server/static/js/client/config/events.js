@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-18 09:03:41
- * @LastEditTime: 2025-02-18 13:29:31
+ * @LastEditTime: 2025-02-19 14:17:47
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -22,7 +22,11 @@ export const TASK_EVENTS = {
     // 任务放弃
     ABANDONED: 'task:abandoned',
     // 任务详情请求
-    DETAILS_REQUESTED: 'task:details:requested'
+    DETAILS_REQUESTED: 'task:details:requested',
+    // 任务列表更新
+    LIST_UPDATED: 'task:list:updated',
+    // 当前任务更新
+    CURRENT_UPDATED: 'task:current:updated'
 };
 
 // 玩家相关事件
@@ -42,7 +46,9 @@ export const MAP_EVENTS = {
     // 地图初始化完成
     INITIALIZED: 'map:initialized',
     // GPS更新
-    GPS_UPDATED: 'gps:update'
+    GPS_UPDATED: 'gps:update',
+    // 玩家更新
+    PLAYER_UPDATED: 'player:update'
 };
 
 // UI相关事件

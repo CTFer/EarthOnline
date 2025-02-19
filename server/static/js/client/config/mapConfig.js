@@ -23,12 +23,12 @@ export const AMAP_CONFIG = {
 
     // 卫星图层配置
     satellite: {
-        visible: true,           // 是否默认显示卫星图层
+        visible: false,           // 是否默认显示卫星图层
         opacity: 1,              // 卫星图层透明度
         zIndex: 4,               // 图层叠加顺序
     },
     roadNet: {
-        visible: false,           // 是否默认显示路网图层
+        visible: true,           // 是否默认显示路网图层
         opacity: 1,              // 路网图层透明度
         zIndex: 5,               // 图层叠加顺序
     },

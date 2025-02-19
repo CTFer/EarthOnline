@@ -203,6 +203,13 @@ class RoadmapService:
                 cursor.execute('SELECT id FROM roadmap WHERE id = ?', (item['id'],))
                 exists = cursor.fetchone()
                 
+                # 确保user_id有值
+                user_id = item.get('user_id')
+                if not user_id:
+                    # 如果没有user_id，使用默认用户ID(比如系统用户)
+                    user_id = 1  # 假设1是系统用户ID
+                    print(f"[Sync] 记录 {item['id']} 没有user_id，使用默认值: {user_id}")
+                
                 if exists:
                     # 更新现有记录
                     cursor.execute('''
@@ -221,12 +228,12 @@ class RoadmapService:
                         item['name'],
                         item['description'],
                         item['status'],
-                        item['color'],
+                        item.get('color', '#ffffff'),  # 使用默认颜色
                         item['addtime'],
                         item['edittime'],
-                        item['order'],
-                        item['user_id'],
-                        item['is_deleted'],
+                        item.get('order', 0),  # 使用默认顺序
+                        user_id,
+                        item.get('is_deleted', 0),
                         item['id']
                     ))
                 else:
@@ -241,12 +248,12 @@ class RoadmapService:
                         item['name'],
                         item['description'],
                         item['status'],
-                        item['color'],
+                        item.get('color', '#ffffff'),  # 使用默认颜色
                         item['addtime'],
                         item['edittime'],
-                        item['order'],
-                        item['user_id'],
-                        item['is_deleted']
+                        item.get('order', 0),  # 使用默认顺序
+                        user_id,
+                        item.get('is_deleted', 0)
                     ))
                 
                 if item['is_deleted']:
@@ -303,20 +310,33 @@ class RoadmapService:
             last_sync_time = int(request.headers.get('X-Sync-Time', 0))
             
             # 获取数据库连接
-            conn = roadmap_service.get_db()
+            conn = self.get_db()
             cursor = conn.cursor()
             
             try:
                 # 获取所有更新的数据
                 cursor.execute('''
                     SELECT r.*, 
-                        CASE WHEN r.edittime > ? THEN 0 ELSE 1 END as is_deleted
+                        CASE 
+                            WHEN r.edittime > ? THEN 0 
+                            ELSE 1 
+                        END as is_deleted,
+                        COALESCE(r.user_id, 1) as user_id  -- 确保user_id有值
                     FROM roadmap r
                     WHERE r.edittime > ?
                     ORDER BY r.edittime ASC
                 ''', (last_sync_time, last_sync_time))
                 
-                updates = [dict(row) for row in cursor.fetchall()]
+                # 转换结果为字典列表
+                columns = [col[0] for col in cursor.description]
+                updates = []
+                for row in cursor.fetchall():
+                    item = dict(zip(columns, row))
+                    # 确保所有必需字段都有值
+                    item['color'] = item.get('color', '#ffffff')
+                    item['order'] = item.get('order', 0)
+                    item['is_deleted'] = item.get('is_deleted', 0)
+                    updates.append(item)
                 
                 return json.dumps({
                     'code': 0,

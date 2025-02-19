@@ -11,22 +11,20 @@ class WordcloudService {
         this.wordCloudChart = null;
         
         // 订阅相关事件
+        this.handleResize = this.handleResize.bind(this);
         this.setupEventListeners();
         Logger.info('WordcloudService', '初始化文字云服务');
     }
 
-    setupEventListeners() {
-        // 监听窗口大小变化
-        window.addEventListener("resize", () => {
-            if (this.wordCloudChart) {
-                this.wordCloudChart.resize();
-            }
-        });
+    handleResize() {
+        if (this.wordCloudChart) {
+            this.wordCloudChart.resize();
+        }
+    }
 
-        // 监听任务完成事件，更新文字云
-        this.eventBus.on("task:completed", () => {
-            this.updateWordCloud();
-        });
+    setupEventListeners() {
+        window.addEventListener("resize", this.handleResize);
+        this.eventBus.on("task:completed", this.updateWordCloud.bind(this));
     }
 
     async initWordCloud(container) {
@@ -134,6 +132,9 @@ class WordcloudService {
             this.wordCloudChart.dispose();
             this.wordCloudChart = null;
         }
+        // 移除事件监听
+        window.removeEventListener("resize", this.handleResize);
+        this.eventBus.off("task:completed", this.updateWordCloud);
         Logger.info('WordcloudService', '文字云服务已销毁');
     }
 

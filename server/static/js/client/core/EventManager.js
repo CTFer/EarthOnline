@@ -5,12 +5,19 @@
  * @Description: 事件管理器，负责处理所有事件监听和分发
  */
 import Logger from '../../utils/logger.js';
+import { 
+    TASK_EVENTS,
+    PLAYER_EVENTS,
+    MAP_EVENTS,
+    UI_EVENTS,
+    AUDIO_EVENTS,
+    WS_EVENTS
+} from "../config/events.js";
 
 class EventManager {
-    constructor(services, core) {
+    constructor(services) {
         this.services = services;
-        this.core = core;
-        this.eventHandlers = new Map();
+        this.eventBus = services.eventBus;
         Logger.info('EventManager', '初始化事件管理器');
     }
 
@@ -21,12 +28,13 @@ class EventManager {
         Logger.info('EventManager', '开始设置事件监听器');
         
         try {
-            // 设置各类事件监听
-            this.setupTaskEvents();
-            this.setupPlayerEvents();
-            this.setupMapEvents();
-            this.setupUIEvents();
-            this.setupGlobalEvents();
+            // 初始化各类事件监听
+            this.initializeTaskEvents();
+            this.initializePlayerEvents();
+            this.initializeMapEvents();
+            this.initializeUIEvents();
+            this.initializeAudioEvents();
+            this.initializeWSEvents();
             
             Logger.info('EventManager', '事件监听器设置完成');
         } catch (error) {
@@ -36,218 +44,183 @@ class EventManager {
     }
 
     /**
-     * 设置任务相关事件
+     * 初始化任务相关事件
      */
-    setupTaskEvents() {
-        Logger.debug('EventManager', '设置任务相关事件监听');
+    initializeTaskEvents() {
+        // 任务状态更新
+        this.eventBus.on(TASK_EVENTS.STATUS_UPDATED, async (data) => {
+            try {
+                await this.services.taskService.updateTaskStatus(data);
+                await this.services.uiService.updateTaskStatus(data);
+            } catch (error) {
+                Logger.error('EventManager', '处理任务状态更新失败:', error);
+            }
+        });
 
-        // 任务加载完成事件
-        this.core.eventBus.on('tasks:loaded', this.handleTasksLoaded.bind(this));
-        
-        // 当前任务更新事件
-        this.core.eventBus.on('currentTasks:updated', this.handleCurrentTasksUpdated.bind(this));
-        
-        // 任务状态更新事件
-        this.core.eventBus.on('task:status:updated', this.handleTaskStatusUpdated.bind(this));
-        
-        // 任务操作事件
-        this.core.eventBus.on('task:accepted', this.handleTaskAccepted.bind(this));
-        this.core.eventBus.on('task:abandoned', this.handleTaskAbandoned.bind(this));
-        this.core.eventBus.on('task:completed', this.handleTaskCompleted.bind(this));
-    }
+        // 任务完成
+        this.eventBus.on(TASK_EVENTS.COMPLETED, async (data) => {
+            try {
+                await this.services.playerService.handleTaskComplete(data);
+                await this.services.wordcloudService.updateWordCloud();
+                this.eventBus.emit(AUDIO_EVENTS.PLAY, 'COMPLETE');
+            } catch (error) {
+                Logger.error('EventManager', '处理任务完成失败:', error);
+            }
+        });
 
-    /**
-     * 设置玩家相关事件
-     */
-    setupPlayerEvents() {
-        Logger.debug('EventManager', '设置玩家相关事件监听');
+        // 任务接受
+        this.eventBus.on(TASK_EVENTS.ACCEPTED, async (data) => {
+            try {
+                const result = await this.services.taskService.acceptTask(data.taskId);
+                if (result.code === 0) {
+                    this.eventBus.emit(AUDIO_EVENTS.PLAY, 'ACCEPT');
+                }
+            } catch (error) {
+                Logger.error('EventManager', '处理任务接受失败:', error);
+            }
+        });
 
-        // 玩家ID更新事件
-        this.core.eventBus.on('player:id-updated', this.handlePlayerIdUpdated.bind(this));
-        
-        // 玩家信息更新事件
-        this.core.eventBus.on('player:info-updated', this.handlePlayerInfoUpdated.bind(this));
-    }
-
-    /**
-     * 设置地图相关事件
-     */
-    setupMapEvents() {
-        Logger.debug('EventManager', '设置地图相关事件监听');
-
-        // 地图渲染器切换事件
-        this.core.eventBus.on('map:renderer:changed', this.handleMapRendererChanged.bind(this));
-        
-        // GPS更新事件
-        this.core.eventBus.on('gps:update', this.handleGPSUpdate.bind(this));
-    }
-
-    /**
-     * 设置UI相关事件
-     */
-    setupUIEvents() {
-        Logger.debug('EventManager', '设置UI相关事件监听');
-        
-        // 初始化UI服务的任务事件监听
-        this.services.uiService.initTaskEvents();
-    }
-
-    /**
-     * 设置全局事件
-     */
-    setupGlobalEvents() {
-        Logger.debug('EventManager', '设置全局事件监听');
-        
-        // 全局错误事件
-        this.core.eventBus.on('error', this.handleGlobalError.bind(this));
-        
-        // 应用初始化完成事件
-        this.core.eventBus.on('app:initialized', () => {
-            Logger.info('EventManager', '应用初始化完成');
+        // 任务放弃
+        this.eventBus.on(TASK_EVENTS.ABANDONED, async (data) => {
+            try {
+                await this.services.taskService.handleTaskAbandoned(data);
+            } catch (error) {
+                Logger.error('EventManager', '处理任务放弃失败:', error);
+            }
         });
     }
 
-    // 事件处理方法
-    async handleTasksLoaded(tasks) {
-        try {
-            Logger.info('EventManager', '处理任务加载完成事件');
-            await this.services.uiService.renderTaskList(tasks);
-        } catch (error) {
-            this.handleError(error, '任务加载失败');
-        }
-    }
-
-    async handleCurrentTasksUpdated(tasks) {
-        try {
-            Logger.info('EventManager', '处理当前任务更新事件');
-            await this.services.uiService.renderCurrentTasks(tasks);
-        } catch (error) {
-            this.handleError(error, '更新当前任务失败');
-        }
-    }
-
-    async handleTaskStatusUpdated(data) {
-        try {
-            Logger.info('EventManager', '处理任务状态更新事件');
-            await this.services.taskService.updateTaskStatus(data);
-            await this.services.uiService.updateTaskStatus(data);
-            
-            if (data.status === 'COMPLETED') {
-                this.services.audioService.playSound('COMPLETE');
+    /**
+     * 初始化玩家相关事件
+     */
+    initializePlayerEvents() {
+        // 玩家ID更新
+        this.eventBus.on(PLAYER_EVENTS.ID_UPDATED, async (newId) => {
+            try {
+                await this.services.wsService.subscribeToPlayerEvents(newId);
+                await this.services.taskService.updatePlayerId(newId);
+                await this.services.playerService.loadPlayerInfo();
+            } catch (error) {
+                Logger.error('EventManager', '处理玩家ID更新失败:', error);
             }
-        } catch (error) {
-            this.handleError(error, '更新任务状态失败');
-        }
-    }
+        });
 
-    async handleTaskAccepted(data) {
-        try {
-            Logger.info('EventManager', '处理任务接受事件');
-            const result = await this.services.taskService.acceptTask(data.taskId, data.playerId);
-            
-            if (result.code === 0) {
-                this.services.uiService.showSuccessMessage('任务接受成功');
-                this.services.audioService.playSound('ACCEPT');
-            } else {
-                this.services.uiService.showErrorMessage(result.msg || '接受任务失败');
-                this.services.audioService.playSound('ERROR');
+        // 玩家信息更新
+        this.eventBus.on(PLAYER_EVENTS.INFO_UPDATED, async (playerInfo) => {
+            try {
+                await this.services.uiService.updatePlayerInfo(playerInfo);
+            } catch (error) {
+                Logger.error('EventManager', '处理玩家信息更新失败:', error);
             }
-        } catch (error) {
-            this.handleError(error, '接受任务失败');
-        }
-    }
+        });
 
-    async handleTaskAbandoned(data) {
-        try {
-            Logger.info('EventManager', '处理任务放弃事件');
-            const result = await this.services.taskService.abandonTask(data.taskId, data.playerId);
-            
-            if (result.code === 0) {
-                this.services.uiService.showSuccessMessage('任务已放弃');
-                this.services.audioService.playSound('ABANDON');
-            } else {
-                this.services.uiService.showErrorMessage(result.msg || '放弃任务失败');
-                this.services.audioService.playSound('ERROR');
+        // 玩家经验值更新
+        this.eventBus.on(PLAYER_EVENTS.EXP_UPDATED, async (data) => {
+            try {
+                await this.services.uiService.updateLevelAndExp(data);
+            } catch (error) {
+                Logger.error('EventManager', '处理经验值更新失败:', error);
             }
-        } catch (error) {
-            this.handleError(error, '放弃任务失败');
-        }
-    }
-
-    async handleTaskCompleted(taskData) {
-        try {
-            Logger.info('EventManager', '处理任务完成事件');
-            await this.services.wordcloudService.updateWordCloud();
-            this.services.audioService.playSound('COMPLETE');
-            this.services.uiService.showNotification({
-                type: 'SUCCESS',
-                message: `任务 ${taskData.name} 已完成！`
-            });
-        } catch (error) {
-            this.handleError(error, '处理任务完成失败');
-        }
-    }
-
-    async handlePlayerIdUpdated(newId) {
-        try {
-            Logger.info('EventManager', '处理玩家ID更新事件');
-            this.services.wsManager.subscribeToTasks(newId);
-            this.services.taskService.updatePlayerId(newId);
-            await this.services.playerService.loadPlayerInfo();
-            await this.services.taskService.loadTasks();
-        } catch (error) {
-            this.handleError(error, '更新玩家信息失败');
-        }
-    }
-
-    async handlePlayerInfoUpdated(playerInfo) {
-        try {
-            Logger.info('EventManager', '处理玩家信息更新事件');
-            await this.services.uiService.updatePlayerInfo(playerInfo);
-        } catch (error) {
-            this.handleError(error, '更新玩家界面失败');
-        }
-    }
-
-    handleMapRendererChanged(type) {
-        try {
-            Logger.info('EventManager', '处理地图渲染器变更事件');
-            this.services.mapService.switchRenderer(type);
-        } catch (error) {
-            this.handleError(error, '切换地图显示失败');
-        }
-    }
-
-    handleGPSUpdate(gpsData) {
-        try {
-            Logger.debug('EventManager', '处理GPS更新事件');
-            if (this.services.mapService.currentRenderer) {
-                this.services.mapService.currentRenderer.updatePosition(gpsData);
-                this.services.mapService.currentRenderer.updateGPSInfo(gpsData);
-            }
-        } catch (error) {
-            this.handleError(error, '更新GPS数据失败');
-        }
-    }
-
-    handleGlobalError(error) {
-        Logger.error('EventManager', '全局错误:', error);
-        this.services.uiService.showErrorMessage(error.message || '操作失败，请重试');
+        });
     }
 
     /**
-     * 统一的错误处理方法
-     * @param {Error} error 错误对象
-     * @param {string} userMessage 用户友好的错误消息
+     * 初始化地图相关事件
      */
-    handleError(error, userMessage) {
-        Logger.error('EventManager', '事件处理错误:', error);
-        this.services.uiService.showNotification({
-            type: 'ERROR',
-            message: userMessage || '操作失败，请重试'
+    initializeMapEvents() {
+        // 渲染器切换
+        this.eventBus.on(MAP_EVENTS.RENDERER_CHANGED, async (type) => {
+            try {
+                await this.services.mapService.switchRenderer(type);
+                this.services.uiService.updateMapSwitchButton(type);
+            } catch (error) {
+                Logger.error('EventManager', '处理地图渲染器切换失败:', error);
+            }
         });
-        this.services.audioService.playSound('ERROR');
+
+        // GPS更新
+        this.eventBus.on(MAP_EVENTS.GPS_UPDATED, (data) => {
+            try {
+                this.services.mapService.handleGPSUpdate(data);
+            } catch (error) {
+                Logger.error('EventManager', '处理GPS更新失败:', error);
+            }
+        });
+    }
+
+    /**
+     * 初始化UI相关事件
+     */
+    initializeUIEvents() {
+        // 显示通知
+        this.eventBus.on(UI_EVENTS.NOTIFICATION_SHOW, (data) => {
+            try {
+                this.services.uiService.showNotification(data);
+            } catch (error) {
+                Logger.error('EventManager', '显示通知失败:', error);
+            }
+        });
+
+        // 显示模态框
+        this.eventBus.on(UI_EVENTS.MODAL_SHOW, (data) => {
+            try {
+                this.services.uiService.showModal(data);
+            } catch (error) {
+                Logger.error('EventManager', '显示模态框失败:', error);
+            }
+        });
+    }
+
+    /**
+     * 初始化音频相关事件
+     */
+    initializeAudioEvents() {
+        // 播放音效
+        this.eventBus.on(AUDIO_EVENTS.PLAY, (soundId) => {
+            try {
+                this.services.audioService.handlePlaySound(soundId);
+            } catch (error) {
+                Logger.error('EventManager', '播放音效失败:', error);
+            }
+        });
+
+        // 音量变化
+        this.eventBus.on(AUDIO_EVENTS.VOLUME_CHANGED, (data) => {
+            try {
+                this.services.audioService.handleVolumeChange(data);
+            } catch (error) {
+                Logger.error('EventManager', '处理音量变化失败:', error);
+            }
+        });
+    }
+
+    /**
+     * 初始化WebSocket相关事件
+     */
+    initializeWSEvents() {
+        // WebSocket连接状态
+        this.eventBus.on(WS_EVENTS.CONNECTED, () => {
+            try {
+                this.services.uiService.showNotification({
+                    type: 'SUCCESS',
+                    message: 'WebSocket连接成功'
+                });
+            } catch (error) {
+                Logger.error('EventManager', '处理WebSocket连接成功失败:', error);
+            }
+        });
+
+        this.eventBus.on(WS_EVENTS.DISCONNECTED, () => {
+            try {
+                this.services.uiService.showNotification({
+                    type: 'WARNING',
+                    message: 'WebSocket连接断开'
+                });
+            } catch (error) {
+                Logger.error('EventManager', '处理WebSocket断开连接失败:', error);
+            }
+        });
     }
 }
 
-export default EventManager; 
+export default EventManager;

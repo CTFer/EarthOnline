@@ -386,6 +386,137 @@ class TaskService {
             throw error;
         }
     }
+
+    /**
+     * 处理NFC任务更新通知
+     * @param {Object} data 任务更新数据
+     */
+    handleTaskUpdate(data) {
+        Logger.info("TaskService", "开始处理NFC任务更新:", data);
+
+        // 参数验证
+        if (!data || !data.type) {
+            Logger.error("TaskService", "无效的任务更新数据:", data);
+            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+                type: "ERROR",
+                message: "收到无效的任务更新",
+            });
+            return;
+        }
+
+        Logger.debug("TaskService", "处理任务类型:", data.type);
+        
+        // 使用Map对象替代switch语句，提高可维护性
+        const taskHandlers = {
+            // 处理身份识别更新
+            "IDENTITY": () => {
+                Logger.info("TaskService", "处理身份识别更新");
+                // 更新玩家ID
+                this.playerService.setPlayerId(data.player_id);
+                // 重新加载玩家信息
+                this.playerService.loadPlayerInfo();
+                // 刷新任务列表
+                this.refreshTasks();
+            },
+            
+            // 处理需要刷新任务的更新类型
+            "NEW_TASK": () => {
+                Logger.info("TaskService", "处理新任务更新");
+                this.refreshTasks();
+                this.eventBus.emit(AUDIO_EVENTS.PLAY, data.type);
+            },
+            "COMPLETE": () => {
+                Logger.info("TaskService", "处理任务完成更新");
+                this.refreshTasks();
+                this.eventBus.emit(AUDIO_EVENTS.PLAY, data.type);
+            },
+            "CHECK": () => {
+                Logger.info("TaskService", "处理任务检查更新");
+                this.refreshTasks();
+                this.eventBus.emit(AUDIO_EVENTS.PLAY, data.type);
+            },
+            
+            // 处理只需要显示通知的更新类型
+            "ALREADY_COMPLETED": () => {
+                Logger.info("TaskService", "处理任务重复完成通知");
+            },
+            "REJECT": () => {
+                Logger.info("TaskService", "处理任务驳回通知");
+            },
+            "CHECKING": () => {
+                Logger.info("TaskService", "处理任务审核中通知");
+            },
+            
+            // 处理错误情况
+            "ERROR": () => {
+                Logger.info("TaskService", "处理错误消息");
+                this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
+            }
+        };
+
+        // 执行对应的处理函数
+        const handler = taskHandlers[data.type];
+        if (handler) {
+            try {
+                handler();
+            } catch (error) {
+                Logger.error("TaskService", `处理任务类型 ${data.type} 时发生错误:`, error);
+                this.handleEventError(error, `处理任务更新失败: ${data.type}`);
+            }
+        } else {
+            Logger.warn("TaskService", "未知的任务类型:", data.type);
+        }
+
+        // 显示通知
+        Logger.debug("TaskService", "准备显示通知:", data);
+        this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, data);
+        Logger.debug("TaskService", "通知显示完成");
+    }
+
+    /**
+     * 刷新所有任务
+     */
+    async refreshTasks() {
+        try {
+            Logger.info("TaskService", "开始刷新任务列表");
+            
+            // 使用防抖，避免频繁刷新
+            if (this._refreshTimeout) {
+                clearTimeout(this._refreshTimeout);
+            }
+            
+            this._refreshTimeout = setTimeout(async () => {
+                // 并行加载所有任务和当前任务
+                await Promise.all([
+                    this.loadTasks().then(tasks => {
+                        this.eventBus.emit(TASK_EVENTS.LIST_UPDATED, tasks);
+                    }),
+                    this.loadCurrentTasks().then(currentTasks => {
+                        this.eventBus.emit(TASK_EVENTS.CURRENT_UPDATED, currentTasks);
+                    })
+                ]);
+                
+                Logger.info("TaskService", "任务列表刷新完成");
+            }, 300); // 300ms 的防抖时间
+            
+        } catch (error) {
+            Logger.error("TaskService", "刷新任务失败:", error);
+            this.handleEventError(error, "刷新任务失败");
+        }
+    }
+
+    /**
+     * 处理事件错误
+     * @private
+     */
+    handleEventError(error, userMessage) {
+        Logger.error("TaskService", userMessage, error);
+        this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+            type: "ERROR",
+            message: userMessage
+        });
+        this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
+    }
 }
 
 export default TaskService;

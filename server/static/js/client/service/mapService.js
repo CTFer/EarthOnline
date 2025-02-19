@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:42
- * @LastEditTime: 2025-02-18 14:09:33
+ * @LastEditTime: 2025-02-19 14:42:19
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -19,7 +19,7 @@ import {
     MAP_EVENTS,
     UI_EVENTS 
 } from "../config/events.js";
-
+import { WS_EVENT_TYPES } from "../config/wsConfig.js";
 class MapService {
     constructor(api, eventBus) {
         // 首先记录构造函数开始执行的日志
@@ -318,28 +318,28 @@ class MapService {
         if (endInput) endInput.value = this.customEndTime;
     }
 
-    async handleGPSUpdate(data) {
-        Logger.debug('MapService', 'GPS更新:', data);
-        try {
-            if (!this.validateGPSData(data)) {
-                Logger.warn('MapService', '无效的GPS数据:', data);
-                return;
-            }
+    // async handleGPSUpdate(data) {
+    //     Logger.debug('MapService', 'GPS更新:', data);
+    //     try {
+    //         if (!this.validateGPSData(data)) {
+    //             Logger.warn('MapService', '无效的GPS数据:', data);
+    //             return;
+    //         }
 
-            if (this.currentRenderer) {
-                await this.currentRenderer.updatePosition(data);
-                await this.currentRenderer.updateGPSInfo(data);
-            } else {
-                Logger.warn('MapService', '没有活动的渲染器');
-            }
-        } catch (error) {
-            Logger.error('MapService', '处理GPS更新失败:', error);
-            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-                type: 'ERROR',
-                message: '更新GPS位置失败'
-            });
-        }
-    }
+    //         if (this.currentRenderer) {
+    //             await this.currentRenderer.updatePosition(data);
+    //             await this.currentRenderer.updateGPSInfo(data);
+    //         } else {
+    //             Logger.warn('MapService', '没有活动的渲染器');
+    //         }
+    //     } catch (error) {
+    //         Logger.error('MapService', '处理GPS更新失败:', error);
+    //         this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+    //             type: 'ERROR',
+    //             message: '更新GPS位置失败'
+    //         });
+    //     }
+    // }
 
     validateGPSData(data) {
         if (!data || typeof data !== 'object') return false;
@@ -560,28 +560,52 @@ class MapService {
     // 设置WebSocket管理器
     setWebSocketManager(wsManager) {
         Logger.info('MapService', '设置WebSocket管理器');
-        if (!wsManager) {
-            Logger.error('MapService', 'WebSocket管理器无效');
+        
+        if (!wsManager || !wsManager.socket) {
+            Logger.error('MapService', 'WebSocket管理器无效或未初始化');
+            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+                type: 'WARNING',
+                message: 'GPS实时更新功能可能不可用'
+            });
             return;
         }
 
         this.wsManager = wsManager;
         
-        // 确保handleGPSUpdate已经绑定到this
-        if (!this.handleGPSUpdate) {
-            this.handleGPSUpdate = this.handleGPSUpdate.bind(this);
+        try {
+            // 使用新的订阅方法
+            this.wsManager.subscribe(WS_EVENT_TYPES.BUSINESS.GPS_UPDATE, (data) => {
+                Logger.debug('MapService', '收到GPS更新:', data);
+                this.handleGPSUpdate(data);
+            });
+            
+            Logger.info('MapService', 'GPS更新处理器设置成功');
+            
+        } catch (error) {
+            Logger.error('MapService', 'GPS更新处理器设置失败:', error);
+            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+                type: 'ERROR',
+                message: 'GPS更新功能初始化失败'
+            });
+        }
+    }
+
+    handleGPSUpdate(data) {
+        if (!data || typeof data !== 'object') {
+            Logger.warn('MapService', '收到无效的GPS数据:', data);
+            return;
         }
 
         try {
-            // 检查wsManager是否有onGPSUpdate方法
-            if (typeof this.wsManager.onGPSUpdate === 'function') {
-                this.wsManager.onGPSUpdate(this.handleGPSUpdate);
-                Logger.info('MapService', 'GPS更新处理器设置成功');
-            } else {
-                Logger.error('MapService', 'WebSocket管理器缺少onGPSUpdate方法');
-            }
+            // 更新地图上的GPS点位
+            this.currentRenderer?.updateGPSPoint(data);
+            
+            // 触发GPS更新事件
+            this.eventBus.emit(MAP_EVENTS.GPS_UPDATED, data);
+            
+            Logger.debug('MapService', 'GPS数据更新成功');
         } catch (error) {
-            Logger.error('MapService', 'GPS更新处理器设置失败:', error);
+            Logger.error('MapService', 'GPS数据更新失败:', error);
         }
     }
 
@@ -650,7 +674,7 @@ class MapService {
                     }
                     break;
                 default:
-                    Logger.error('MapService', `不支持的时间范围类型: ${this.timeRange}`);
+                    Logger.error('MapService', `不支持的时间范围类型: ${JSON.stringify(this.timeRange, null, 2)}`);
                     this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
                         type: 'ERROR',
                         message: `不支持的时间范围: ${this.timeRange}，已重置为today`,

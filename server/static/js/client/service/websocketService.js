@@ -1,12 +1,18 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-17 13:47:42
- * @LastEditTime: 2025-02-18 10:41:53
+ * @LastEditTime: 2025-02-19 14:34:33
  * @LastEditors: 一根鱼骨棒
  * @Description: WebSocket服务管理
  */
 import Logger from '../../utils/logger.js';
-import WebSocketManager from '../../function/WebSocketManager.js';
+import { SERVER } from '../../config/config.js';
+import { 
+    WS_STATE,
+    WS_EVENT_TYPES,
+    WS_CONFIG,
+    WS_ERROR_TYPES
+} from "../config/wsConfig.js";
 import { 
     TASK_EVENTS,
     PLAYER_EVENTS,
@@ -16,373 +22,424 @@ import {
 } from "../config/events.js";
 
 class WebSocketService {
-    constructor(eventBus, api) {
+    constructor(eventBus) {
+        if (!eventBus) {
+            throw new Error('EventBus is required for WebSocketService');
+        }
         this.eventBus = eventBus;
-        this.api = api;
-        this.wsManager = null;
-        this.connected = false;
+        this.socket = null;
+        this.state = WS_STATE.DISCONNECTED;
         this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 5;
-        this.reconnectDelay = 1000; // 初始重连延迟1秒
-        this.connectionTimeout = null;
         this.currentSubscribedPlayerId = null;
-        this.isInitializing = false; // 添加初始化状态标志
-        this.hasShownError = false;  // 添加错误显示标志
+        this.subscriptions = new Set();
+        this.isInitializing = false;
+        
+        // 预先绑定事件处理方法
+        this.handleGPSUpdate = this.handleGPSUpdate.bind(this);
+        this.handlePlayerUpdate = this.handlePlayerUpdate.bind(this);
         
         Logger.info('WebSocketService', '初始化WebSocket服务');
     }
 
+    // 创建WebSocket错误
+    createWSError(type, message, details = null) {
+        const error = {
+            type,
+            message,
+            details,
+            timestamp: Date.now()
+        };
+        Logger.error('WebSocketService', `WebSocket错误: ${message}`, error);
+        return error;
+    }
+
+    // 处理WebSocket错误
+    handleWSError(error, operation = '') {
+        let wsError;
+        
+        if (error.type && Object.values(WS_ERROR_TYPES).includes(error.type)) {
+            // 已经是格式化的WebSocket错误
+            wsError = error;
+        } else {
+            // 根据错误类型创建相应的WebSocket错误
+            switch(true) {
+                case error.code === 'ECONNREFUSED':
+                    wsError = this.createWSError(
+                        WS_ERROR_TYPES.CONNECTION_ERROR,
+                        '连接服务器失败',
+                        { originalError: error.message }
+                    );
+                    break;
+                case error.message?.includes('timeout'):
+                    wsError = this.createWSError(
+                        WS_ERROR_TYPES.TIMEOUT_ERROR,
+                        `操作超时: ${operation}`,
+                        { originalError: error.message }
+                    );
+                    break;
+                case error.message?.includes('network'):
+                    wsError = this.createWSError(
+                        WS_ERROR_TYPES.NETWORK_ERROR,
+                        '网络连接异常',
+                        { originalError: error.message }
+                    );
+                    break;
+                default:
+                    wsError = this.createWSError(
+                        WS_ERROR_TYPES.UNKNOWN_ERROR,
+                        '发生未知错误',
+                        { originalError: error.message }
+                    );
+            }
+        }
+
+        // 触发UI通知
+        this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+            type: 'ERROR',
+            message: wsError.message,
+            details: wsError.details
+        });
+
+        return wsError;
+    }
+
+    // 获取WebSocket管理器
+    getWSManager() {
+        if (!this.socket) {
+            Logger.warn('WebSocketService', 'WebSocket尚未初始化');
+            return null;
+        }
+
+        return {
+            socket: this.socket,
+            state: this.state,
+            // 返回socket实例而不是事件处理函数
+            subscribe: (eventName, callback) => {
+                if (typeof callback === 'function') {
+                    this.socket.on(eventName, callback);
+                    this.subscriptions.add({ eventName, callback });
+                    Logger.debug('WebSocketService', `订阅事件: ${eventName}`);
+                }
+            },
+            unsubscribe: (eventName, callback) => {
+                if (typeof callback === 'function') {
+                    this.socket.off(eventName, callback);
+                    this.subscriptions.delete({ eventName, callback });
+                    Logger.debug('WebSocketService', `取消订阅事件: ${eventName}`);
+                }
+            }
+        };
+    }
+
+    handleGPSUpdate(data) {
+        Logger.debug('WebSocketService', '收到GPS更新:', data);
+        this.eventBus.emit(MAP_EVENTS.GPS_UPDATE, data);
+    }
+
+    handlePlayerUpdate(data) {
+        Logger.debug('WebSocketService', '收到玩家更新:', data);
+        this.eventBus.emit(PLAYER_EVENTS.INFO_UPDATED, data);
+    }
+
     // 初始化WebSocket连接
     async initialize() {
-        // 防止重复初始化
         if (this.isInitializing) {
-            Logger.warn('WebSocketService', '初始化正在进行中，跳过重复初始化');
+            Logger.warn('WebSocketService', 'WebSocket正在初始化中');
             return;
         }
-        
-        // 如果已经连接，不需要重新初始化
-        if (this.connected && this.wsManager?.socket?.connected) {
-            Logger.info('WebSocketService', 'WebSocket已连接，无需重新初始化');
+
+        if (this.socket?.connected) {
+            Logger.info('WebSocketService', 'WebSocket已连接');
+            // 不立即触发连接事件，等待其他服务初始化完成
             return;
         }
 
         this.isInitializing = true;
-        Logger.info('WebSocketService', '开始初始化WebSocket管理器');
+        this.state = WS_STATE.CONNECTING;
+        Logger.info('WebSocketService', '开始初始化WebSocket');
         
         try {
-            // 清理之前的连接
-            await this.disconnect();
-
-            // 创建新的WebSocket管理器
-            this.wsManager = new WebSocketManager();
-            
-            // 设置连接超时
-            this.setConnectionTimeout();
+            // 创建socket连接，但不自动连接
+            this.socket = io(SERVER, {
+                ...WS_CONFIG.CONNECTION,
+                autoConnect: false
+            });
             
             // 设置事件处理器
             this.setupEventHandlers();
             
-            // 等待连接完成
-            await new Promise((resolve, reject) => {
-                const timeoutId = setTimeout(() => {
-                    reject(new Error('WebSocket连接超时'));
-                }, 5000);
-
-                this.wsManager.onConnect(() => {
-                    clearTimeout(timeoutId);
-                    this.connected = true;
-                    this.reconnectAttempts = 0;
-                    this.hasShownError = false; // 重置错误显示标志
-                    resolve();
-                });
-
-                this.wsManager.onError((error) => {
-                    clearTimeout(timeoutId);
-                    reject(error);
-                });
-            });
-
-            Logger.info('WebSocketService', 'WebSocket初始化成功');
-        } catch (error) {
-            Logger.error('WebSocketService', 'WebSocket初始化失败:', error);
-            throw error;
-        } finally {
+            Logger.info('WebSocketService', 'WebSocket初始化配置完成，等待连接');
             this.isInitializing = false;
+        } catch (error) {
+            this.isInitializing = false;
+            this.state = WS_STATE.ERROR;
+            this.handleWSError(error, 'initialize');
+            throw error;
         }
     }
 
-    // 设置连接超时
-    setConnectionTimeout() {
-        // 清除之前的超时
-        if (this.connectionTimeout) {
-            clearTimeout(this.connectionTimeout);
+    // 开始连接
+    async connect() {
+        if (!this.socket) {
+            Logger.error('WebSocketService', '无法连接：WebSocket未初始化');
+            return;
         }
 
-        // 设置新的超时（5秒）
-        this.connectionTimeout = setTimeout(() => {
-            if (!this.connected) {
-                const error = new Error('WebSocket连接超时');
-                Logger.warn('WebSocketService', '连接超时详情:', {
-                    attempts: this.reconnectAttempts,
-                    maxAttempts: this.maxReconnectAttempts,
-                    delay: this.reconnectDelay,
-                    wsState: this.wsManager?.socket?.connected
-                });
-                this.handleReconnect();
-            }
-        }, 5000); // 增加超时时间到5秒
+        if (this.socket.connected) {
+            Logger.info('WebSocketService', 'WebSocket已经连接');
+            this.eventBus.emit(WS_EVENTS.CONNECTED);
+            return;
+        }
+
+        try {
+            this.state = WS_STATE.CONNECTING;
+            this.eventBus.emit(WS_EVENTS.CONNECTING);
+            
+            // 连接
+            this.socket.connect();
+            
+            // 等待连接完成
+            await this.waitForConnection();
+            
+            Logger.info('WebSocketService', 'WebSocket连接成功');
+        } catch (error) {
+            this.state = WS_STATE.ERROR;
+            this.handleWSError(error, 'connect');
+            this.eventBus.emit(WS_EVENTS.ERROR);
+            throw error;
+        }
+    }
+
+    // 等待连接完成
+    waitForConnection() {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('WebSocket连接超时'));
+            }, WS_CONFIG.CONNECTION.timeout);
+
+            this.socket.once(WS_EVENT_TYPES.SYSTEM.CONNECT, () => {
+                clearTimeout(timeout);
+                this.state = WS_STATE.CONNECTED;
+                this.eventBus.emit(WS_EVENTS.CONNECTED);
+                resolve();
+            });
+
+            this.socket.once(WS_EVENT_TYPES.SYSTEM.CONNECT_ERROR, (error) => {
+                clearTimeout(timeout);
+                reject(error);
+            });
+        });
     }
 
     // 设置事件处理器
     setupEventHandlers() {
-        if (!this.wsManager) {
-            Logger.error('WebSocketService', 'WebSocket管理器未初始化');
+        if (!this.socket) {
+            Logger.error('WebSocketService', '无法设置事件处理器：socket未初始化');
             return;
         }
 
-        // 使用WebSocketManager提供的事件接口
-        this.wsManager.onConnect(() => {
-            Logger.info('WebSocketService', 'WebSocket连接成功');
-            this.connected = true;
-            this.reconnectAttempts = 0;
-            this.reconnectDelay = 1000;
-            
-            // 清除连接超时
-            if (this.connectionTimeout) {
-                clearTimeout(this.connectionTimeout);
+        // GPS更新事件
+        this.socket.on(WS_EVENT_TYPES.BUSINESS.GPS_UPDATE, (data) => {
+            Logger.debug('WebSocketService', '收到GPS更新:', data);
+            if (data && typeof data === 'object') {
+                this.eventBus.emit(MAP_EVENTS.GPS_UPDATE, data);
+            } else {
+                Logger.warn('WebSocketService', '收到无效的GPS数据:', data);
             }
-            
+        });
+
+        // 玩家更新事件
+        this.socket.on(WS_EVENT_TYPES.BUSINESS.PLAYER_UPDATE, (data) => {
+            Logger.debug('WebSocketService', '收到玩家更新:', data);
+            if (data && typeof data === 'object') {
+                this.eventBus.emit(PLAYER_EVENTS.INFO_UPDATED, data);
+            } else {
+                Logger.warn('WebSocketService', '收到无效的玩家数据:', data);
+            }
+        });
+
+        // 连接事件
+        this.socket.on(WS_EVENT_TYPES.SYSTEM.CONNECT, () => {
+            Logger.info('WebSocketService', 'WebSocket连接成功');
+            this.state = WS_STATE.CONNECTED;
+            this.reconnectAttempts = 0;
             this.eventBus.emit(WS_EVENTS.CONNECTED);
         });
 
-        this.wsManager.onDisconnect(() => {
-            Logger.warn('WebSocketService', 'WebSocket连接断开');
-            this.connected = false;
+        // 断开连接事件
+        this.socket.on(WS_EVENT_TYPES.SYSTEM.DISCONNECT, (reason) => {
+            Logger.warn('WebSocketService', 'WebSocket断开连接:', reason);
+            this.state = WS_STATE.DISCONNECTED;
             this.eventBus.emit(WS_EVENTS.DISCONNECTED);
             this.handleReconnect();
         });
 
-        this.wsManager.onError((error) => {
+        // 错误事件
+        this.socket.on(WS_EVENT_TYPES.SYSTEM.ERROR, (error) => {
             Logger.error('WebSocketService', 'WebSocket错误:', error);
-            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-                type: 'ERROR',
-                message: 'WebSocket连接出错'
-            });
-        });
-
-        // 设置GPS更新处理
-        this.wsManager.onGPSUpdate((data) => {
-            Logger.debug('WebSocketService', 'GPS更新:', data);
-            if (this.validateGPSData(data)) {
-                this.eventBus.emit(MAP_EVENTS.GPS_UPDATED, data);
-            }
-        });
-        
-        // 设置任务更新处理
-        this.wsManager.onTaskUpdate((data) => {
-            Logger.debug('WebSocketService', '任务更新:', data);
-            if (this.validateTaskData(data)) {
-                this.eventBus.emit(TASK_EVENTS.STATUS_UPDATED, {
-                    ...data,
-                    timestamp: Date.now()
-                });
-            }
-        });
-        
-        // 设置NFC任务更新处理
-        this.wsManager.onNFCTaskUpdate((data) => {
-            Logger.debug('WebSocketService', 'NFC任务更新:', data);
-            if (this.validateNFCTaskData(data)) {
-                this.eventBus.emit(TASK_EVENTS.STATUS_UPDATED, {
-                    ...data,
-                    source: 'NFC',
-                    timestamp: Date.now()
-                });
-            }
+            this.handleWSError(error, 'socket');
         });
     }
 
-    // 处理重连逻辑
+    // 处理重连
     handleReconnect() {
-        // 如果正在初始化或已经连接，跳过重连
-        if (this.isInitializing || this.connected) {
-            Logger.debug('WebSocketService', '跳过重连: 正在初始化或已连接');
+        if (this.reconnectAttempts >= WS_CONFIG.RECONNECT.maxAttempts) {
+            this.eventBus.emit(WS_EVENTS.ERROR);
+            Logger.error('WebSocketService', '重连次数超过最大限制');
             return;
         }
 
-        // 检查是否达到最大重试次数
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            if (!this.hasShownError) { // 只在第一次显示错误
-                const error = new Error(`WebSocket重连失败(${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-                Logger.error('WebSocketService', '重连失败详情:', {
-                    attempts: this.reconnectAttempts,
-                    maxAttempts: this.maxReconnectAttempts,
-                    lastDelay: this.reconnectDelay,
-                    wsState: this.wsManager?.socket?.connected,
-                    serverUrl: this.wsManager?.socket?.io?.uri
-                });
-                
-                this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-                    type: 'ERROR',
-                    message: 'WebSocket连接失败,请检查网络后刷新页面',
-                    details: error.message
-                });
-                
-                this.hasShownError = true; // 标记已显示错误
-            }
-            return;
-        }
+        this.reconnectAttempts++;
+        
+        // 发送重连事件时传递数字
+        this.eventBus.emit(WS_EVENTS.RECONNECTING, this.reconnectAttempts);
+        
+        Logger.info('WebSocketService', `尝试重连 (${this.reconnectAttempts}/${WS_CONFIG.RECONNECT.maxAttempts})`);
 
-        // 使用指数退避策略
-        const baseDelay = 2000;
-        const maxDelay = 30000;
-        const delay = Math.min(baseDelay * Math.pow(2, this.reconnectAttempts), maxDelay);
-        
-        Logger.info('WebSocketService', `准备重连(${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}), 延迟: ${delay}ms`);
-        
-        // 清理之前的重连定时器
-        if (this._reconnectTimer) {
-            clearTimeout(this._reconnectTimer);
-        }
-        
-        this._reconnectTimer = setTimeout(async () => {
-            if (!this.connected) {
-                this.reconnectAttempts++;
-                try {
-                    await this.initialize();
-                    
-                    // 重连成功后恢复之前的订阅
-                    if (this.currentSubscribedPlayerId) {
-                        await this.subscribeToPlayerEvents(this.currentSubscribedPlayerId);
-                    }
-                } catch (error) {
-                    Logger.error('WebSocketService', '重连尝试失败:', {
-                        attempt: this.reconnectAttempts,
-                        error: error.message,
-                        stack: error.stack,
-                        nextDelay: delay * 2
-                    });
-                    
-                    // 如果还没到最大重试次数,继续重连
-                    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                        this.handleReconnect();
-                    }
-                }
-            }
-        }, delay);
+        setTimeout(() => {
+            this.connect();
+        }, WS_CONFIG.RECONNECT.delay);
     }
 
-    // 验证GPS数据
+    // 数据验证方法
     validateGPSData(data) {
-        if (!data || typeof data !== 'object') {
-            Logger.error('WebSocketService', '无效的GPS数据格式');
+        if (!data?.latitude || !data?.longitude) {
+            this.handleWSError(
+                this.createWSError(
+                    WS_ERROR_TYPES.INVALID_DATA,
+                    '无效的GPS数据',
+                    { data }
+                )
+            );
             return false;
         }
-
-        const { latitude, longitude, accuracy } = data;
-        if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-            Logger.error('WebSocketService', 'GPS坐标无效');
-            return false;
-        }
-
         return true;
     }
 
-    // 验证任务数据
     validateTaskData(data) {
-        if (!data || typeof data !== 'object') {
-            Logger.error('WebSocketService', '无效的任务数据格式');
+        if (!data?.id || !data?.status) {
+            this.handleWSError(
+                this.createWSError(
+                    WS_ERROR_TYPES.INVALID_DATA,
+                    '无效的任务数据',
+                    { data }
+                )
+            );
             return false;
         }
-
-        if (!data.id || !data.status) {
-            Logger.error('WebSocketService', '任务数据缺少必要字段');
-            return false;
-        }
-
         return true;
     }
 
-    // 验证NFC任务数据
     validateNFCTaskData(data) {
-        if (!data || typeof data !== 'object') {
-            Logger.error('WebSocketService', '无效的NFC任务数据格式');
+        if (!data?.type || !data?.taskId) {
+            this.handleWSError(
+                this.createWSError(
+                    WS_ERROR_TYPES.INVALID_DATA,
+                    '无效的NFC任务数据',
+                    { data }
+                )
+            );
             return false;
         }
-
-        if (!data.type || !data.taskId) {
-            Logger.error('WebSocketService', 'NFC任务数据缺少必要字段');
-            return false;
-        }
-
         return true;
     }
 
-    // 订阅玩家相关的WebSocket事件
+    // 订阅相关方法
     subscribeToPlayerEvents(playerId) {
-        if (!this.wsManager || !playerId) {
-            Logger.error('WebSocketService', '无法订阅玩家事件: WebSocket未初始化或玩家ID无效');
-            return;
-        }
-
-        // 如果已经订阅了相同的玩家ID，则跳过
-        if (this.currentSubscribedPlayerId === playerId) {
-            Logger.debug('WebSocketService', `已经订阅了玩家(${playerId})的事件，跳过重复订阅`);
-            return;
-        }
-
-        Logger.info('WebSocketService', `订阅玩家(${playerId})的WebSocket事件`);
+        if (!playerId) return;
         
-        try {
-            // 如果之前订阅了其他玩家，先取消订阅
-            if (this.currentSubscribedPlayerId) {
-                this.unsubscribeFromPlayerEvents(this.currentSubscribedPlayerId);
-            }
+        const room = `user_${playerId}`;
+        
+        // 如果已订阅相同玩家，跳过
+        if (this.currentSubscribedPlayerId === playerId) {
+            return;
+        }
 
-            // 更新当前订阅的玩家ID
+        // 取消之前的订阅
+        if (this.currentSubscribedPlayerId) {
+            this.unsubscribeFromPlayerEvents(this.currentSubscribedPlayerId);
+        }
+
+        try {
             this.currentSubscribedPlayerId = playerId;
             
-            // 执行新的订阅
-            this.wsManager.subscribeToTasks(playerId);
-            this.wsManager.subscribeToGPS(playerId);
+            // 订阅任务和GPS
+            this.socket.emit(WS_EVENT_TYPES.ROOM.SUBSCRIBE_TASKS, { player_id: playerId, room });
+            this.socket.emit(WS_EVENT_TYPES.ROOM.SUBSCRIBE_GPS, { player_id: playerId, room });
+            this.socket.emit(WS_EVENT_TYPES.ROOM.JOIN, { room });
+            
+            this.subscriptions.add(room);
+            this.subscriptions.add(`gps_${room}`);
         } catch (error) {
-            Logger.error('WebSocketService', '订阅玩家事件失败:', error);
-            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-                type: 'ERROR',
-                message: '订阅玩家事件失败'
-            });
+            this.handleWSError(
+                this.createWSError(
+                    WS_ERROR_TYPES.SUBSCRIPTION_ERROR,
+                    '订阅玩家事件失败',
+                    { playerId, error: error.message }
+                )
+            );
         }
     }
 
-    // 取消玩家事件订阅
     unsubscribeFromPlayerEvents(playerId) {
-        if (!this.wsManager || !playerId) return;
+        if (!playerId) return;
 
-        Logger.info('WebSocketService', `取消订阅玩家(${playerId})的WebSocket事件`);
+        const room = `user_${playerId}`;
         
         try {
-            const room = `user_${playerId}`;
-            this.wsManager.socket.emit('unsubscribe_tasks', { player_id: playerId, room });
-            this.wsManager.socket.emit('unsubscribe_gps', { player_id: playerId, room });
-            this.wsManager.socket.emit('leave', { room });
+            this.socket.emit(WS_EVENT_TYPES.ROOM.UNSUBSCRIBE_TASKS, { player_id: playerId, room });
+            this.socket.emit(WS_EVENT_TYPES.ROOM.UNSUBSCRIBE_GPS, { player_id: playerId, room });
+            this.socket.emit(WS_EVENT_TYPES.ROOM.LEAVE, { room });
             
-            // 清除当前订阅的玩家ID
+            this.subscriptions.delete(room);
+            this.subscriptions.delete(`gps_${room}`);
+            
             if (this.currentSubscribedPlayerId === playerId) {
                 this.currentSubscribedPlayerId = null;
             }
         } catch (error) {
-            Logger.error('WebSocketService', '取消订阅玩家事件失败:', error);
+            Logger.error('WebSocketService', '取消订阅失败:', error);
+        }
+    }
+
+    // 重新订阅所有房间
+    resubscribeAll() {
+        for (const subscription of this.subscriptions) {
+            const isGPS = subscription.startsWith('gps_user_');
+            const playerId = isGPS 
+                ? subscription.replace('gps_user_', '')
+                : subscription.replace('user_', '');
+            
+            if (isGPS) {
+                this.socket.emit(WS_EVENT_TYPES.ROOM.SUBSCRIBE_GPS, {
+                    player_id: playerId,
+                    room: `user_${playerId}`
+                });
+            } else {
+                this.socket.emit(WS_EVENT_TYPES.ROOM.SUBSCRIBE_TASKS, {
+                    player_id: playerId,
+                    room: subscription
+                });
+                this.socket.emit(WS_EVENT_TYPES.ROOM.JOIN, { room: subscription });
+            }
         }
     }
 
     // 断开连接
-    async disconnect() {
-        if (this.wsManager) {
-            // 清理超时定时器
-            if (this.connectionTimeout) {
-                clearTimeout(this.connectionTimeout);
-                this.connectionTimeout = null;
-            }
-            
-            // 断开WebSocket连接
-            if (this.wsManager.socket) {
-                this.wsManager.socket.disconnect();
-            }
-            
-            this.wsManager = null;
-            this.connected = false;
+    disconnect() {
+        if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
+            this.state = WS_STATE.DISCONNECTED;
+            this.subscriptions.clear();
+            this.currentSubscribedPlayerId = null;
             this.eventBus.emit(WS_EVENTS.DISCONNECTED);
         }
     }
 
-    // 获取WebSocket管理器实例
-    getWSManager() {
-        return this.wsManager;
-    }
-
     // 获取连接状态
     isConnected() {
-        return this.connected;
+        return this.state === WS_STATE.CONNECTED;
     }
 }
 

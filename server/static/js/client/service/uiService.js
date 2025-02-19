@@ -1,17 +1,13 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-02-18 16:42:39
+ * @LastEditTime: 2025-02-19 14:58:09
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
 import Logger from "../../utils/logger.js";
-import { 
-    TASK_EVENTS,
-    UI_EVENTS,
-    AUDIO_EVENTS,
-    MAP_EVENTS 
-} from "../config/events.js";
+import { TASK_EVENTS, UI_EVENTS, AUDIO_EVENTS, MAP_EVENTS,WS_EVENTS } from "../config/events.js";
+import {  WS_STATE, WS_CONFIG } from "../config/wsConfig.js";
 
 class UIService {
   constructor(eventBus, store, templateService, taskService) {
@@ -22,6 +18,8 @@ class UIService {
     this.observers = new Map();
     Logger.info("UIService", "初始化UI服务");
 
+    // 初始化状态显示元素
+    this.initStatusElements();
     // 初始化事件监听
     this.initEvents();
   }
@@ -45,7 +43,57 @@ class UIService {
     // 地图相关事件监听
     this.eventBus.on(MAP_EVENTS.RENDERER_CHANGED, this.updateMapSwitchButton.bind(this));
 
+    // WebSocket状态事件监听
+    this.eventBus.on(WS_EVENTS.CONNECTED, () => {
+      this.updateWebSocketStatus("WebSocket已连接", WS_STATE.CONNECTED);
+      this.showNotification({
+        type: 'SUCCESS',
+        message: 'WebSocket连接成功'
+      });
+    });
+
+    this.eventBus.on(WS_EVENTS.DISCONNECTED, () => {
+      this.updateWebSocketStatus("WebSocket已断开", WS_STATE.DISCONNECTED);
+      this.showNotification({
+        type: 'WARNING',
+        message: 'WebSocket连接断开'
+      });
+    });
+
+    this.eventBus.on(WS_EVENTS.CONNECTING, () => {
+      this.updateWebSocketStatus("WebSocket连接中...", WS_STATE.CONNECTING);
+    });
+
+    this.eventBus.on(WS_EVENTS.ERROR, () => {
+      this.updateWebSocketStatus("WebSocket连接错误", WS_STATE.ERROR);
+      this.showNotification({
+        type: 'ERROR',
+        message: 'WebSocket连接错误'
+      });
+    });
+
+    this.eventBus.on(WS_EVENTS.RECONNECTING, (attempt) => {
+      const currentAttempt = typeof attempt === 'number' ? attempt : 1;
+      const maxAttempts = WS_CONFIG.RECONNECT.maxAttempts;
+      
+      this.updateWebSocketStatus(
+        `WebSocket重连中(${currentAttempt}/${maxAttempts})`,
+        WS_STATE.RECONNECTING
+      );
+    });
+
     Logger.info("UIService", "事件监听初始化完成");
+  }
+
+  initStatusElements() {
+    // 获取状态显示元素
+    this.statusDot = document.querySelector('.status-dot');
+    this.statusText = document.querySelector('.status-text');
+    Logger.debug('UIService', 'WebSocket状态显示元素:', this.statusDot, this.statusText);
+    if (!this.statusDot || !this.statusText) {
+      Logger.warn('UIService', 'WebSocket状态显示元素未找到');
+    }
+   
   }
 
   setupDOMObserver() {
@@ -108,7 +156,7 @@ class UIService {
                 onConfirm: () => {
                   this.eventBus.emit(TASK_EVENTS.ABANDONED, { taskId, playerId: this.store.state.playerId });
                   layer.closeAll();
-                }
+                },
               });
             });
           }
@@ -120,7 +168,7 @@ class UIService {
       Logger.error("UIService", "显示任务详情失败:", error);
       this.showNotification({
         type: "ERROR",
-        message: "显示任务详情失败"
+        message: "显示任务详情失败",
       });
     }
   }
@@ -130,45 +178,44 @@ class UIService {
    * @param {Object} data 通知数据
    */
   showNotification(data) {
-    Logger.debug('UIService', '显示通知:', data);
-    
+    Logger.debug("UIService", "显示通知:", data);
+
     // 防止重复通知
     const notificationKey = `${data.type}-${data.message}`;
     const now = Date.now();
-    
-    if (this._lastNotification && 
-        this._lastNotification.key === notificationKey && 
-        now - this._lastNotification.time < 1000) { // 1秒内的相同通知将被忽略
-        Logger.debug('UIService', '忽略重复通知');
-        return;
+
+    if (this._lastNotification && this._lastNotification.key === notificationKey && now - this._lastNotification.time < 1000) {
+      // 1秒内的相同通知将被忽略
+      Logger.debug("UIService", "忽略重复通知");
+      return;
     }
-    
+
     // 记录本次通知
     this._lastNotification = {
-        key: notificationKey,
-        time: now
+      key: notificationKey,
+      time: now,
     };
 
     try {
-        // 使用 layer 显示通知
-        const icon = this._getNotificationIcon(data.type);
-        layer.msg(data.message, {
-            icon: icon,
-            time: 2000,
-            offset: '15px'
-        });
+      // 使用 layer 显示通知
+      const icon = this._getNotificationIcon(data.type);
+      layer.msg(data.message, {
+        icon: icon,
+        time: 2000,
+        offset: "15px",
+      });
     } catch (error) {
-        Logger.error('UIService', '显示通知失败:', error);
-        console.error('显示通知失败:', error);
+      Logger.error("UIService", "显示通知失败:", error);
+      console.error("显示通知失败:", error);
     }
   }
 
   _getNotificationIcon(type) {
     const iconMap = {
-        'SUCCESS': 1,
-        'ERROR': 2,
-        'WARNING': 0,
-        'INFO': 6
+      SUCCESS: 1,
+      ERROR: 2,
+      WARNING: 0,
+      INFO: 6,
     };
     return iconMap[type] || 6;
   }
@@ -549,68 +596,68 @@ class UIService {
    */
   async handleTaskAccept(taskId) {
     Logger.info("UIService", `处理接受任务: ${taskId}`);
-    
+
     try {
-        // 使用 Promise 包装 layer.confirm
-        await new Promise((resolve, reject) => {
-            layer.confirm(
-                "确定要接受这个任务吗？",
-                {
-                    title: "接受任务",
-                    btn: ["确定", "取消"],
-                    icon: 3,
-                },
-                async (index) => {
-                    try {
-                        // 关闭确认对话框
-                        layer.close(index);
-                        
-                        // 调用任务服务接受任务
-                        const result = await this.taskService.acceptTask(taskId);
-                        
-                        // 根据返回结果显示不同的提示
-                        if (result.code === 1) {
-                            // 已接受的情况
-                            this.showNotification({
-                                type: "INFO",
-                                message: result.msg || "已接受该任务"
-                            });
-                        } else if (result.code === 0) {
-                            // 成功接受的情况
-                            this.showNotification({
-                                type: "SUCCESS",
-                                message: "任务接受成功"
-                            });
-                            
-                            // 发送音频播放事件
-                            this.eventBus.emit(AUDIO_EVENTS.PLAY, "ACCEPT");
-                        }
-                        
-                        resolve();
-                    } catch (error) {
-                        Logger.error("UIService", "接受任务失败:", error);
-                        this.showNotification({
-                            type: "ERROR",
-                            message: error.message || "接受任务失败"
-                        });
-                        
-                        // 发送错误音频事件
-                        this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
-                        reject(error);
-                    }
-                },
-                () => {
-                    // 取消按钮回调
-                    resolve();
-                }
-            );
-        });
+      // 使用 Promise 包装 layer.confirm
+      await new Promise((resolve, reject) => {
+        layer.confirm(
+          "确定要接受这个任务吗？",
+          {
+            title: "接受任务",
+            btn: ["确定", "取消"],
+            icon: 3,
+          },
+          async (index) => {
+            try {
+              // 关闭确认对话框
+              layer.close(index);
+
+              // 调用任务服务接受任务
+              const result = await this.taskService.acceptTask(taskId);
+
+              // 根据返回结果显示不同的提示
+              if (result.code === 1) {
+                // 已接受的情况
+                this.showNotification({
+                  type: "INFO",
+                  message: result.msg || "已接受该任务",
+                });
+              } else if (result.code === 0) {
+                // 成功接受的情况
+                this.showNotification({
+                  type: "SUCCESS",
+                  message: "任务接受成功",
+                });
+
+                // 发送音频播放事件
+                this.eventBus.emit(AUDIO_EVENTS.PLAY, "ACCEPT");
+              }
+
+              resolve();
+            } catch (error) {
+              Logger.error("UIService", "接受任务失败:", error);
+              this.showNotification({
+                type: "ERROR",
+                message: error.message || "接受任务失败",
+              });
+
+              // 发送错误音频事件
+              this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
+              reject(error);
+            }
+          },
+          () => {
+            // 取消按钮回调
+            resolve();
+          }
+        );
+      });
     } catch (error) {
-        Logger.error("UIService", "处理任务接受失败:", error);
-        this.showNotification({
-            type: "ERROR",
-            message: "处理任务接受失败"
-        });
+      Logger.error("UIService", "处理任务接受失败:", error);
+      this.showNotification({
+        type: "ERROR",
+        message: "处理任务接受失败",
+      });
     }
   }
 
@@ -621,8 +668,8 @@ class UIService {
   async handleTaskAbandon(taskId) {
     Logger.info("UIService", "处理放弃任务:", taskId);
     try {
-       // 显示确认对话框
-       layer.confirm(
+      // 显示确认对话框
+      layer.confirm(
         "确定要放弃这个任务吗？放弃后将无法恢复。",
         {
           title: "放弃任务",
@@ -647,7 +694,7 @@ class UIService {
       Logger.error("UIService", "放弃任务失败:", error);
       this.showNotification({
         type: "ERROR",
-        message: "放弃任务失败"
+        message: "放弃任务失败",
       });
       this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
     }
@@ -656,58 +703,58 @@ class UIService {
   // ... 其他UI相关方法
   // 优化地图渲染器变更处理方法
   updateMapSwitchButton(type) {
-    Logger.debug('UIService', '更新地图切换按钮:', type);
-    
-    const button = document.getElementById('switchMapType');
-                  
+    Logger.debug("UIService", "更新地图切换按钮:", type);
+
+    const button = document.getElementById("switchMapType");
+
     if (!button) {
-        Logger.debug('UIService', '找不到地图切换按钮，可能尚未创建');
-        return;
+      Logger.debug("UIService", "找不到地图切换按钮，可能尚未创建");
+      return;
     }
 
     try {
-        // 如果按钮当前类型与目标类型相同，不进行更新
-        if (button.dataset.type === type) {
-            Logger.debug('UIService', '按钮状态无需更新');
-            return;
-        }
+      // 如果按钮当前类型与目标类型相同，不进行更新
+      if (button.dataset.type === type) {
+        Logger.debug("UIService", "按钮状态无需更新");
+        return;
+      }
 
-        // 更新按钮文本和数据属性
-        const buttonText = button.querySelector('span') || button;
-        buttonText.textContent = type === 'AMAP' ? '切换到Echarts地图' : '切换到高德地图';
-        button.dataset.type = type;
+      // 更新按钮文本和数据属性
+      const buttonText = button.querySelector("span") || button;
+      buttonText.textContent = type === "AMAP" ? "切换到Echarts地图" : "切换到高德地图";
+      button.dataset.type = type;
 
-        Logger.debug('UIService', '地图切换按钮更新完成');
+      Logger.debug("UIService", "地图切换按钮更新完成");
     } catch (error) {
-        Logger.error('UIService', '更新地图切换按钮失败:', error);
+      Logger.error("UIService", "更新地图切换按钮失败:", error);
     }
   }
 
   updatePlayerInfo(playerData) {
-    Logger.debug('UIService', '更新玩家UI:', playerData);
-    
+    Logger.debug("UIService", "更新玩家UI:", playerData);
+
     try {
       if (!playerData) {
-        Logger.warn('UIService', '无效的玩家数据');
+        Logger.warn("UIService", "无效的玩家数据");
         return;
       }
 
       // 更新基本信息
-      const nameElement = document.getElementById('playerName');
-      const pointsElement = document.getElementById('playerPoints');
-      
-      if (nameElement) nameElement.textContent = playerData.player_name || '未知玩家';
-      if (pointsElement) pointsElement.textContent = playerData.points || '0';
-      
+      const nameElement = document.getElementById("playerName");
+      const pointsElement = document.getElementById("playerPoints");
+
+      if (nameElement) nameElement.textContent = playerData.player_name || "未知玩家";
+      if (pointsElement) pointsElement.textContent = playerData.points || "0";
+
       // 更新等级和经验值
       this.updateLevelAndExp(playerData);
-      
-      Logger.debug('UIService', '玩家UI更新完成');
+
+      Logger.debug("UIService", "玩家UI更新完成");
     } catch (error) {
-      Logger.error('UIService', '更新玩家UI失败:', error);
+      Logger.error("UIService", "更新玩家UI失败:", error);
       this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-        type: 'ERROR',
-        message: '更新玩家界面失败'
+        type: "ERROR",
+        message: "更新玩家界面失败",
       });
     }
   }
@@ -716,9 +763,9 @@ class UIService {
     try {
       if (!playerData) return;
 
-      const levelElement = document.querySelector('.level');
-      const expElement = document.querySelector('.exp');
-      const expBarInner = document.querySelector('.exp-bar-inner');
+      const levelElement = document.querySelector(".level");
+      const expElement = document.querySelector(".exp");
+      const expBarInner = document.querySelector(".exp-bar-inner");
 
       if (levelElement) {
         levelElement.textContent = `${playerData.level || 0}/100`;
@@ -731,10 +778,43 @@ class UIService {
         expBarInner.style.width = `${Math.min(100, expPercentage)}%`;
       }
 
-      Logger.debug('UIService', '等级和经验值更新完成');
+      Logger.debug("UIService", "等级和经验值更新完成");
     } catch (error) {
-      Logger.error('UIService', '更新等级和经验值失败:', error);
+      Logger.error("UIService", "更新等级和经验值失败:", error);
       throw error;
+    }
+  }
+
+  /**
+   * 更新WebSocket状态显示
+   * @param {string} message 状态消息
+   * @param {string} status 状态类型
+   */
+  updateWebSocketStatus(message, status) {
+    Logger.debug('UIService', `更新WebSocket状态: ${message} 状态: ${status}`);
+    
+    if (!this.statusDot || !this.statusText) {
+      Logger.warn('UIService', 'WebSocket状态显示元素不存在，重新初始化');
+      this.initStatusElements();
+    }
+
+    if (this.statusDot) {
+      // 移除所有状态类
+      this.statusDot.classList.remove(
+        'connected', 
+        'disconnected', 
+        'connecting', 
+        'error', 
+        'reconnecting'
+      );
+      // 添加当前状态类
+      this.statusDot.classList.add(status.toLowerCase());
+      Logger.debug('UIService', `状态点更新为: ${status.toLowerCase()}`);
+    }
+
+    if (this.statusText) {
+      this.statusText.textContent = message;
+      Logger.debug('UIService', `状态文本更新为: ${message}`);
     }
   }
 }

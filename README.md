@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-12 16:39:10
- * @LastEditTime: 2025-02-17 19:36:32
+ * @LastEditTime: 2025-02-18 20:55:32
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -145,6 +145,38 @@ python init_db.py
 python app.py
 ```
 
+### 配套接口数据格式
+
+#### NFCTOOLS 数据
+
+```text
+[ HTTP POST ]
+Request: http://{DEV_SERVER}/api/tasks/nfc_post
+POST parameters :
+名称: card_id / 值: 1(int类型 填入 )
+名称: type / 值: TASK(NFC卡类型)
+名称: player_id / 值: 0(int类型 按照NFC卡片设计)
+名称: id / 值: 1(int类型 )
+名称: value / 值: 0(int类型 )
+名称: timastamp / 值: 170000000(时间戳)
+名称: device / 值: {SERIAL}(字符串)
+
+```
+
+#### GPS数据格式
+
+```json
+{"location":"{last_loc_latlong}","accruacy":"{last_loc_accuracy}","speed":"{last_loc_speed_kmh}","timestamp":"{last_loc_age_timestamp}","player_id":"1","device":"{device_name}"}
+
+```
+
+location：x，y 纬度，精度数据
+accruacy：int类型，GPS定位精度
+speed：小数，单位公里/小时
+player_id:当前数据对应的玩家ID
+device：当前数据的采集设备
+timestamp：设备采集数据的时间 格式 yyyy-MM-dd HH:mm:ss macroDroid数据格式
+
 ### 代码规范
 
 - 使用 Black 格式化 Python 代码
@@ -188,5 +220,4 @@ chore: 构建过程或辅助工具的变动
 - 问题反馈: [Issues](https://github.com/yourusername/earthonline/issues)
 - 邮件联系: [775639471@qq.com](mailto:775639471@qq.com)
 
-无线续杯方案
-irm <https://aizaozao.com/accelerate.php/https://raw.githubusercontent.com/yuaotian/go-cursor-help/refs/heads/master/scripts/run/cursor_win_id_modifier.ps1> | iex
+
