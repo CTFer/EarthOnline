@@ -52,36 +52,56 @@
 
 // 通知动画
 @keyframes slideInDown {
-    from {
-        transform: translateY(-100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 @keyframes slideOutRight {
-    from {
-        transform: translateX(0);
-        opacity: 1;
-    }
-    to {
-        transform: translateX(100%);
-        opacity: 0;
-    }
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
 }
 
 @keyframes fadeOut {
-    from {
-        opacity: 1;
-    }
-    to {
-        opacity: 0;
-    }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes myfirst2 {
+  from {
+    -webkit-transform: rotate(0deg);
+    transform: rotate(0deg);
+  }
+  to {
+    -webkit-transform: rotate(359deg);
+    transform: rotate(359deg);
+  }
 }
 
+@keyframes myfirst {
+  from {
+    -webkit-transform: rotate(0deg);
+    transform: rotate(0deg);
+  }
+  to {
+    -webkit-transform: rotate(-359deg);
+    transform: rotate(-359deg);
+  }
+}
 // 动画类
 .animate {
   &-fadeIn {
@@ -95,4 +115,65 @@
   &-pulse {
     animation: pulse 1s infinite;
   }
-} 
+}
+// 背景动画
+.bg-box {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100vw;
+  z-index: -1;
+  .map {
+    position: relative;
+    width: 100vw;
+    margin: 0 auto;
+    height: 100vh;
+    z-index: 9;
+
+    .map1,
+    .map2,
+    .map3 {
+      position: absolute;
+      opacity: 0.5;
+      img {
+        width: 100%;
+      }
+    }
+    .map1 {
+      width: 45%;
+      height: 80%;
+      z-index: 2;
+      text-align: center;
+      margin: 0 auto;
+      right: 25%;
+      top: 5%;
+      animation: myfirst2 30s infinite linear;
+    }
+    .map2 {
+      width: 45%;
+      height: 80%;
+      margin: 0 auto;
+      text-align: center;
+      z-index: 3;
+      opacity: 0.2;
+      right: 25%;
+      top: 5%;
+      animation: myfirst 20s infinite linear;
+    }
+    .map3 {
+      width: 45%;
+      height: 80%;
+      margin: 0 auto;
+      text-align: center;
+      z-index: 1;
+      right: 25%;
+      top: 5%;
+    }
+  }
+}
+
+#bg-star {
+  position: absolute;
+}

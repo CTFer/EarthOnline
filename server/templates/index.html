@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:40:28
- * @LastEditTime: 2025-02-18 11:37:58
+ * @LastEditTime: 2025-02-19 18:54:18
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -9,68 +9,77 @@
 -->
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>团总的地球Online</title>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <!-- 添加缓存控制 meta 标签 -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <!-- favicon -->
-    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
-    <link rel="stylesheet" href="/static/css/swiper-bundle.min.css">
-    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg" />
+    <link rel="stylesheet" href="/static/css/swiper-bundle.min.css" />
+    <link rel="stylesheet" href="/static/layui/css/layui.css" />
     <!-- 修改 CSS 引用，添加随机参数 -->
-    <link rel="stylesheet" href="/static/css/client/index.min.css?v=1.0.1" id="mainStyle">
+    <link rel="stylesheet" href="/static/css/client/index.min.css?v=1.0.1" id="mainStyle" />
     <!-- jQuery -->
     <script src="/static/js/jquery.min.js"></script>
     <!-- 高德地图配置项 -->
     <script type="text/javascript">
-        window._AMapSecurityConfig = {
-            securityJsCode: "a64ba8d506a1154e41b9ca50a6113c55",   // 安全密钥
-        };
+      window._AMapSecurityConfig = {
+        securityJsCode: "a64ba8d506a1154e41b9ca50a6113c55", // 安全密钥
+      };
     </script>
     <script src="https://webapi.amap.com/maps?v=2.0&key=16de1da59d44d6967f9a6bf5248963c5&plugin=AMap.Scale,AMap.ToolBar"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts-extension-amap@latest/dist/echarts-extension-amap.min.js"></script>
     <script src="/static/js/echarts.min.js"></script>
     <!-- 在已有的高德地图 JS 后面添加 -->
     <script src="https://webapi.amap.com/ui/1.1/main.js"></script>
-</head>
-<body>
+  </head>
+  <body>
+    <!-- 动态背景 -->
+    <canvas id="bg-star"></canvas>
+    <div class="bg-box">
+      <div class="map">
+        <div class="map1"><img src="static/img/lbx.png" /></div>
+        <div class="map2"><img src="static/img/jt.png" /></div>
+        <div class="map3"><img src="static/img/map.png" /></div>
+      </div>
+    </div>
     <div class="game-container">
-        <!-- 左侧角色面板 -->
-        <div class="character-panel  panel-base">
-            <h2 class="panel-title">
-                <i class="layui-icon layui-icon-user"></i>
-                角色信息
-                <span class="title-decoration"></span>
-            </h2>
-            <div class="character-container">
-                <div id="wordCloudContainer" class="word-cloud-container">
-                    <!-- 文字云将通过JS动态生成 -->
-                </div>
-                <div class="character-stats">
-                    <!-- 人物形象区域 支持live2d和图片展示 -->
-                    <div id="live2dContainer"></div>
-                    <div id="character-image"></div>
-                    <!-- 角色基本信息 -->
-                    <div class="character-info">
-                        <div class="info-row nickname-row">
-                            <span class="info-label">昵称</span>
-                            <span class="info-value" id="playerName">加载中...</span>
-                        </div>
-                        <div class="info-row points-row">
-                            <span class="info-label">
-                                <img src="/static/img/points.png" alt="积分">
-                                积分
-                            </span>
-                            <span class="info-value" id="playerPoints">0</span>
-                        </div>
-                    </div>
-                    
-                    <!-- 角色属性 -->
-                    <div class="stat-group">
-                        <!-- <div class="stat-item">
+      <!-- 左侧角色面板 -->
+      <div class="character-panel panel-base">
+        <h2 class="panel-title">
+          <i class="layui-icon layui-icon-user"></i>
+          角色信息
+          <span class="title-decoration"></span>
+        </h2>
+        <div class="character-container">
+          <div id="wordCloudContainer" class="word-cloud-container">
+            <!-- 文字云将通过JS动态生成 -->
+          </div>
+          <div class="character-stats">
+            <!-- 人物形象区域 支持live2d和图片展示 -->
+            <div id="live2dContainer"></div>
+            <div id="character-image"></div>
+            <!-- 角色基本信息 -->
+            <div class="character-info">
+              <div class="info-row nickname-row">
+                <span class="info-label">昵称</span>
+                <span class="info-value" id="playerName">加载中...</span>
+              </div>
+              <div class="info-row points-row">
+                <span class="info-label">
+                  <img src="/static/img/points.png" alt="积分" />
+                  积分
+                </span>
+                <span class="info-value" id="playerPoints">0</span>
+              </div>
+            </div>
+
+            <!-- 角色属性 -->
+            <div class="stat-group">
+              <!-- <div class="stat-item">
                             <span>生命值</span>
                             <div class="stat-value">
                                 <div class="stat-bar">
@@ -88,204 +97,203 @@
                                 <span id="mp">9999/9999</span>
                             </div>
                         </div> -->
-                    </div>
-                    <div class="stat-group">
-                        <!-- <div class="stat-item">
+            </div>
+            <div class="stat-group">
+              <!-- <div class="stat-item">
                             <span>物攻</span>
                             <span id="physicalAtk">99999</span>
                         </div> -->
-
-                    </div>
-                    <div class="exp-section">
-                        <div class="exp-bar">
-                            <div class="exp-bar-inner"></div>
-                        </div>
-                        <div class="exp-info">
-                            <span class="level">66/100</span>
-                            <span class="exp">75666/99999</span>
-                        </div>
-                    </div>
-                </div>
             </div>
+            <div class="exp-section">
+              <div class="exp-bar">
+                <div class="exp-bar-inner"></div>
+              </div>
+              <div class="exp-info">
+                <span class="level">66/100</span>
+                <span class="exp">75666/99999</span>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
-
-        <!-- 中间主内容区 -->
-        <div class="main-content panel-base">
-            <!-- 上半部分：轨迹展示区 -->
-            <div class="main-content-top">
-                <!-- <h2 class="panel-title">
+      <!-- 中间主内容区 -->
+      <div class="main-content panel-base">
+        <!-- 上半部分：轨迹展示区 -->
+        <div class="main-content-top">
+          <!-- <h2 class="panel-title">
                     <i class="layui-icon layui-icon-location"></i>
                     轨迹
                     <span class="title-decoration"></span>
                 </h2> -->
 
-                <!-- 在GPS地图容器上方添加时间筛选 -->
-                <div class="map-controls">
-                    <div class="control-group time-filter">
-                        <i class="layui-icon layui-icon-date"></i>
-                        <select id="timeRangeSelect" class="time-range-select">
-                            <option value="today">当日</option>
-                            <option value="week">近一周</option>
-                            <option value="month">近一月</option>
-                            <option value="year">近一年</option>
-                            <option value="custom">自定义时间范围</option>
-                        </select>
-                        <!-- 自定义时间范围选择器,默认隐藏 -->
-                        <div id="customDateRange" class="custom-date-range" style="display: none;">
-                            <input type="datetime-local" id="startTime" class="date-input">
-                            <span>至</span>
-                            <input type="datetime-local" id="endTime" class="date-input">
-                            <button id="applyCustomRange" class="apply-btn">应用</button>
-                        </div>
-                    </div>
-
-                    <div class="control-group status-info">
-                        <div class="info-item gps-speed">
-                            <i class="layui-icon layui-icon-engine"></i>
-                            <span id="currentSpeed">0.0 km/h</span>
-                        </div>
-                        <div class="info-item gps-time">
-                            <i class="layui-icon layui-icon-time"></i>
-                            <span id="lastUpdateTime">未更新</span>
-                        </div>
-                        <div class="info-item battery-status">
-                            <i class="layui-icon layui-icon-cellphone"></i>
-                            <span id="batteryLevel">100%</span>
-                        </div>
-                    </div>
-
-                    <div class="control-group map-controls-buttons">
-                        <button id="switchMapType" class="control-btn">
-                            <i class="layui-icon layui-icon-chart"></i>
-                            <span>切换地图</span>
-                        </button>
-                        <button id="switchDisplayMode" class="control-btn">
-                            <i class="layui-icon layui-icon-share"></i>
-                            <span>切换显示</span>
-                        </button>
-                    </div>
-                </div>
-                <div id="gpsMapContainer" class="gps-map-container">
-                    <!-- GPS地图将通过JS动态生成 -->
-                </div>
+          <!-- 在GPS地图容器上方添加时间筛选 -->
+          <div class="map-controls">
+            <div class="control-group time-filter">
+              <i class="layui-icon layui-icon-date"></i>
+              <select id="timeRangeSelect" class="time-range-select">
+                <option value="today">当日</option>
+                <option value="week">近一周</option>
+                <option value="month">近一月</option>
+                <option value="year">近一年</option>
+                <option value="custom">自定义时间范围</option>
+              </select>
+              <!-- 自定义时间范围选择器,默认隐藏 -->
+              <div id="customDateRange" class="custom-date-range" style="display: none">
+                <input type="datetime-local" id="startTime" class="date-input" />
+                <span>至</span>
+                <input type="datetime-local" id="endTime" class="date-input" />
+                <button id="applyCustomRange" class="apply-btn">应用</button>
+              </div>
             </div>
-            
-            <!-- 下半部分：进行中的任务 -->
-            <div class="main-content-bottom">
-                <h2 class="panel-title">
-                    <i class="layui-icon layui-icon-loading"></i>
-                    进行中的任务
-                    <span class="title-decoration"></span>
-                </h2>
-                <!-- 任务容器 -->
-                <div class="active-tasks-wrapper active-tasks-container">
-                    <div class="swiper active-tasks-swiper">
-                        <div class="swiper-wrapper task-panel">
-                            <!-- 任务将在这里生成 -->
-                        </div>
-                        <div class="swiper-scrollbar swiper-scrollbar-active-tasks"></div>
-                    </div>
-                </div>
+
+            <div class="control-group status-info">
+              <div class="info-item gps-speed">
+                <i class="layui-icon layui-icon-engine"></i>
+                <span id="currentSpeed">0.0 km/h</span>
+              </div>
+              <div class="info-item gps-time">
+                <i class="layui-icon layui-icon-time"></i>
+                <span id="lastUpdateTime">未更新</span>
+              </div>
+              <div class="info-item battery-status">
+                <i class="layui-icon layui-icon-cellphone"></i>
+                <span id="batteryLevel">100%</span>
+              </div>
             </div>
+
+            <div class="control-group map-controls-buttons">
+              <button id="switchMapType" class="control-btn">
+                <i class="layui-icon layui-icon-chart"></i>
+                <span>切换地图</span>
+              </button>
+              <button id="switchDisplayMode" class="control-btn">
+                <i class="layui-icon layui-icon-share"></i>
+                <span>切换显示</span>
+              </button>
+            </div>
+          </div>
+          <div id="gpsMapContainer" class="gps-map-container">
+            <!-- GPS地图将通过JS动态生成 -->
+          </div>
         </div>
 
-        <!-- 右侧任务列表 -->
-        <div class="task-panel panel-base">
-            <!-- 添加通知面板 -->
-            <div class="notification-section">
-                <h2 class="panel-title">
-                    <i class="layui-icon layui-icon-notice"></i>
-                    通知
-                    <span class="title-decoration"></span>
-                </h2>
-                <div class="notification-container">
-                    <div class="notification-list">
-                        <!-- 测试通知数据 -->
-                        <div class="notification-item success">
-                            <div class="notification-header">
-                                <div class="notification-title">
-                                    <i class="layui-icon layui-icon-ok-circle notification-icon success"></i>
-                                    任务完成
-                                </div>
-                                <span class="notification-time">10:30</span>
-                            </div>
-                            <div class="notification-content">恭喜你完成了"探索神秘遗迹"任务！获得500积分奖励。</div>
-                        </div>
-                        
-                        <div class="notification-item warning">
-                            <div class="notification-header">
-                                <div class="notification-title">
-                                    <i class="layui-icon layui-icon-tips notification-icon warning"></i>
-                                    任务提醒
-                                </div>
-                                <span class="notification-time">09:15</span>
-                            </div>
-                            <div class="notification-content">"寻找失落的宝藏"任务即将到期，请尽快完成。</div>
-                        </div>
-                        
-                        <div class="notification-item info">
-                            <div class="notification-header">
-                                <div class="notification-title">
-                                    <i class="layui-icon layui-icon-notice notification-icon info"></i>
-                                    系统公告
-                                </div>
-                                <span class="notification-time">08:00</span>
-                            </div>
-                            <div class="notification-content">服务器将于今晚22:00进行例行维护，预计持续2小时。</div>
-                        </div>
-                        
-                        <div class="notification-item error">
-                            <div class="notification-header">
-                                <div class="notification-title">
-                                    <i class="layui-icon layui-icon-close-fill notification-icon error"></i>
-                                    任务失败
-                                </div>
-                                <span class="notification-time">昨天</span>
-                            </div>
-                            <div class="notification-content">"穿越时空"任务未能在规定时间内完成，任务已自动取消。</div>
-                        </div>
-                    </div>
-                </div>
+        <!-- 下半部分：进行中的任务 -->
+        <div class="main-content-bottom">
+          <h2 class="panel-title">
+            <i class="layui-icon layui-icon-loading"></i>
+            进行中的任务
+            <span class="title-decoration"></span>
+          </h2>
+          <!-- 任务容器 -->
+          <div class="active-tasks-wrapper active-tasks-container">
+            <div class="swiper active-tasks-swiper">
+              <div class="swiper-wrapper task-panel">
+                <!-- 任务将在这里生成 -->
+              </div>
+              <div class="swiper-scrollbar swiper-scrollbar-active-tasks"></div>
             </div>
-
-            <!-- 任务列表部分 -->
-            <h2 class="panel-title">
-                <i class="layui-icon layui-icon-flag"></i>
-                可用任务
-                <span class="title-decoration"></span>
-            </h2>
-            <div class="task-list-container">
-                <div id="taskList">
-                    <div class="swiper task-list-swiper">
-                        <div class="swiper-wrapper">
-                            <div class="swiper-slide">
-                                <div class="loading-state">加载中...</div>
-                            </div>
-                        </div>
-                        <div class="swiper-scrollbar swiper-scrollbar-task-list"></div>
-                    </div>
-                </div>
-            </div>
+          </div>
         </div>
+      </div>
+
+      <!-- 右侧任务列表 -->
+      <div class="task-panel panel-base">
+        <!-- 添加通知面板 -->
+        <div class="notification-section">
+          <h2 class="panel-title">
+            <i class="layui-icon layui-icon-notice"></i>
+            通知
+            <span class="title-decoration"></span>
+          </h2>
+          <div class="notification-container">
+            <div class="notification-list">
+              <!-- 测试通知数据 -->
+              <div class="notification-item success">
+                <div class="notification-header">
+                  <div class="notification-title">
+                    <i class="layui-icon layui-icon-ok-circle notification-icon success"></i>
+                    任务完成
+                  </div>
+                  <span class="notification-time">10:30</span>
+                </div>
+                <div class="notification-content">恭喜你完成了"探索神秘遗迹"任务！获得500积分奖励。</div>
+              </div>
+
+              <div class="notification-item warning">
+                <div class="notification-header">
+                  <div class="notification-title">
+                    <i class="layui-icon layui-icon-tips notification-icon warning"></i>
+                    任务提醒
+                  </div>
+                  <span class="notification-time">09:15</span>
+                </div>
+                <div class="notification-content">"寻找失落的宝藏"任务即将到期，请尽快完成。</div>
+              </div>
+
+              <div class="notification-item info">
+                <div class="notification-header">
+                  <div class="notification-title">
+                    <i class="layui-icon layui-icon-notice notification-icon info"></i>
+                    系统公告
+                  </div>
+                  <span class="notification-time">08:00</span>
+                </div>
+                <div class="notification-content">服务器将于今晚22:00进行例行维护，预计持续2小时。</div>
+              </div>
+
+              <div class="notification-item error">
+                <div class="notification-header">
+                  <div class="notification-title">
+                    <i class="layui-icon layui-icon-close-fill notification-icon error"></i>
+                    任务失败
+                  </div>
+                  <span class="notification-time">昨天</span>
+                </div>
+                <div class="notification-content">"穿越时空"任务未能在规定时间内完成，任务已自动取消。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 任务列表部分 -->
+        <h2 class="panel-title">
+          <i class="layui-icon layui-icon-flag"></i>
+          可用任务
+          <span class="title-decoration"></span>
+        </h2>
+        <div class="task-list-container">
+          <div id="taskList">
+            <div class="swiper task-list-swiper">
+              <div class="swiper-wrapper">
+                <div class="swiper-slide">
+                  <div class="loading-state">加载中...</div>
+                </div>
+              </div>
+              <div class="swiper-scrollbar swiper-scrollbar-task-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- WebSocket状态显示 -->
     <div class="websocket-status">
-        <span class="status-dot"></span>
-        <span class="status-text">WebSocket连接中...</span>
+      <span class="status-dot"></span>
+      <span class="status-text">WebSocket连接中...</span>
     </div>
 
     <!-- 脚本引用 -->
+    <script src="/static/js/bg.js""></script>
     <script src="/static/js/swiper-bundle.min.js"></script>
     <script src="/static/layui/layui.js"></script>
     <script src="/static/js/socket.io.js"></script>
     <script src="/static/js/echarts-wordcloud.min.js"></script>
     <script type="module" src="/static/js/client/game.js?v=1.0.1" id="mainJs"></script>
     <script>
-        // 生成随机版本号
-        document.getElementById('mainStyle').href = '/static/css/client/index.min.css?v=' + Math.random();
-        document.getElementById('mainJs').src = '/static/js/client/game.js?v=1' + Math.random();
+      // 生成随机版本号
+      document.getElementById("mainStyle").href = "/static/css/client/index.min.css?v=" + Math.random();
+      document.getElementById("mainJs").src = "/static/js/client/game.js?v=1" + Math.random();
     </script>
-</body>
+  </body>
 </html>

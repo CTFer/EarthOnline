@@ -7,7 +7,27 @@
 
 // 默认渲染器类型
 export const RENDER_TYPE = 'AMAP';  // 'AMAP' | 'ECHARTS'
+// 地图渲染配置
+export const MAP_CONFIG = {
 
+    backgroundOpacity: 0.8,                    // 默认背景透明度
+    RENDER_TYPE: localStorage.getItem("mapType") || "ECHARTS", // 从本地存储读取上次的选择
+    AMAP: {
+      mapStyle: "amap://styles/dark",
+      zoom: 14,
+      features: ["bg", "building", "road"],
+      viewMode: "2D",
+      pitch: 0,
+    },
+    ECHARTS: {
+      zoom: 14,
+      mapStyle: {
+        areaColor: "#15273f",
+        borderColor: "#1e3148",
+        borderWidth: 1,
+      },
+    },
+  };
 // 高德地图配置
 export const AMAP_CONFIG = {
     // 地图基础配置
@@ -38,10 +58,10 @@ export const AMAP_CONFIG = {
     key: '16de1da59d44d6967f9a6bf5248963c5',            // API密钥
 };
 
+
+
 // Echarts地图配置
 export const ECHARTS_CONFIG = {
-    // 地图基础样式
-    backgroundColor: 'transparent',
     geo: {
         roam: true,              // 是否开启鼠标缩放和平移漫游
         label: {
@@ -132,6 +152,7 @@ export const TIME_RANGE_CONFIG = {
 
 export default {
     RENDER_TYPE,
+    MAP_CONFIG,
     AMAP_CONFIG,
     ECHARTS_CONFIG,
     MARKER_STYLE,

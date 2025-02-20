@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:42
- * @LastEditTime: 2025-02-19 14:42:19
+ * @LastEditTime: 2025-02-20 10:01:09
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -12,8 +12,9 @@
  * @Description: 地图服务管理器
  */
 import Logger from '../../utils/logger.js';
-import { MAP_CONFIG } from '../../config/config.js';
+import { MAP_CONFIG } from '../config/mapConfig.js';
 import AMapRenderer from './map/amapRenderer.js';
+
 import EchartsRenderer from './map/echartsRenderer.js';
 import { 
     MAP_EVENTS,
@@ -58,6 +59,9 @@ class MapService {
             
             // 初始化WebSocket管理器引用
             this.wsManager = null;
+            
+            // 初始化背景透明度
+            this.backgroundOpacity = MAP_CONFIG.backgroundOpacity||localStorage.getItem('mapBackgroundOpacity');
             
             // 设置事件监听
             Logger.debug('MapService', '开始设置事件监听');
@@ -483,6 +487,10 @@ class MapService {
             // 更新本地存储
             localStorage.setItem('mapType', normalizedType);
             
+            // 设置初始透明度
+            this.setBackgroundOpacity(this.backgroundOpacity);
+            Logger.debug('MapService', '设置初始透明度:', this.backgroundOpacity);
+            
             Logger.info('MapService', `地图渲染器(${normalizedType})初始化完成`);
             
             // 触发渲染器变更事件
@@ -745,6 +753,28 @@ class MapService {
         }
         
         Logger.info('MapService', '地图服务销毁完成');
+    }
+
+    /**
+     * 设置地图整体透明度
+     * @param {number} opacity - 透明度值 (0-1)
+     */
+    setBackgroundOpacity(opacity) {
+        Logger.debug('MapService', `设置地图透明度: ${opacity}`);
+        
+        try {
+            // 更新地图容器透明度
+            const container = document.querySelector('.gps-map-container');
+            if (container) {
+                container.style.opacity = opacity;
+            }
+            
+            // 保存到本地存储
+            localStorage.setItem('mapBackgroundOpacity', opacity.toString());
+            
+        } catch (error) {
+            Logger.error('MapService', '设置地图透明度失败:', error);
+        }
     }
 
     // ... 其他地图相关方法

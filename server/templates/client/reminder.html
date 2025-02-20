@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>提词器</title>
+    <!-- 引入layui框架 -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        /* 基础样式 */
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        
+        /* 控制面板样式 */
+        .control-panel {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+        
+        /* 文本输入区样式 */
+        #textInput {
+            width: 100%;
+            min-height: 200px;
+            margin-bottom: 20px;
+            resize: vertical;
+        }
+        
+        /* 全屏显示区样式 */
+        .fullscreen-display {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            color: #fff;
+            z-index: 9999;
+            overflow: hidden;
+        }
+        
+        /* 滚动文本容器 */
+        .scroll-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            transform: translateY(100vh);
+            transition: transform linear;
+            z-index: 9999;
+        }
+        
+        /* 控制按钮样式 */
+        .control-buttons {
+            margin-top: 10px;
+        }
+        
+        /* 设置项样式 */
+        .settings-item {
+            margin-bottom: 10px;
+        }
+        
+        /* 颜色选择器样式 */
+        .color-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .color-option {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .color-option:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .color-option.active {
+            border-color: #1890ff;
+            transform: scale(1.15);
+            box-shadow: 0 4px 16px rgba(24, 144, 255, 0.3);
+        }
+        
+        .color-option.active::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 16px;
+            height: 16px;
+            background: #1890ff;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 历史记录列表样式 */
+        .history-list {
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* 退出全屏按钮样式 */
+        .exit-fullscreen {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none;
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .control-panel {
+                padding: 10px;
+            }
+
+            .settings-item {
+                margin-bottom: 15px;
+            }
+
+            .layui-input-inline {
+                width: 100% !important;
+                margin-right: 0 !important;
+            }
+
+            .layui-form-mid {
+                margin-top: 5px;
+                display: block;
+            }
+
+            .control-buttons button {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            .exit-fullscreen {
+                padding: 15px;
+                font-size: 16px;
+            }
+        }
+
+        /* 英文文本优化 */
+        .lang-en {
+            font-family: Arial, sans-serif;
+            word-spacing: 0.2em;
+        }
+
+        /* 全屏配置面板样式 */
+        .fullscreen-settings {
+            position: fixed;
+            bottom:10%;
+            left: 40%;
+            z-index: 10000;
+            background: rgba(0, 0, 0, 0.95);
+            color: #fff;
+            padding: 20px;
+            border-radius: 16px;
+            width: min(360px, calc(100vw - 40px));
+            display: none;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .fullscreen-settings .settings-item {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .fullscreen-settings .settings-item label {
+            display: block;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 14px;
+            font-weight: normal;
+        }
+        
+        .fullscreen-settings .settings-item .value-display {
+            position: absolute;
+            right: 0;
+            top: 0;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 14px;
+        }
+        
+        .fullscreen-settings input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+            margin: 10px 0;
+        }
+        
+        .fullscreen-settings input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
+        }
+        
+        .fullscreen-settings input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+        
+        .fullscreen-settings input[type="range"]::-webkit-slider-runnable-track {
+            height: 4px;
+            background: linear-gradient(to right, #1890ff, rgba(24, 144, 255, 0.3));
+            border-radius: 2px;
+        }
+        
+        /* 添加滑动条样式 */
+        .settings-slider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        .settings-slider input[type="range"] {
+            -webkit-appearance: none;
+            flex: 1;
+            height: 4px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 2px;
+        }
+
+        .settings-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #1890ff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+        }
+
+        .settings-slider input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        .settings-slider input[type="range"]::-webkit-slider-runnable-track {
+            height: 4px;
+            background: linear-gradient(to right, #1890ff, rgba(24, 144, 255, 0.3));
+            border-radius: 2px;
+        }
+
+        .settings-slider input[type="number"] {
+            width: 60px !important;
+            text-align: center;
+        }
+        
+        /* 开关样式 */
+        .switch-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 5px;
+        }
+        
+        .switch {
+            position: relative;
+            width: 44px;
+            height: 22px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.15);
+            transition: .4s;
+            border-radius: 22px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #1890ff;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+        
+        /* 焦点区域遮罩 */
+        .focus-mask {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10000;
+            display: none;
+        }
+
+        .focus-mask::before,
+        .focus-mask::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            transition: all 0.3s ease;
+        }
+
+        .focus-mask::before {
+            top: 0;
+            height: var(--mask-top-height, 0);
+        }
+
+        .focus-mask::after {
+            bottom: 0;
+            height: var(--mask-bottom-height, 0);
+        }
+        
+        /* 倒计时遮罩和显示 */
+        .countdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.15);
+            z-index: 10000;
+            display: none;
+            /* backdrop-filter: blur(4px); */
+        }
+        
+        .countdown {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 80px;
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            z-index: 10001;
+            display: none;
+            background: rgba(0, 0, 0, 0.15);
+            padding: 20px 40px;
+            border-radius: 16px;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 焦点区域样式 */
+        .scroll-text div {
+            transition: opacity 0.3s ease;
+        }
+        
+        .scroll-text div.focus {
+            opacity: 1;
+        }
+        
+        .scroll-text div.blur {
+            opacity: 0.3;
+        }
+        
+        /* 全屏控制按钮组 */
+        .fullscreen-controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10000;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 12px;
+            display: none;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .fullscreen-controls button {
+            margin: 0 8px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            /* padding: 10px 15px; */
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+        
+        .fullscreen-controls button:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .fullscreen-controls button:active {
+            transform: translateY(0);
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .fullscreen-controls .layui-icon {
+            font-size: 20px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* 移动端控制按钮优化 */
+        @media (max-width: 768px) {
+            .fullscreen-settings{
+                left: 10%;
+                width: 70vw;
+            }
+            .fullscreen-controls {
+                bottom: 20px;
+                padding: 12px;
+            }
+            
+            .fullscreen-controls button {
+                /* padding: 12px 18px; */
+                margin: 0 6px;
+            }
+            
+            .fullscreen-controls .layui-icon {
+                font-size: 24px;
+            }
+            
+            .speed-indicator {
+                padding: 12px 16px;
+                font-size: 24px;
+                right: 15px;
+            }
+        }
+        @media (max-width: 1200px) {
+        
+            .fullscreen-settings{
+                left: 10%;
+                width: 70vw;
+            }
+    }
+    </style>
+</head>
+<body>
+    <!-- 控制面板 -->
+    <div class="control-panel layui-form">
+        <div class="settings-item">
+            <label>文本内容：</label>
+            <div class="layui-btn-group" style="margin-bottom: 10px;">
+                <button type="button" class="layui-btn layui-btn-sm" id="saveText">保存当前文本</button>
+                <button type="button" class="layui-btn layui-btn-sm layui-btn-danger" id="clearText">清空文本</button>
+                <button type="button" class="layui-btn layui-btn-sm" id="clearHistory">清空历史记录</button>
+            </div>
+            <textarea id="textInput" class="layui-textarea" placeholder="请输入需要显示的文字内容..." data-auto-save="true"></textarea>
+            <div id="historyList" class="history-list"></div>
+        </div>
+        
+        <div class="settings-item">
+            <label>文本语言：</label>
+            <div class="layui-input-inline">
+                <input type="radio" name="textLang" value="zh" title="中文" checked>
+                <input type="radio" name="textLang" value="en" title="英文">
+            </div>
+        </div>
+
+        <div class="settings-item">
+            <label>文字大小：</label>
+            <div class="layui-input-inline" style="width: 100%;">
+                <div class="settings-slider">
+                    <input type="range" id="fontSizeSlider" min="12" max="100" value="48">
+                    <input type="number" id="fontSize" class="layui-input" value="48" min="12" max="100">
+                </div>
+                <div class="layui-form-mid">（12-100像素）</div>
+            </div>
+        </div>
+        
+        <div class="settings-item">
+            <label>滚动速度：</label>
+            <div class="layui-input-inline" style="width: 100%;">
+                <div class="settings-slider">
+                    <input type="range" id="scrollSpeedSlider" min="0" max="100" value="50">
+                    <input type="number" id="scrollSpeed" class="layui-input" value="50" min="0" max="100">
+                </div>
+                <div class="layui-form-mid">（0-100，0表示不滚动，100表示最快速度）</div>
+            </div>
+        </div>
+        
+        <div class="settings-item">
+            <label>行间距：</label>
+            <div class="layui-input-inline" style="width: 100%;">
+                <div class="settings-slider">
+                    <input type="range" id="lineHeightSlider" min="1" max="5" value="2" step="0.1">
+                    <input type="number" id="lineHeight" class="layui-input" value="2" min="1" max="5" step="0.1">
+                </div>
+                <div class="layui-form-mid">（1-5倍）</div>
+            </div>
+        </div>
+        
+        <div class="settings-item">
+            <label>字间距：</label>
+            <div class="layui-input-inline" style="width: 100%;">
+                <div class="settings-slider">
+                    <input type="range" id="letterSpacingSlider" min="0" max="10" value="2">
+                    <input type="number" id="letterSpacing" class="layui-input" value="2" min="0" max="10">
+                </div>
+                <div class="layui-form-mid">（0-10像素）</div>
+            </div>
+        </div>
+        
+        <div class="settings-item">
+            <label>文字颜色：</label>
+            <div class="layui-input-inline">
+                <input type="hidden" id="textColor" value="#ffffff">
+                <div class="color-group" id="textColorGroup">
+                    <!-- 由 JavaScript 动态填充颜色选项 -->
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-item">
+            <label>背景颜色：</label>
+            <div class="layui-input-inline">
+                <input type="hidden" id="bgColor" value="#000000">
+                <div class="color-group" id="bgColorGroup">
+                    <!-- 由 JavaScript 动态填充颜色选项 -->
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-item">
+            <label>焦点区域：</label>
+            <div class="layui-input-block">
+                <input type="checkbox" id="focusAreaEnabled" lay-skin="switch" lay-text="开启|关闭">
+            </div>
+        </div>
+
+        <div class="settings-item" id="focusAreaSettings" style="display: block;">
+            <label>焦点行数：</label>
+            <div class="layui-input-inline" style="width: 200px;">
+                <input type="number" id="focusAreaSize" class="layui-input" value="3" min="1" max="7">
+            </div>
+            <div class="layui-form-mid">（1-7行）</div>
+        </div>
+
+        <div class="settings-item">
+            <label>镜像显示：</label>
+            <div class="layui-input-inline">
+                <input type="checkbox" id="mirrorText" lay-skin="switch" lay-text="开启|关闭">
+            </div>
+            <div class="layui-form-mid">开启后文字左右镜像显示</div>
+        </div>
+
+        <div class="settings-item">
+            <label>倒计时：</label>
+            <div class="layui-input-inline" style="width: 200px;">
+                <input type="number" id="countdownTime" class="layui-input" value="0" min="0" max="10">
+            </div>
+            <div class="layui-form-mid">（0-10秒）</div>
+        </div>
+        
+        <div class="control-buttons">
+            <button type="button" class="layui-btn layui-btn-normal" id="startBtn">开始</button>
+            <button type="button" class="layui-btn layui-btn-primary" id="stopBtn" style="display: none;">停止</button>
+            <button type="button" class="layui-btn layui-btn-warm" id="saveConfigBtn">保存配置</button>
+        </div>
+    </div>
+
+    <!-- 全屏显示区 -->
+    <div class="fullscreen-display">
+        <button class="exit-fullscreen" id="exitFullscreen">退出全屏</button>
+        
+        <!-- 焦点区域遮罩 -->
+        <div class="focus-mask" id="focusMask"></div>
+        
+        <!-- 倒计时遮罩和显示 -->
+        <div class="countdown-overlay" id="countdownOverlay"></div>
+        <div class="countdown" id="countdown"></div>
+        
+        <!-- 全屏配置面板 -->
+        <div class="fullscreen-settings" id="fullscreenSettings">
+            <div class="settings-item">
+                <label>字体大小</label>
+                <span class="value-display">32</span>
+                <input type="range" id="fullscreenFontSize" min="12" max="100" value="32" data-target="fontSize">
+            </div>
+            
+            <div class="settings-item">
+                <label>速度</label>
+                <span class="value-display">5.0</span>
+                <input type="range" id="fullscreenSpeed" min="0" max="100" value="50" data-target="scrollSpeed">
+            </div>
+            
+            <div class="settings-item">
+                <label>行高</label>
+                <span class="value-display">2.0</span>
+                <input type="range" id="fullscreenLineHeight" min="1" max="5" value="2" step="0.1" data-target="lineHeight">
+            </div>
+            
+            <div class="settings-item">
+                <label>字间距</label>
+                <span class="value-display">2</span>
+                <input type="range" id="fullscreenLetterSpacing" min="0" max="10" value="2" data-target="letterSpacing">
+            </div>
+            
+            <div class="settings-item">
+                <div class="switch-wrapper">
+                    <label>焦点区域</label>
+                    <label class="switch">
+                        <input type="checkbox" id="fullscreenFocusAreaEnabled">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="fullscreenFocusAreaSettings" style="display: none; margin-top: 10px;">
+                    <label>焦点行数</label>
+                    <span class="value-display">3</span>
+                    <input type="range" id="fullscreenFocusAreaSize" min="1" max="7" value="3">
+                </div>
+            </div>
+            
+            <div class="settings-item">
+                <div class="switch-wrapper">
+                    <label>镜像显示</label>
+                    <label class="switch">
+                        <input type="checkbox" id="fullscreenMirrorText">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 速度指示器 -->
+        <div class="speed-indicator" id="speedIndicator">1x</div>
+        
+        <!-- 全屏控制按钮组 -->
+        <div class="fullscreen-controls" id="fullscreenControls">
+            <button class="layui-btn layui-btn-primary" id="toggleSettings">
+                <i class="layui-icon layui-icon-set"></i>
+            </button>
+            <button class="layui-btn layui-btn-primary" id="pauseBtn">
+                <i class="layui-icon layui-icon-pause"></i>
+            </button>
+            <button class="layui-btn layui-btn-primary" id="resumeBtn" style="display: none;">
+                <i class="layui-icon layui-icon-play"></i>
+            </button>
+        </div>
+        
+        <div class="scroll-text"></div>
+        
+        <!-- 添加进度条 -->
+        <div class="progress-bar">
+            <div class="progress"></div>
+        </div>
+    </div>
+
+    <!-- 引入必要的JS文件 -->
+    <script src="/static/layui/layui.js"></script>
+    <script src="/static/js/client/reminder.js"></script>
+</body>
+</html>

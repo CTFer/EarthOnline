@@ -11,13 +11,14 @@
 
 // 通用面板样式
 .panel-base {
-  background: rgba(13, 27, 45, 0.95);
+  background:@background-color;
   border: 1px solid @border-color;
   border-radius: @border-radius-lg;
   height: calc(100vh - 40px);
   min-height: 600px;
   position: relative;
-  background: @secondary-color;
+  // background: @secondary-color;
+  background: transparent;
   border-radius: @border-radius-lg;
   .card-shadow();
   overflow: hidden;

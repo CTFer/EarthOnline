@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:31
- * @LastEditTime: 2025-02-19 14:55:25
+ * @LastEditTime: 2025-02-19 20:58:25
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -17,26 +17,7 @@ export const Character_image = {
   1: "/static/img/character_image.png",
 };
 
-// 地图渲染配置
-export const MAP_CONFIG = {
-  RENDER_TYPE: localStorage.getItem("mapType") || "ECHARTS", // 从本地存储读取上次的选择
-  AMAP: {
-    mapStyle: "amap://styles/dark",
-    zoom: 14,
-    features: ["bg", "building", "road"],
-    viewMode: "2D",
-    pitch: 0,
-  },
-  ECHARTS: {
-    backgroundColor: "transparent",
-    zoom: 14,
-    mapStyle: {
-      areaColor: "#15273f",
-      borderColor: "#1e3148",
-      borderWidth: 1,
-    },
-  },
-};
+
 
 // 控制台日志配置
 // 现在日志系统的工作方式如下：
@@ -48,8 +29,8 @@ export const MAP_CONFIG = {
 export const LOG_CONFIG = {
   enableConsoleLog: true, // 是否启用控制台输出
   logLevel: "debug", // 日志级别: 'debug', 'info', 'warn', 'error'
-  allowedModules: ['WebSocketService','UIService'], // 允许输出日志的模块，为空输出全部模块（白名单优先级高于黑名单）
-  blockedModules: ['Utils','AMapRenderer','Live2DService'], // 禁止输出日志的模块（黑名单）
+  allowedModules: [], // 允许输出日志的模块，为空输出全部模块（白名单优先级高于黑名单）
+  blockedModules: ['Utils','AMapRenderer','echartsRenderer.js','Live2DService','MapService'], // 禁止输出日志的模块（黑名单）
   alwaysError: true, // 是否总是输出error级别的日志
   timeFormat: true, // 是否在日志中显示时间
   styleOutput: true, // 是否启用样式输出

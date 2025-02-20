@@ -922,7 +922,10 @@ def setup_logging():
         ]
     )
     return logging.getLogger(__name__)
-
+@app.route('/reminder')
+def reminder():
+    """提词器页面"""
+    return render_template('client/reminder.html')
     # 在应用启动时调用
 if __name__ == '__main__':
     logger = setup_logging()
@@ -972,6 +975,8 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Failed to start server: {str(e)}", exc_info=True)
         raise
+
+
 
 
 

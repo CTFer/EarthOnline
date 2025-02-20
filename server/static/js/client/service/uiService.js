@@ -1,13 +1,14 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-02-19 14:58:09
+ * @LastEditTime: 2025-02-19 16:08:53
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
 import Logger from "../../utils/logger.js";
-import { TASK_EVENTS, UI_EVENTS, AUDIO_EVENTS, MAP_EVENTS,WS_EVENTS } from "../config/events.js";
+import { TASK_EVENTS, UI_EVENTS, AUDIO_EVENTS, MAP_EVENTS,WS_EVENTS, PLAYER_EVENTS } from "../config/events.js";
 import {  WS_STATE, WS_CONFIG } from "../config/wsConfig.js";
+import {gameUtils} from "../../utils/utils.js";
 
 class UIService {
   constructor(eventBus, store, templateService, taskService) {
@@ -20,6 +21,8 @@ class UIService {
 
     // 初始化状态显示元素
     this.initStatusElements();
+    // 初始化DOM观察器
+    this.setupDOMObserver();
     // 初始化事件监听
     this.initEvents();
   }
@@ -35,6 +38,7 @@ class UIService {
     this.eventBus.on(TASK_EVENTS.ABANDONED, this.handleTaskAbandon.bind(this));
     this.eventBus.on(TASK_EVENTS.STATUS_UPDATED, this.updateTaskStatus.bind(this));
     this.eventBus.on(TASK_EVENTS.DETAILS_REQUESTED, this.showTaskDetails.bind(this));
+    this.eventBus.on(TASK_EVENTS.COMPLETED, this.handleTaskComplete.bind(this));
 
     // UI相关事件监听
     this.eventBus.on(UI_EVENTS.NOTIFICATION_SHOW, this.showNotification.bind(this));
@@ -42,6 +46,9 @@ class UIService {
 
     // 地图相关事件监听
     this.eventBus.on(MAP_EVENTS.RENDERER_CHANGED, this.updateMapSwitchButton.bind(this));
+
+    // 玩家相关事件监听
+    this.eventBus.on(PLAYER_EVENTS.INFO_UPDATED, this.updatePlayerInfo.bind(this));
 
     // WebSocket状态事件监听
     this.eventBus.on(WS_EVENTS.CONNECTED, () => {
@@ -96,9 +103,86 @@ class UIService {
    
   }
 
+  /**
+   * 设置DOM观察器
+   * @private
+   */
   setupDOMObserver() {
-    Logger.debug("UIService", "设置DOM观察器");
-    // DOM观察器逻辑
+    Logger.debug("UIService", "初始化DOM观察器");
+
+    const taskObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === "childList") {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === 1) {
+              // 处理任务卡片
+              if (node.classList?.contains("task-card")) {
+                this.initializeTaskCard(node);
+              }
+              // 处理新添加节点中的任务卡片
+              const taskCards = node.getElementsByClassName("task-card");
+              Array.from(taskCards).forEach((card) => this.initializeTaskCard(card));
+            }
+          });
+        }
+      });
+    });
+
+    // 设置观察器配置
+    const config = { childList: true, subtree: true };
+
+    // 监听相关容器
+    const containers = [
+      document.getElementById("taskList"), 
+      document.querySelector(".active-tasks-swiper .swiper-wrapper"),
+      document.querySelector(".tasks-list")
+    ].filter(Boolean);
+
+    containers.forEach((container) => {
+      taskObserver.observe(container, config);
+      // 初始化已存在的任务卡片
+      Array.from(container.getElementsByClassName("task-card")).forEach((card) => 
+        this.initializeTaskCard(card)
+      );
+    });
+
+    // 存储观察器实例以便后续清理
+    this.observers.set('taskObserver', taskObserver);
+  }
+
+  /**
+   * 初始化任务卡片
+   * @private
+   * @param {HTMLElement} taskCard - 任务卡片DOM元素
+   */
+  initializeTaskCard(taskCard) {
+    const timeElement = taskCard.querySelector(".task-time");
+    if (!timeElement) return;
+
+    const endtime = parseInt(taskCard.dataset.endtime);
+    if (!endtime) return;
+
+    const timeUpdateInterval = setInterval(() => {
+      const isActive = gameUtils.updateTaskTime(taskCard, endtime);
+      if (!isActive) {
+        clearInterval(timeUpdateInterval);
+        taskCard.classList.add("expired");
+      }
+    }, 1000);
+  }
+
+  /**
+   * 清理所有观察器
+   * @public
+   */
+  destroy() {
+    Logger.info("UIService", "开始清理UI服务");
+    
+    // 清理所有观察器
+    this.observers.forEach(observer => observer.disconnect());
+    this.observers.clear();
+    
+    Logger.info("UIService", "UI服务清理完成");
   }
 
   updateTaskList(tasks) {
@@ -816,6 +900,54 @@ class UIService {
       this.statusText.textContent = message;
       Logger.debug('UIService', `状态文本更新为: ${message}`);
     }
+  }
+
+  // 处理任务完成事件
+  handleTaskComplete(taskData) {
+    Logger.info("UIService", "处理任务完成事件:", taskData);
+    try {
+      // 更新UI显示
+      this.showNotification({
+        type: "SUCCESS",
+        message: `任务完成！获得 ${taskData.rewards?.points || 0} 点经验`
+      });
+      
+      // 播放完成音效
+      this.eventBus.emit(AUDIO_EVENTS.PLAY, "COMPLETE");
+      
+      // 刷新任务列表
+      this.taskService.refreshTasks().then(() => {
+        Logger.debug("UIService", "任务列表已刷新");
+      });
+    } catch (error) {
+      Logger.error("UIService", "处理任务完成事件失败:", error);
+      this.showNotification({
+        type: "ERROR",
+        message: "处理任务完成失败"
+      });
+    }
+  }
+
+  // 处理任务错误
+  handleTaskError(error) {
+    Logger.error("UIService", "任务错误:", error);
+    this.showNotification({
+      type: "ERROR",
+      message: error.message || "任务操作失败"
+    });
+    this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
+  }
+
+  // 处理任务点击
+  handleTaskClick(taskData) {
+    Logger.debug("UIService", "处理任务点击:", taskData);
+    this.showTaskDetails(taskData);
+  }
+
+  // 处理当前任务更新
+  handleCurrentTasksUpdated(tasks) {
+    Logger.info("UIService", "当前任务更新:", tasks);
+    this.renderCurrentTasks(tasks);
   }
 }
 

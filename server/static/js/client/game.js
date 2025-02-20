@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-02-19 14:25:21
+ * @LastEditTime: 2025-02-19 17:59:41
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -34,6 +34,7 @@ import {
     AUDIO_EVENTS,
     LIVE2D_EVENTS 
 } from "./config/events.js";
+import EventManager from './core/EventManager.js';
 
 // 在文件开头声明全局变量
 let taskManager;
@@ -105,34 +106,35 @@ class GameManager {
     Logger.info("GameManager", "初始化服务组件");
     
     try {
-        // 1. 初始化基础服务
+        // 1. 初始化基础服务（无依赖）
         this.templateService = new TemplateService();
         
-        // 2. 初始化WebSocket服务
+        // 2. 初始化WebSocket服务（依赖：eventBus）
         this.websocketService = new WebSocketService(this.eventBus);
-        await this.websocketService.initialize();  // 等待WebSocket连接完成
+        await this.websocketService.initialize();
         
-        // 3. 初始化UI服务（依赖模板服务）
-        this.uiService = new UIService(
-            this.eventBus, 
-            this.store,
-            this.templateService  // 传入模板服务
-        );
-        
-        // 4. 初始化玩家服务
+        // 3. 初始化玩家服务（依赖：api, eventBus, store）
         this.playerService = new PlayerService(
             this.api,
             this.eventBus,
             this.store
         );
         
-        // 5. 初始化任务服务（依赖玩家服务和模板服务）
+        // 4. 初始化任务服务（依赖：api, eventBus, store, playerService, templateService）
         this.taskService = new TaskService(
             this.api,
             this.eventBus,
             this.store,
             this.playerService,
             this.templateService
+        );
+        
+        // 5. 初始化UI服务（依赖：eventBus, store, templateService, taskService）
+        this.uiService = new UIService(
+            this.eventBus, 
+            this.store,
+            this.templateService,
+            this.taskService
         );
 
         // 6. 初始化其他服务
@@ -144,6 +146,7 @@ class GameManager {
         // 7. 设置事件监听器
         await this.setupEventListeners();
         await this.websocketService.connect();
+        
         this.initialized = true;
         Logger.info("GameManager", "服务组件初始化完成");
     } catch (error) {
@@ -335,17 +338,7 @@ class GameManager {
     }
   }
 
-  // 添加事件处理方法
-  handleCurrentTasksUpdated(tasks) {
-    Logger.info("[GameManager]", "Current tasks updated:", tasks);
-    this.renderCurrentTasks(tasks);
-  }
-
-  handleTaskError(error) {
-    Logger.error("GameManager", "Task error:", error);
-    layer.msg(error.message || "任务操作失败", { icon: 2 });
-  }
-
+  // 设置事件监听器
   async setupEventListeners() {
     Logger.info("GameManager", "开始设置事件监听器");
 
@@ -358,18 +351,12 @@ class GameManager {
       if (!this.audioService) throw new Error("音频服务未初始化");
       if (!this.websocketService) throw new Error("WebSocket服务未初始化");
 
-      // 任务相关事件
-      await this.setupTaskEvents();
-      
-      // 玩家相关事件
+      // 设置玩家相关事件
       await this.setupPlayerEvents();
       
-      // 地图相关事件
+      // 设置地图相关事件
       await this.setupMapEvents();
       
-      // UI相关事件
-      await this.setupUIEvents();
-
       // 初始化后台服务
       await Promise.allSettled([
         this.audioService.init().catch(error => {
@@ -396,43 +383,6 @@ class GameManager {
       });
       throw error;
     }
-  }
-
-  // 设置任务相关事件
-  async setupTaskEvents() {
-    Logger.debug("GameManager", "设置任务相关事件监听");
-
-    // 任务状态更新事件（统一处理）
-    this.eventBus.on(TASK_EVENTS.STATUS_UPDATED, async (data) => {
-        try {
-            Logger.info("GameManager", "任务状态更新事件:", data);
-            // 只在特定状态下刷新任务
-            if (['COMPLETED', 'ABANDONED', 'ACCEPTED'].includes(data.status)) {
-                await this.taskService.refreshTasks();
-            }
-            // 根据状态播放不同音效
-            if (data.status) {
-                this.audioService.playSound(data.status);
-            } 
-            // 委托给TaskService处理
-            await this.taskService.handleTaskUpdate(data);
-        } catch (error) {
-            Logger.error("GameManager", "处理任务状态更新失败:", error);
-            this.handleEventError(error, "更新任务状态失败");
-        }
-    });
-
-    // 任务完成事件
-    this.eventBus.on(TASK_EVENTS.COMPLETED, (taskData) => {
-        try {
-            Logger.info("GameManager", "任务完成事件:", taskData);
-            // 更新词云
-            this.wordcloudService.updateWordCloud();
-        } catch (error) {
-            Logger.error("GameManager", "处理任务完成事件失败:", error);
-            this.handleEventError(error, "处理任务完成失败");
-        }
-    });
   }
 
   // 设置玩家相关事件
@@ -464,35 +414,11 @@ class GameManager {
         this.handleEventError(error, "更新玩家信息失败");
       }
     });
-
-    // 监听玩家信息更新事件
-    this.eventBus.on(PLAYER_EVENTS.INFO_UPDATED, (playerInfo) => {
-      try {
-        Logger.info("GameManager", "玩家信息更新事件");
-        // 委托给UIService处理界面更新
-        this.uiService.updatePlayerInfo(playerInfo);
-      } catch (error) {
-        Logger.error("GameManager", "处理玩家信息更新事件失败:", error);
-        this.handleEventError(error, "更新玩家界面失败");
-      }
-    });
   }
 
   // 设置地图相关事件
   async setupMapEvents() {
     Logger.debug("GameManager", "设置地图相关事件监听");
-
-    // 监听地图渲染器切换事件
-    this.eventBus.on(MAP_EVENTS.RENDERER_CHANGED, (type) => {
-      try {
-        Logger.info("GameManager", `地图渲染器切换事件: ${type}`);
-        // 委托给UIService处理界面更新
-        this.uiService.updateMapSwitchButton(type);
-      } catch (error) {
-        Logger.error("GameManager", "处理地图渲染器切换事件失败:", error);
-        this.handleEventError(error, "切换地图显示失败");
-      }
-    });
 
     // 监听GPS更新事件
     this.eventBus.on(MAP_EVENTS.GPS_UPDATED, (gpsData) => {
@@ -509,53 +435,6 @@ class GameManager {
         this.handleEventError(error, "更新GPS数据失败");
       }
     });
-  }
-
-  // 设置UI相关事件
-  async setupUIEvents() {
-    Logger.debug("GameManager", "设置UI相关事件监听");
-
-    try {
-      // 检查必要的服务是否存在
-      if (!this.uiService) {
-        throw new Error("UI服务未初始化");
-      }
-      if (!this.taskService) {
-        throw new Error("任务服务未初始化");
-      }
-      if (!this.audioService) {
-        throw new Error("音频服务未初始化");
-      }
-      if (!this.eventBus) {
-        throw new Error("事件总线未初始化");
-      }
-
-      // 初始化UI服务的事件监听
-      this.uiService.initTaskEvents({
-        taskService: this.taskService,
-        audioService: this.audioService,
-        eventBus: this.eventBus,
-        eventTypes: {
-          TASK_EVENTS,
-          UI_EVENTS,
-          AUDIO_EVENTS
-        }
-      });
-        
-      Logger.info("GameManager", "UI事件监听设置完成");
-    } catch (error) {
-      Logger.error("GameManager", "设置UI事件监听失败:", {
-        message: error.message,
-        stack: error.stack,
-        services: {
-          uiService: !!this.uiService,
-          taskService: !!this.taskService,
-          audioService: !!this.audioService,
-          eventBus: !!this.eventBus
-        }
-      });
-      throw error;
-    }
   }
 
   /**
@@ -586,52 +465,6 @@ class GameManager {
     this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
   }
 
-  // 添加新的渲染方法
-  renderTaskList(tasks) {
-    Logger.info("GameManager", "开始渲染任务列表，任务数量:", tasks.length);
-
-    const container = document.querySelector(".task-list-swiper .swiper-wrapper");
-    if (!container) {
-      Logger.error("GameManager", "找不到任务列表容器");
-      return;
-    }
-
-    try {
-      if (!tasks || !tasks.length) {
-        Logger.info("GameManager", "没有可用任务");
-        container.innerHTML = `
-                    <div class="swiper-slide">
-                        <div class="empty-task">暂无可用任务</div>
-                    </div>`;
-      } else {
-        Logger.debug("GameManager", "开始渲染任务卡片");
-        const taskCards = tasks.map((task) => {
-          try {
-            return this.taskService.createAvailableTaskCard(task);
-          } catch (err) {
-            Logger.error("GameManager", "渲染单个任务卡片失败:", err, task);
-            return "";
-          }
-        });
-
-        container.innerHTML = taskCards.join("");
-        Logger.debug("GameManager", "任务卡片渲染完成");
-      }
-
-      // 初始化滑动组件
-      Logger.info("GameManager", "重新初始化滑动组件");
-      this.taskService.initTaskSwipers();
-
-      Logger.info("GameManager", "任务列表渲染完成");
-    } catch (error) {
-      Logger.error("GameManager", "渲染任务列表失败:", error);
-      container.innerHTML = `
-                <div class="swiper-slide">
-                    <div class="error-task">加载任务失败: ${error.message}</div>
-                </div>`;
-    }
-  }
-
   // 删除原有的 showTaskDetails 方法，改为调用 UIService
   handleTaskClick(taskData) {
     Logger.debug("GameManager", "处理任务点击:", taskData);
@@ -649,6 +482,32 @@ class GameManager {
     this.websocketService.disconnect();
     this.live2dService.cleanup();
     Logger.info("GameManager", "资源清理完成");
+  }
+
+  /**
+   * 初始化事件管理器
+   */
+  initializeEventManager() {
+    Logger.info('Game', '初始化事件管理器');
+    try {
+      this.eventManager = new EventManager({
+        eventBus: this.eventBus,
+        taskService: this.taskService,
+        playerService: this.playerService,
+        uiService: this.uiService,
+        mapService: this.mapService,
+        audioService: this.audioService,
+        wsService: this.websocketService,
+        wordcloudService: this.wordcloudService,
+        live2dService: this.live2dService,
+        notificationService: this.notificationService
+      });
+      this.eventManager.initializeEventListeners();
+      Logger.info('Game', '事件管理器初始化完成');
+    } catch (error) {
+      Logger.error('Game', '初始化事件管理器失败:', error);
+      throw error;
+    }
   }
 }
 
