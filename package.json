@@ -1,0 +1,16 @@
+{
+  "name": "game-client",
+  "version": "1.0.0",
+  "description": "地球Online的前端依赖",
+  "main": "game.js",
+  "dependencies": {
+    "layui": "^2.9.7",
+    "jquery": "^3.7.1",
+    "echarts": "^5.4.3",
+    "swiper": "^11.0.5"
+  },
+  "devDependencies": {
+    "less": "^4.2.0",
+    "less-loader": "^12.1.0"
+  }
+} 

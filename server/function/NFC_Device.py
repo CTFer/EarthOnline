@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+
+# Author: 一根鱼骨棒 Email 775639471@qq.com
+# Date: 2025-02-09 19:16:32
+# LastEditTime: 2025-02-20 16:28:34
+# LastEditors: 一根鱼骨棒
+# Description: 本开源代码使用GPL 3.0协议
+# Software: VScode
+# Copyright 2025 迷舍
+
 import sqlite3
 import os
 import logging

@@ -1,0 +1,9 @@
+Flask==3.0.0
+Flask-SocketIO==5.5.1
+SQLite3==3.45.1
+python-socketio==5.11.1
+pyserial==3.5
+waitress==3.0.2
+ndef==0.3.3
+python-dotenv==1.0.0
+logging==0.5.1.2 

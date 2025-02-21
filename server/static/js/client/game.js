@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-02-19 17:59:41
+ * @LastEditTime: 2025-02-21 14:20:22
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -154,12 +154,13 @@ class GameManager {
         throw error;
     }
   }
-
+  // 初始化地图服务
   async initializeMapService() {
     this.mapService = new MapService(this.api, this.eventBus, this.store);
     await this.mapService.initMap();
   }
 
+  // 初始化其他服务
   async initializeOtherServices() {
     this.wordcloudService = new WordcloudService(
       this.api,

@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:31
- * @LastEditTime: 2025-02-19 20:58:25
+ * @LastEditTime: 2025-02-21 16:39:46
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -17,20 +17,18 @@ export const Character_image = {
   1: "/static/img/character_image.png",
 };
 
-
-
 // 控制台日志配置
 // 现在日志系统的工作方式如下：
 // 1、如果模块在白名单中（allowedModules 不为空），只输出白名单中的模块日志
 // 2、如果白名单为空，则检查黑名单：
-  // - 如果模块在黑名单中，不输出该模块的日志
-  // - 如果模块不在黑名单中，输出该模块的日志
+// - 如果模块在黑名单中，不输出该模块的日志
+// - 如果模块不在黑名单中，输出该模块的日志
 // 特例：如果是错误日志且 alwaysError 为 true，则始终输出，不受黑白名单影响
 export const LOG_CONFIG = {
   enableConsoleLog: true, // 是否启用控制台输出
-  logLevel: "debug", // 日志级别: 'debug', 'info', 'warn', 'error'
+  logLevel: "info", // 日志级别: 'debug', 'info', 'warn', 'error'
   allowedModules: [], // 允许输出日志的模块，为空输出全部模块（白名单优先级高于黑名单）
-  blockedModules: ['Utils','AMapRenderer','echartsRenderer.js','Live2DService','MapService'], // 禁止输出日志的模块（黑名单）
+  blockedModules: ["Utils", "Live2DService", "TaskService",'SwiperService','TemplateService'], // 禁止输出日志的模块（黑名单）
   alwaysError: true, // 是否总是输出error级别的日志
   timeFormat: true, // 是否在日志中显示时间
   styleOutput: true, // 是否启用样式输出
@@ -44,30 +42,30 @@ export const LOG_CONFIG = {
 
 // 音频配置
 export const AUDIO_CONFIG = {
-  enabled: false,  // 是否启用音频
-  preloadStrategy: 'ON_DEMAND', // 加载策略: 'IMMEDIATE'(立即加载) | 'ON_DEMAND'(按需加载)
+  enabled: false, // 是否启用音频
+  preloadStrategy: "ON_DEMAND", // 加载策略: 'IMMEDIATE'(立即加载) | 'ON_DEMAND'(按需加载)
   sounds: {
-      COMPLETE: {
-          path: "/static/audio/complete.mp3",
-          preload: true  // 是否预加载
-      },
-      ACCEPT: {
-          path: "/static/audio/accept.mp3",
-          preload: false
-      },
-      ERROR: {
-          path: "/static/audio/error.mp3",
-          preload: true  // 错误提示音最好预加载
-      },
-      ABANDON: {
-          path: "/static/audio/abandon.mp3",
-          preload: false
-      },
-      CHECKING: {
-          path: "/static/audio/check.mp3",
-          preload: false
-      }
-  }
+    COMPLETE: {
+      path: "/static/audio/complete.mp3",
+      preload: true, // 是否预加载
+    },
+    ACCEPT: {
+      path: "/static/audio/accept.mp3",
+      preload: false,
+    },
+    ERROR: {
+      path: "/static/audio/error.mp3",
+      preload: true, // 错误提示音最好预加载
+    },
+    ABANDON: {
+      path: "/static/audio/abandon.mp3",
+      preload: false,
+    },
+    CHECKING: {
+      path: "/static/audio/check.mp3",
+      preload: false,
+    },
+  },
 };
 // 任务类型配置
 export const TASK_TYPE_MAP = {
