@@ -1,13 +1,29 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-22 18:32:02
- * @LastEditTime: 2025-02-22 19:25:46
+ * @LastEditTime: 2025-02-22 19:44:00
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
  * Copyright 2025 迷舍
  */
 // cz-custom-adapter.js
+const { execSync } = require('child_process');
+
+// 获取上一次提交信息中的版本号
+function getLastCommitVersion() {
+    try {
+        // 执行 Git 命令获取最近的提交信息
+        const lastCommitMessage = execSync('git log -1 --pretty=%B').toString();
+        // 从提交信息中提取版本号
+        const versionMatch = lastCommitMessage.match(/\((V\d+\.\d+\.\d+)\)/);
+        return versionMatch ? versionMatch[1] : 'V0.0.0'; // 如果没有找到，返回默认值
+    } catch (error) {
+        console.error('无法获取上一次提交的版本号:', error);
+        return 'V0.0.0'; // 出现错误时返回默认值
+    }
+}
+
 module.exports = {
   // 当用户开始进行 commit 时，会调用这个函数来提示用户输入信息
   prompter: function (cz, commit) {
@@ -45,10 +61,10 @@ module.exports = {
       {
         type: "input",
         name: "version",
-        message: "输入版本号 (如 V0.2.12):",
-        default: "V0.0.0",
+        message: "输入版本号 (上一次提交的版本号:" + getLastCommitVersion() + "):",
+        default: getLastCommitVersion().replace('V', ''), // 去掉 "V" 以便用户输入
         validate: function (input) {
-          return input.startsWith("V") ? true : "版本号必须以 V 开头";
+          return /^\d+\.\d+\.\d+$/.test(input) ? true : "版本号格式应为 x.x.x";
         },
       },
       {
@@ -74,7 +90,7 @@ module.exports = {
     // 使用 cz 对象的 prompt 方法来提示用户输入信息
     cz.prompt(questions).then(function (answers) {
       const type = answers.type;
-      const version = answers.version;
+      const version = `V${answers.version}`; // 自动添加 "V" 前缀
       const subject = answers.subject;
       const body = answers.body ? "\n\n" + answers.body : "";
       const knownBugs = answers.knownBugs ? "\n\n已知 BUG:\n" + answers.knownBugs : "";
