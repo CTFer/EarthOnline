@@ -305,84 +305,17 @@ class EventManager {
     /**
      * 初始化WebSocket相关事件
      */
-    handleWSConnect() {
-        try {
-            this.uiService.showNotification({
-                type: 'SUCCESS',
-                message: 'WebSocket连接成功'
-            });
-        } catch (error) {
-            this.handleError('WebSocket连接', error, 'WebSocket连接失败');
-        }
-    }
-
-    handleWSDisconnect() {
-        try {
-            this.uiService.showNotification({
-                type: 'WARNING',
-                message: 'WebSocket连接断开'
-            });
-        } catch (error) {
-            this.handleError('WebSocket断开', error, 'WebSocket断开连接失败');
-        }
-    }
-
-    handleWSConnecting() {
-        try {
-            this.uiService.updateWebSocketStatus("WebSocket连接中...", WS_STATE.CONNECTING);
-        } catch (error) {
-            this.handleError('WebSocket连接中', error, 'WebSocket连接状态更新失败');
-        }
-    }
-
-    handleWSError() {
-        try {
-            this.uiService.updateWebSocketStatus("WebSocket连接错误", WS_STATE.ERROR);
-            this.uiService.showNotification({
-                type: 'ERROR',
-                message: 'WebSocket连接错误'
-            });
-        } catch (error) {
-            this.handleError('WebSocket错误', error, 'WebSocket错误状态更新失败');
-        }
-    }
-
-    handleWSReconnecting(attempt) {
-        try {
-            const currentAttempt = typeof attempt === 'number' ? attempt : 1;
-            const maxAttempts = WS_CONFIG.RECONNECT.maxAttempts;
-            
-            this.uiService.updateWebSocketStatus(
-                `WebSocket重连中(${currentAttempt}/${maxAttempts})`,
-                WS_STATE.RECONNECTING
-            );
-        } catch (error) {
-            this.handleError('WebSocket重连', error, 'WebSocket重连状态更新失败');
-        }
-    }
-
-    handleGPSUpdate(data) {
-        try {
-            if (data && typeof data === 'object') {
-                this.mapService.handleGPSUpdate(data);
-            } else {
-                Logger.warn('EventManager', '收到无效的GPS数据:', data);
-            }
-        } catch (error) {
-            this.handleError('GPS更新', error, 'GPS数据更新失败');
-        }
-    }
-
     initializeWSEvents() {
         // WebSocket连接状态事件
-        this.eventBus.on(WS_EVENTS.CONNECTED, this.handleWSConnect.bind(this));
-        this.eventBus.on(WS_EVENTS.DISCONNECTED, this.handleWSDisconnect.bind(this));
-        this.eventBus.on(WS_EVENTS.CONNECTING, this.handleWSConnecting.bind(this));
-        this.eventBus.on(WS_EVENTS.ERROR, this.handleWSError.bind(this));
-        this.eventBus.on(WS_EVENTS.RECONNECTING, this.handleWSReconnecting.bind(this));
-
-        // GPS更新事件
-        this.eventBus.on(WS_EVENT_TYPES.BUSINESS.GPS_UPDATE, this.handleGPSUpdate.bind(this));
+        this.eventBus.on(WS_EVENTS.CONNECTED, () => {
+            this.uiService.updateWebSocketStatus('connected');
+        });
+        this.eventBus.on(WS_EVENTS.DISCONNECTED, () => {
+            this.uiService.updateWebSocketStatus('disconnected');
+        });
+        this.eventBus.on(WS_EVENTS.ERROR, () => {
+            this.uiService.updateWebSocketStatus('error');
+        });
         
         Logger.info('EventManager', 'WebSocket事件监听器设置完成');
     }

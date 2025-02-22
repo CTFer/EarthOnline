@@ -56,9 +56,37 @@ class UIService {
   initEvents() {
     Logger.debug("UIService", "初始化事件监听");
 
-
+    this.setupEventListeners();
 
     Logger.info("UIService", "事件监听初始化完成");
+  }
+
+  setupEventListeners() {
+    // 移除WebSocket相关的事件监听
+    // 其他事件监听保持不变
+  }
+
+  updateWebSocketStatus(status) {
+    const statusDot = document.querySelector('.status-dot');
+    const statusText = document.querySelector('.status-text');
+   // 移除所有状态类
+   statusDot.classList.remove(
+    'connected', 
+    'disconnected', 
+    'connecting', 
+    'error', 
+    'reconnecting'
+  );
+    if (status === 'connected') {
+        statusDot.classList.add('connected');
+        statusText.textContent = 'WebSocket连接成功';
+    } else if (status === 'disconnected') {
+        statusDot.classList.add('disconnected');
+        statusText.textContent = 'WebSocket已断开';
+    } else if (status === 'error') {
+        statusDot.classList.add('error');
+        statusText.textContent = 'WebSocket连接错误';
+    }
   }
 
   initStatusElements() {
@@ -790,42 +818,9 @@ class UIService {
   }
 
   /**
-   * 更新WebSocket状态显示
-   * @param {string} message 状态消息
-   * @param {string} status 状态类型
+   * 处理任务完成事件
+   * @param {Object} taskData 任务数据
    */
-  updateWebSocketStatus(message, status) {
-    Logger.debug('UIService', `更新WebSocket状态: ${message} 状态: ${status}`);
-    
-    // 获取状态显示元素
-    const statusContainer = document.querySelector('.websocket-status');
-    const statusDot = statusContainer?.querySelector('.status-dot');
-    const statusText = statusContainer?.querySelector('.status-text');
-
-    if (!statusContainer || !statusDot || !statusText) {
-      Logger.warn('UIService', 'WebSocket状态显示元素不存在');
-      return;
-    }
-
-    // 移除所有状态类
-    statusDot.classList.remove(
-      'connected', 
-      'disconnected', 
-      'connecting', 
-      'error', 
-      'reconnecting'
-    );
-    
-    // 添加当前状态类
-    statusDot.classList.add(status.toLowerCase());
-    Logger.debug('UIService', `状态点更新为: ${status.toLowerCase()}`);
-
-    // 更新状态文本
-    statusText.textContent = message;
-    Logger.debug('UIService', `状态文本更新为: ${message}`);
-  }
-
-  // 处理任务完成事件
   handleTaskComplete(taskData) {
     Logger.info("UIService", "处理任务完成事件:", taskData);
     try {

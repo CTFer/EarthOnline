@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-17 13:47:42
- * @LastEditTime: 2025-02-22 14:21:40
+ * @LastEditTime: 2025-02-22 20:46:07
  * @LastEditors: 一根鱼骨棒
  * @Description: WebSocket服务管理
  */
@@ -254,12 +254,13 @@ class WebSocketService {
             this.state = WS_STATE.CONNECTED;
             this.reconnectAttempts = 0;
             Logger.info('WebSocketService', 'WebSocket连接成功');
+            this.eventBus.emit(WS_EVENTS.CONNECTED);
         });
 
         this.socket.on(WS_EVENT_TYPES.SYSTEM.DISCONNECT, () => {
             this.state = WS_STATE.DISCONNECTED;
             Logger.warn('WebSocketService', 'WebSocket连接断开');
-            this.handleReconnect();
+            this.eventBus.emit(WS_EVENTS.DISCONNECTED);
         });
 
         this.socket.on(WS_EVENT_TYPES.SYSTEM.CONNECT_ERROR, (error) => {
@@ -270,7 +271,7 @@ class WebSocketService {
 
         this.socket.on(WS_EVENT_TYPES.SYSTEM.ERROR, (error) => {
             this.state = WS_STATE.ERROR;
-            this.handleWSError(error);
+            this.eventBus.emit(WS_EVENTS.ERROR);
         });
 
         Logger.info('WebSocketService', 'WebSocket事件处理器设置完成');
