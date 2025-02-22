@@ -7,5 +7,7 @@ earthonline/nginx.htaccess
 server/database/game.db
 main.sql
 resource/
+node_modules/
 test/
 server.log
+package-lock.json

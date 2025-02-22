@@ -236,7 +236,7 @@ class TemplateService {
      * @returns {string} 任务卡片HTML
      */
     createTaskCard(task) {
-        Logger.debug("TemplateService", "创建任务卡片:", task);
+        // Logger.debug("TemplateService", "创建任务卡片:", task);
         
         try {
             const typeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
@@ -278,7 +278,7 @@ class TemplateService {
      * @returns {string} 任务卡片HTML
      */
     createActiveTaskCard(task) {
-        Logger.debug("TemplateService", "创建进行中任务卡片:", task);
+        // Logger.debug("TemplateService", "创建进行中任务卡片:", task);
         
         try {
             const typeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
@@ -327,7 +327,7 @@ class TemplateService {
      * @returns {string} 任务详情HTML
      */
     createTaskDetailTemplate(taskData) {
-        Logger.debug("TemplateService", "创建任务详情模板:", taskData);
+        // Logger.debug("TemplateService", "创建任务详情模板:", taskData);
         
         try {
             const typeInfo = gameUtils.getTaskTypeInfo(taskData.task_type, taskData.icon);

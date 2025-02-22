@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:54
- * @LastEditTime: 2025-02-18 12:25:27
+ * @LastEditTime: 2025-02-21 20:28:48
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -13,15 +13,22 @@ import Logger from '../../utils/logger.js';
 class EventBus {
     constructor() {
         this.events = {};
+        this.eventTrace = {}; // 用于记录事件的传播路径
         Logger.info('EventBus', '事件总线初始化');
     }
 
     on(event, callback) {
         if (!this.events[event]) {
             this.events[event] = [];
+            this.eventTrace[event] = []; // 初始化事件的传播路径记录
         }
-        this.events[event].push(callback);
-        Logger.debug('EventBus', `注册事件处理器: ${event}`);
+        // 检查回调是否已经注册
+        if (!this.events[event].includes(callback)) {
+            this.events[event].push(callback);
+            Logger.debug('EventBus', `注册事件处理器: ${event}`);
+        } else {
+            Logger.debug('EventBus', `事件处理器已存在: ${event}`);
+        }
     }
 
     off(event, callback) {
@@ -42,9 +49,15 @@ class EventBus {
             caller
         });
         
+        // 获取并记录事件传播路径
+        const trace = this.getEventTrace(event);
+        Logger.debug('EventBus', `事件传播路径: ${trace.map((cb, index) => `Callback ${index}: ${cb.name || '匿名函数'}`).join(', ')}`);
+        
         if (this.events[event]) {
-            this.events[event].forEach(callback => {
+            this.eventTrace[event] = []; // 重置事件的传播路径记录
+            this.events[event].forEach((callback, index) => {
                 try {
+                    this.eventTrace[event].push(`Callback ${index}: ${callback.name || '匿名函数'}`); // 记录回调函数的调用
                     callback(data);
                 } catch (error) {
                     Logger.error('EventBus', `事件处理器错误 ${event}:`, error);
@@ -62,6 +75,14 @@ class EventBus {
     // 获取特定事件的监听器数量
     getListenerCount(event) {
         return this.events[event] ? this.events[event].length : 0;
+    }
+
+    // 获取特定事件的传播路径
+    getEventTrace(event) {
+        Logger.debug('EventBus', `获取事件传播路径: ${event}`, {
+            trace: this.eventTrace[event] || []
+        });
+        return this.eventTrace[event] || [];
     }
 }
 

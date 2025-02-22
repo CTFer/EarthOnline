@@ -25,26 +25,8 @@ class AudioService {
       Logger.info("AudioService", "音频服务已禁用");
       return;
     }
-
-    // 初始化事件监听
-    this.setupEventListeners();
     
     Logger.info("AudioService", "初始化音频服务");
-  }
-
-  setupEventListeners() {
-    Logger.debug("AudioService", "设置事件监听");
-    
-    // 音频播放事件
-    this.eventBus.on(AUDIO_EVENTS.PLAY, this.handlePlaySound.bind(this));
-    
-    // 音频停止事件
-    this.eventBus.on(AUDIO_EVENTS.STOP, this.handleStopSound.bind(this));
-    
-    // 音量变更事件
-    this.eventBus.on(AUDIO_EVENTS.VOLUME_CHANGED, this.handleVolumeChange.bind(this));
-    
-    Logger.info("AudioService", "事件监听设置完成");
   }
 
   async init() {

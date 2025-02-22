@@ -15,11 +15,11 @@ class NotificationService {
         this.container = document.querySelector('.notification-list');
         
         // 绑定WebSocket事件
-        if (this.wsManager) {
-            this.wsManager.socket.on('notification:new', this.handleNewNotification.bind(this));
-            this.wsManager.socket.on('notification:update', this.handleNotificationUpdate.bind(this));
-            this.wsManager.socket.on('notification:delete', this.handleNotificationDelete.bind(this));
-        }
+        // if (this.wsManager) {
+        //     this.wsManager.socket.on('notification:new', this.handleNewNotification.bind(this));
+        //     this.wsManager.socket.on('notification:update', this.handleNotificationUpdate.bind(this));
+        //     this.wsManager.socket.on('notification:delete', this.handleNotificationDelete.bind(this));
+        // }
         
         // 初始化通知列表
         this.loadNotifications();
@@ -208,9 +208,9 @@ class NotificationService {
     destroy() {
         Logger.info('NotificationService', '清理通知服务资源');
         if (this.wsManager) {
-            this.wsManager.socket.off('notification:new');
-            this.wsManager.socket.off('notification:update');
-            this.wsManager.socket.off('notification:delete');
+            // this.wsManager.socket.off('notification:new');
+            // this.wsManager.socket.off('notification:update');
+            // this.wsManager.socket.off('notification:delete');
         }
         this.notifications = [];
         if (this.container) {

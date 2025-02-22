@@ -20,7 +20,7 @@ class TaskService {
         Logger.info('TaskService', '初始化任务服务');
         
         // 初始化事件监听
-        this.initEvents();
+        // this.initEvents();
     }
 
     /**
@@ -31,9 +31,9 @@ class TaskService {
         Logger.debug('TaskService', '初始化事件监听');
         
         // 任务相关事件监听
-        this.eventBus.on(TASK_EVENTS.COMPLETED, this.handleTaskComplete.bind(this));
-        this.eventBus.on(TASK_EVENTS.STATUS_UPDATED, this.handleTaskStatusUpdate.bind(this));
-        this.eventBus.on(TASK_EVENTS.ABANDONED, this.handleTaskAbandoned.bind(this));
+        // this.eventBus.on(TASK_EVENTS.COMPLETED, this.handleTaskComplete.bind(this));
+        // this.eventBus.on(TASK_EVENTS.STATUS_UPDATED, this.handleTaskStatusUpdate.bind(this));
+        // this.eventBus.on(TASK_EVENTS.ABANDONED, this.handleTaskAbandoned.bind(this));
         
         Logger.info('TaskService', '事件监听初始化完成');
     }

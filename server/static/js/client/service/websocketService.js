@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-17 13:47:42
- * @LastEditTime: 2025-02-19 14:34:33
+ * @LastEditTime: 2025-02-22 14:21:40
  * @LastEditors: 一根鱼骨棒
  * @Description: WebSocket服务管理
  */
@@ -238,47 +238,42 @@ class WebSocketService {
             return;
         }
 
+        // 事件监听器已迁移到EventManager.js
         // GPS更新事件
-        this.socket.on(WS_EVENT_TYPES.BUSINESS.GPS_UPDATE, (data) => {
-            Logger.debug('WebSocketService', '收到GPS更新:', data);
-            if (data && typeof data === 'object') {
-                this.eventBus.emit(MAP_EVENTS.GPS_UPDATE, data);
-            } else {
-                Logger.warn('WebSocketService', '收到无效的GPS数据:', data);
-            }
-        });
+        // this.socket.on(WS_EVENT_TYPES.BUSINESS.GPS_UPDATE, (data) => {
+        //     Logger.debug('WebSocketService', '收到GPS更新:', data);
+        //     if (data && typeof data === 'object') {
+        //         this.eventBus.emit(MAP_EVENTS.GPS_UPDATE, data);
+        //     } else {
+        //         Logger.warn('WebSocketService', '收到无效的GPS数据:', data);
+        //     }
+        // });
 
-        // 玩家更新事件
-        this.socket.on(WS_EVENT_TYPES.BUSINESS.PLAYER_UPDATE, (data) => {
-            Logger.debug('WebSocketService', '收到玩家更新:', data);
-            if (data && typeof data === 'object') {
-                this.eventBus.emit(PLAYER_EVENTS.INFO_UPDATED, data);
-            } else {
-                Logger.warn('WebSocketService', '收到无效的玩家数据:', data);
-            }
-        });
-
-        // 连接事件
+        // 系统事件监听
         this.socket.on(WS_EVENT_TYPES.SYSTEM.CONNECT, () => {
-            Logger.info('WebSocketService', 'WebSocket连接成功');
             this.state = WS_STATE.CONNECTED;
             this.reconnectAttempts = 0;
-            this.eventBus.emit(WS_EVENTS.CONNECTED);
+            Logger.info('WebSocketService', 'WebSocket连接成功');
         });
 
-        // 断开连接事件
-        this.socket.on(WS_EVENT_TYPES.SYSTEM.DISCONNECT, (reason) => {
-            Logger.warn('WebSocketService', 'WebSocket断开连接:', reason);
+        this.socket.on(WS_EVENT_TYPES.SYSTEM.DISCONNECT, () => {
             this.state = WS_STATE.DISCONNECTED;
-            this.eventBus.emit(WS_EVENTS.DISCONNECTED);
+            Logger.warn('WebSocketService', 'WebSocket连接断开');
             this.handleReconnect();
         });
 
-        // 错误事件
-        this.socket.on(WS_EVENT_TYPES.SYSTEM.ERROR, (error) => {
-            Logger.error('WebSocketService', 'WebSocket错误:', error);
-            this.handleWSError(error, 'socket');
+        this.socket.on(WS_EVENT_TYPES.SYSTEM.CONNECT_ERROR, (error) => {
+            this.state = WS_STATE.ERROR;
+            this.handleWSError(error, 'connect');
+            this.handleReconnect();
         });
+
+        this.socket.on(WS_EVENT_TYPES.SYSTEM.ERROR, (error) => {
+            this.state = WS_STATE.ERROR;
+            this.handleWSError(error);
+        });
+
+        Logger.info('WebSocketService', 'WebSocket事件处理器设置完成');
     }
 
     // 处理重连

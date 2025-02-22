@@ -34,9 +34,26 @@ class EchartsRenderer {
         }
 
         try {
+            // 检查echarts是否已加载
+            if (typeof echarts === 'undefined') {
+                Logger.error('EchartsRenderer', 'Echarts库未加载');
+                throw new Error('Echarts库未加载');
+            }
+
+            // 等待DOM完全准备好
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             // 初始化Echarts实例
-            this.mapChart = echarts.init(container);
-            
+            this.mapChart = echarts.init(container, null, {
+                renderer: 'canvas',
+                useDirtyRect: false
+            });
+
+            // 确保mapChart不为null
+            if (!this.mapChart) {
+                throw new Error('Echarts实例初始化失败');
+            }
+
             // 先加载地图数据
             Logger.debug('EchartsRenderer', '加载地图数据');
             const chinaJson = await this.loadMapData();
@@ -46,7 +63,7 @@ class EchartsRenderer {
             echarts.registerMap('china', chinaJson);
 
             // 等待一帧以确保地图数据已注册
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await new Promise(resolve => setTimeout(resolve, 50));
 
             // 设置初始配置
             Logger.debug('EchartsRenderer', '设置初始配置');
@@ -375,15 +392,27 @@ class EchartsRenderer {
     }
 
     destroy() {
-        Logger.info('EchartsRenderer', '销毁Echarts地图实例');
-        if (this.mapChart) {
-            this.mapChart.dispose();
-            this.mapChart = null;
+        Logger.debug('EchartsRenderer', '销毁Echarts渲染器');
+        try {
+            if (this.mapChart) {
+                // 移除事件监听
+                this.mapChart.off('georoam');
+                
+                // 销毁实例
+                this.mapChart.dispose();
+                this.mapChart = null;
+            }
+            
+            // 清理数据
+            this.gpsData = [];
+            this.currentZoom = null;
+            this.currentCenter = null;
+            
+            Logger.info('EchartsRenderer', 'Echarts渲染器销毁完成');
+        } catch (error) {
+            Logger.error('EchartsRenderer', '销毁Echarts渲染器失败:', error);
+            throw error;
         }
-        this.gpsData = [];
-        this.currentZoom = null;
-        this.currentCenter = null;
-        Logger.info('EchartsRenderer', '地图实例销毁完成');
     }
 
     // 初始化时间筛选器

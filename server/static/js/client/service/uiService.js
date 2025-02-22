@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-02-19 16:08:53
+ * @LastEditTime: 2025-02-22 14:44:42
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -19,12 +19,34 @@ class UIService {
     this.observers = new Map();
     Logger.info("UIService", "初始化UI服务");
 
-    // 初始化状态显示元素
-    this.initStatusElements();
-    // 初始化DOM观察器
-    this.setupDOMObserver();
-    // 初始化事件监听
-    this.initEvents();
+    // 地图相关状态
+    this.mapRenderType = localStorage.getItem('mapType') || 'ECHARTS';
+    this.mapTimeRange = localStorage.getItem('mapTimeRange') || 'today';
+    this.customStartTime = null;
+    this.customEndTime = null;
+  }
+
+  /**
+   * 初始化UI服务
+   * @returns {Promise<void>}
+   */
+  async initialize() {
+    Logger.info("UIService", "开始初始化UI服务");
+    try {
+      // 初始化状态显示元素
+      this.initStatusElements();
+      // 初始化DOM观察器
+      this.setupDOMObserver();
+      // 初始化事件监听
+      this.initEvents();
+      // 初始化任务事件
+      this.initTaskEvents();
+      
+      Logger.info("UIService", "UI服务初始化完成");
+    } catch (error) {
+      Logger.error("UIService", "UI服务初始化失败:", error);
+      throw error;
+    }
   }
 
   /**
@@ -34,60 +56,7 @@ class UIService {
   initEvents() {
     Logger.debug("UIService", "初始化事件监听");
 
-    // 任务相关事件监听
-    this.eventBus.on(TASK_EVENTS.ABANDONED, this.handleTaskAbandon.bind(this));
-    this.eventBus.on(TASK_EVENTS.STATUS_UPDATED, this.updateTaskStatus.bind(this));
-    this.eventBus.on(TASK_EVENTS.DETAILS_REQUESTED, this.showTaskDetails.bind(this));
-    this.eventBus.on(TASK_EVENTS.COMPLETED, this.handleTaskComplete.bind(this));
 
-    // UI相关事件监听
-    this.eventBus.on(UI_EVENTS.NOTIFICATION_SHOW, this.showNotification.bind(this));
-    this.eventBus.on(UI_EVENTS.MODAL_SHOW, this.showConfirmDialog.bind(this));
-
-    // 地图相关事件监听
-    this.eventBus.on(MAP_EVENTS.RENDERER_CHANGED, this.updateMapSwitchButton.bind(this));
-
-    // 玩家相关事件监听
-    this.eventBus.on(PLAYER_EVENTS.INFO_UPDATED, this.updatePlayerInfo.bind(this));
-
-    // WebSocket状态事件监听
-    this.eventBus.on(WS_EVENTS.CONNECTED, () => {
-      this.updateWebSocketStatus("WebSocket已连接", WS_STATE.CONNECTED);
-      this.showNotification({
-        type: 'SUCCESS',
-        message: 'WebSocket连接成功'
-      });
-    });
-
-    this.eventBus.on(WS_EVENTS.DISCONNECTED, () => {
-      this.updateWebSocketStatus("WebSocket已断开", WS_STATE.DISCONNECTED);
-      this.showNotification({
-        type: 'WARNING',
-        message: 'WebSocket连接断开'
-      });
-    });
-
-    this.eventBus.on(WS_EVENTS.CONNECTING, () => {
-      this.updateWebSocketStatus("WebSocket连接中...", WS_STATE.CONNECTING);
-    });
-
-    this.eventBus.on(WS_EVENTS.ERROR, () => {
-      this.updateWebSocketStatus("WebSocket连接错误", WS_STATE.ERROR);
-      this.showNotification({
-        type: 'ERROR',
-        message: 'WebSocket连接错误'
-      });
-    });
-
-    this.eventBus.on(WS_EVENTS.RECONNECTING, (attempt) => {
-      const currentAttempt = typeof attempt === 'number' ? attempt : 1;
-      const maxAttempts = WS_CONFIG.RECONNECT.maxAttempts;
-      
-      this.updateWebSocketStatus(
-        `WebSocket重连中(${currentAttempt}/${maxAttempts})`,
-        WS_STATE.RECONNECTING
-      );
-    });
 
     Logger.info("UIService", "事件监听初始化完成");
   }
@@ -640,32 +609,11 @@ class UIService {
     Logger.info("UIService", "初始化任务相关事件监听");
 
     try {
-      document.addEventListener("click", (e) => {
-        // 处理任务卡片点击
-        const taskCard = e.target.closest(".task-card");
-        if (taskCard && !e.target.closest("button")) {
-          const taskId = taskCard.dataset.taskId;
-          if (taskId) {
-            this.showTaskDetails(taskId);
-          }
-        }
+      // 移除旧的事件监听
+      document.removeEventListener("click", this.handleDocumentClick);
 
-        // 处理接受任务按钮点击
-        if (e.target.closest(".accept-btn")) {
-          const taskId = e.target.closest(".task-card").dataset.taskId;
-          if (taskId) {
-            this.handleTaskAccept(taskId);
-          }
-        }
-
-        // 处理放弃任务按钮点击
-        if (e.target.closest(".abandon-task")) {
-          const taskId = e.target.closest(".task-card").dataset.taskId;
-          if (taskId) {
-            this.handleTaskAbandon(taskId);
-          }
-        }
-      });
+      // 绑定新的事件监听
+      document.addEventListener("click", this.handleDocumentClick.bind(this));
 
       Logger.info("UIService", "任务事件监听初始化完成");
     } catch (error) {
@@ -786,34 +734,6 @@ class UIService {
 
   // ... 其他UI相关方法
   // 优化地图渲染器变更处理方法
-  updateMapSwitchButton(type) {
-    Logger.debug("UIService", "更新地图切换按钮:", type);
-
-    const button = document.getElementById("switchMapType");
-
-    if (!button) {
-      Logger.debug("UIService", "找不到地图切换按钮，可能尚未创建");
-      return;
-    }
-
-    try {
-      // 如果按钮当前类型与目标类型相同，不进行更新
-      if (button.dataset.type === type) {
-        Logger.debug("UIService", "按钮状态无需更新");
-        return;
-      }
-
-      // 更新按钮文本和数据属性
-      const buttonText = button.querySelector("span") || button;
-      buttonText.textContent = type === "AMAP" ? "切换到Echarts地图" : "切换到高德地图";
-      button.dataset.type = type;
-
-      Logger.debug("UIService", "地图切换按钮更新完成");
-    } catch (error) {
-      Logger.error("UIService", "更新地图切换按钮失败:", error);
-    }
-  }
-
   updatePlayerInfo(playerData) {
     Logger.debug("UIService", "更新玩家UI:", playerData);
 
@@ -877,29 +797,32 @@ class UIService {
   updateWebSocketStatus(message, status) {
     Logger.debug('UIService', `更新WebSocket状态: ${message} 状态: ${status}`);
     
-    if (!this.statusDot || !this.statusText) {
-      Logger.warn('UIService', 'WebSocket状态显示元素不存在，重新初始化');
-      this.initStatusElements();
+    // 获取状态显示元素
+    const statusContainer = document.querySelector('.websocket-status');
+    const statusDot = statusContainer?.querySelector('.status-dot');
+    const statusText = statusContainer?.querySelector('.status-text');
+
+    if (!statusContainer || !statusDot || !statusText) {
+      Logger.warn('UIService', 'WebSocket状态显示元素不存在');
+      return;
     }
 
-    if (this.statusDot) {
-      // 移除所有状态类
-      this.statusDot.classList.remove(
-        'connected', 
-        'disconnected', 
-        'connecting', 
-        'error', 
-        'reconnecting'
-      );
-      // 添加当前状态类
-      this.statusDot.classList.add(status.toLowerCase());
-      Logger.debug('UIService', `状态点更新为: ${status.toLowerCase()}`);
-    }
+    // 移除所有状态类
+    statusDot.classList.remove(
+      'connected', 
+      'disconnected', 
+      'connecting', 
+      'error', 
+      'reconnecting'
+    );
+    
+    // 添加当前状态类
+    statusDot.classList.add(status.toLowerCase());
+    Logger.debug('UIService', `状态点更新为: ${status.toLowerCase()}`);
 
-    if (this.statusText) {
-      this.statusText.textContent = message;
-      Logger.debug('UIService', `状态文本更新为: ${message}`);
-    }
+    // 更新状态文本
+    statusText.textContent = message;
+    Logger.debug('UIService', `状态文本更新为: ${message}`);
   }
 
   // 处理任务完成事件
@@ -948,6 +871,199 @@ class UIService {
   handleCurrentTasksUpdated(tasks) {
     Logger.info("UIService", "当前任务更新:", tasks);
     this.renderCurrentTasks(tasks);
+  }
+
+  // 处理文档点击事件的函数
+  handleDocumentClick(e) {
+    Logger.debug("UIService", "处理文档点击事件");
+    e.stopPropagation(); // 阻止事件冒泡
+
+    // 处理任务卡片点击
+    const taskCard = e.target.closest(".task-card");
+    if (taskCard && !e.target.closest("button")) {
+      Logger.debug("UIService", "处理任务卡片点击");
+      const taskId = taskCard.dataset.taskId;
+      if (taskId) {
+        this.showTaskDetails(taskId);
+      }
+    }
+
+    // 处理接受任务按钮点击
+    if (e.target.closest(".accept-btn")) {
+      const taskId = e.target.closest(".task-card").dataset.taskId;
+      Logger.debug("UIService", "处理接受任务按钮点击::, taskId ", taskId);
+      if (taskId) {
+        this.handleTaskAccept(taskId);
+      }
+    }
+
+    // 处理放弃任务按钮点击
+    if (e.target.closest(".abandon-task")) {
+      const taskId = e.target.closest(".task-card").dataset.taskId;
+      Logger.debug("UIService", "处理放弃任务按钮点击::, taskId ", taskId);
+      if (taskId) {
+        this.handleTaskAbandon(taskId);
+      }
+    }
+  }
+
+  /**
+   * 初始化地图UI组件
+   */
+  async initializeMapUI() {
+    Logger.info('UIService', '初始化地图UI组件');
+    try {
+      Logger.debug('UIService', '开始初始化各个UI组件');
+      this.initMapSwitchButton();
+      this.initTimeRangeSelector();
+      this.initCustomTimeRange();
+      this.initDisplayModeButton();
+      Logger.info('UIService', '地图UI组件初始化完成');
+    } catch (error) {
+      Logger.error('UIService', '初始化地图UI组件失败:', error);
+      this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+        type: 'ERROR',
+        message: '初始化地图控件失败'
+      });
+      throw error; // 抛出错误以便上层处理
+    }
+  }
+
+  /**
+   * 初始化地图切换按钮
+   */
+  initMapSwitchButton() {
+    Logger.debug('UIService', '初始化地图切换按钮');
+    const mapSwitchBtn = document.getElementById('switchMapType');
+    if (!mapSwitchBtn) {
+        Logger.error('UIService', '找不到地图切换按钮');
+        return;
+    }
+
+    // 移除可能存在的旧事件监听器
+    mapSwitchBtn.removeEventListener('click', this.handleMapSwitchClick);
+    
+    // 使用箭头函数保持this上下文
+    this.handleMapSwitchClick = () => {
+        const currentType = localStorage.getItem('mapType') || 'ECHARTS';
+        const newType = currentType === 'AMAP' ? 'ECHARTS' : 'AMAP';
+        Logger.debug("UIService", "触发地图切换事件:", newType);
+        this.eventBus.emit(MAP_EVENTS.RENDERER_CHANGED, newType);
+    };
+
+    mapSwitchBtn.addEventListener('click', this.handleMapSwitchClick);
+  }
+
+  /**
+   * 初始化时间范围选择器
+   */
+  initTimeRangeSelector() {
+    Logger.debug('UIService', '初始化时间范围选择器');
+    const timeRangeSelect = document.getElementById('timeRangeSelect');
+    
+    if (!timeRangeSelect) {
+      Logger.warn('UIService', '找不到时间范围选择器');
+      return;
+    }
+
+    try {
+      // 设置选择器的值
+      timeRangeSelect.value = this.mapTimeRange;
+
+      // 添加change事件监听
+      timeRangeSelect.addEventListener('change', (e) => {
+        const newValue = e.target.value;
+        Logger.debug('UIService', `时间范围变更为: ${newValue}`);
+        this.eventBus.emit(MAP_EVENTS.TIME_RANGE_CHANGED, newValue);
+      });
+
+      this.updateCustomTimeRangeVisibility();
+    } catch (error) {
+      Logger.error('UIService', '初始化时间范围选择器失败:', error);
+    }
+  }
+
+  /**
+   * 初始化自定义时间范围
+   */
+  initCustomTimeRange() {
+    const startInput = document.getElementById('startTime');
+    const endInput = document.getElementById('endTime');
+    const applyButton = document.getElementById('applyCustomRange');
+    
+    if (startInput && endInput) {
+      if (this.mapTimeRange === 'custom' && this.customStartTime && this.customEndTime) {
+        startInput.value = this.customStartTime;
+        endInput.value = this.customEndTime;
+      }
+      
+      startInput.addEventListener('change', () => {
+        this.customStartTime = startInput.value;
+      });
+      
+      endInput.addEventListener('change', () => {
+        this.customEndTime = endInput.value;
+      });
+      
+      if (applyButton) {
+        applyButton.addEventListener('click', () => {
+          if (!this.validateTimeRange(startInput.value, endInput.value)) {
+            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+              type: 'WARNING',
+              message: '请选择有效的时间范围'
+            });
+            return;
+          }
+          
+          this.customStartTime = startInput.value;
+          this.customEndTime = endInput.value;
+          this.eventBus.emit(MAP_EVENTS.TIME_RANGE_CHANGED, 'custom');
+        });
+      }
+    }
+    
+    this.updateCustomTimeRangeVisibility();
+  }
+
+  /**
+   * 初始化显示模式按钮
+   */
+  initDisplayModeButton() {
+    Logger.debug('UIService', '初始化显示模式切换按钮');
+    const displayModeSwitchBtn = document.getElementById('switchDisplayMode');
+    if (!displayModeSwitchBtn) {
+      Logger.warn('UIService', '找不到显示模式切换按钮');
+      return;
+    }
+
+    displayModeSwitchBtn.addEventListener('click', () => {
+      this.eventBus.emit(MAP_EVENTS.DISPLAY_MODE_CHANGED);
+    });
+  }
+
+  /**
+   * 更新自定义时间范围的显示状态
+   */
+  updateCustomTimeRangeVisibility() {
+    const customDateRange = document.getElementById('customDateRange');
+    if (customDateRange) {
+      customDateRange.style.display = this.mapTimeRange === 'custom' ? 'block' : 'none';
+    }
+  }
+
+  /**
+   * 验证时间范围
+   */
+  validateTimeRange(start, end) {
+    if (!start || !end) return false;
+    
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    
+    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) return false;
+    if (startTime >= endTime) return false;
+    
+    return true;
   }
 }
 

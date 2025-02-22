@@ -26,7 +26,7 @@ class PlayerService {
         this.updateTimeout = null;
         
         // 初始化事件监听
-        this.setupEventListeners();
+        // this.setupEventListeners();
         
         // 发布玩家ID初始化事件（使用防抖）
         this.emitPlayerIdUpdate(this.playerId);
@@ -37,10 +37,10 @@ class PlayerService {
         Logger.debug('PlayerService', '设置事件监听');
         
         // 监听任务完成事件，更新玩家经验值
-        this.eventBus.on(TASK_EVENTS.COMPLETED, this.handleTaskComplete.bind(this));
+        // this.eventBus.on(TASK_EVENTS.COMPLETED, this.handleTaskComplete.bind(this));
         
         // 监听玩家信息更新事件
-        this.eventBus.on(PLAYER_EVENTS.INFO_UPDATED, this.handlePlayerInfoUpdate.bind(this));
+        // this.eventBus.on(PLAYER_EVENTS.INFO_UPDATED, this.handlePlayerInfoUpdate.bind(this));
         
         Logger.info('PlayerService', '事件监听设置完成');
     }

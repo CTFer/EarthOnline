@@ -4,13 +4,19 @@
   "description": "地球Online的前端依赖",
   "main": "game.js",
   "dependencies": {
-    "layui": "^2.9.7",
-    "jquery": "^3.7.1",
     "echarts": "^5.4.3",
+    "jquery": "^3.7.1",
+    "layui": "^2.9.7",
     "swiper": "^11.0.5"
   },
   "devDependencies": {
+    "cz-conventional-changelog": "^3.3.0",
     "less": "^4.2.0",
     "less-loader": "^12.1.0"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
   }
-} 
+}

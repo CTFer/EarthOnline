@@ -1,5 +1,5 @@
 import Logger from '../../utils/logger.js';
-
+import { TASK_EVENTS } from '../config/events.js';
 class WordcloudService {
     constructor(apiClient, eventBus, store, playerService) {
         this.api = apiClient;
@@ -24,7 +24,8 @@ class WordcloudService {
 
     setupEventListeners() {
         window.addEventListener("resize", this.handleResize);
-        this.eventBus.on("task:completed", this.updateWordCloud.bind(this));
+        // 移除TASK_EVENTS.COMPLETED事件监听
+        // this.eventBus.on(TASK_EVENTS.COMPLETED, this.updateWordCloud.bind(this));
     }
 
     async initWordCloud(container) {
@@ -134,7 +135,7 @@ class WordcloudService {
         }
         // 移除事件监听
         window.removeEventListener("resize", this.handleResize);
-        this.eventBus.off("task:completed", this.updateWordCloud);
+        // this.eventBus.off("task:completed", this.updateWordCloud);
         Logger.info('WordcloudService', '文字云服务已销毁');
     }
 
