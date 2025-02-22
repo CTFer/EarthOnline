@@ -128,6 +128,11 @@
 </style>
 {% endblock %} {% block extra_scripts %}
 <script>
+  function updateDebugInfo(info) {
+    console.log("Debug Info:", info);
+    // 这里可以添加更多的逻辑来更新页面上的调试信息
+  }
+
   layui.use(["table", "form", "layer", "laydate", "jquery"], function () {
     var table = layui.table,
       form = layui.form,
@@ -207,6 +212,7 @@
                 IN_PROGRESS: '<span class="layui-badge layui-bg-orange">进行中</span>',
                 COMPLETED: '<span class="layui-badge layui-bg-green">已完成</span>',
                 UNFINISH: '<span class="layui-badge layui-bg-black">未完成</span>',
+                ABANDONED: '<span class="layui-badge layui-bg-red">已放弃</span>',
               };
               return statusMap[d.status] || d.status;
             },
@@ -356,7 +362,9 @@
           $.ajax({
             url: "/admin/api/player_tasks/" + data.id,
             method: "DELETE",
+            dataType: "json",
             success: function (res) {
+              console.log("Delete response:", res);
               if (res.code === 0) {
                 layer.msg("删除成功");
                 // 重新加载表格数据

@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-02-22 14:44:42
+ * @LastEditTime: 2025-02-22 22:46:40
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -11,11 +11,12 @@ import {  WS_STATE, WS_CONFIG } from "../config/wsConfig.js";
 import {gameUtils} from "../../utils/utils.js";
 
 class UIService {
-  constructor(eventBus, store, templateService, taskService) {
+  constructor(eventBus, store, templateService, taskService,playerService) {
     this.eventBus = eventBus;
     this.store = store;
     this.templateService = templateService;
     this.taskService = taskService;
+    this.playerService = playerService;
     this.observers = new Map();
     Logger.info("UIService", "初始化UI服务");
 
@@ -24,6 +25,8 @@ class UIService {
     this.mapTimeRange = localStorage.getItem('mapTimeRange') || 'today';
     this.customStartTime = null;
     this.customEndTime = null;
+
+    this.playerId = playerService.getPlayerId(); // 在构造函数中获取 playerId
   }
 
   /**
@@ -222,7 +225,7 @@ class UIService {
           const acceptBtn = layero.find(".accept-task");
           if (acceptBtn.length) {
             acceptBtn.on("click", () => {
-              this.eventBus.emit(TASK_EVENTS.ACCEPTED, { taskId, playerId: this.store.state.playerId });
+              this.eventBus.emit(TASK_EVENTS.ACCEPTED, { taskId, playerId: this.playerId });
               layer.closeAll();
             });
           }
@@ -235,7 +238,7 @@ class UIService {
                 title: "确认放弃",
                 content: "确定要放弃这个任务吗？",
                 onConfirm: () => {
-                  this.eventBus.emit(TASK_EVENTS.ABANDONED, { taskId, playerId: this.store.state.playerId });
+                  this.eventBus.emit(TASK_EVENTS.ABANDONED, { taskId, playerId: this.playerId });
                   layer.closeAll();
                 },
               });
@@ -741,7 +744,7 @@ class UIService {
             // 用户点击确定后触发任务放弃事件
             this.eventBus.emit(TASK_EVENTS.ABANDONED, {
               taskId: taskId,
-              playerId: this.store.state.playerId,
+              playerId: this.playerId,
             });
             layer.closeAll();
           } catch (error) {

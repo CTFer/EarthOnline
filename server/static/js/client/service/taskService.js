@@ -225,7 +225,7 @@ class TaskService {
                 });
                 
                 // 播放放弃音效
-                this.eventBus.emit(AUDIO_EVENTS.PLAY, 'ABANDON');
+                this.eventBus.emit(AUDIO_EVENTS.PLAY, 'ABANDONED');
                 
                 // 显示放弃通知
                 this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {

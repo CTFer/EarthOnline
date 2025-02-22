@@ -112,8 +112,8 @@ class GameManager {
       // 4. 初始化任务服务（依赖：api, eventBus, store, playerService, templateService）
       this.taskService = new TaskService(this.api, this.eventBus, this.store, this.playerService, this.templateService);
 
-      // 5. 初始化UI服务（依赖：eventBus, store, templateService, taskService）
-      this.uiService = new UIService(this.eventBus, this.store, this.templateService, this.taskService);
+      // 5. 初始化UI服务（依赖：eventBus, store, templateService, taskService,playerService）
+      this.uiService = new UIService(this.eventBus, this.store, this.templateService, this.taskService,this.playerService);
       // 等待UI服务初始化完成
       await this.uiService.initialize?.();
 

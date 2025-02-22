@@ -1109,7 +1109,7 @@ def delete_player_task(task_id):
         cursor.execute('DELETE FROM player_task WHERE id=?', (task_id,))
         conn.commit()
         conn.close()
-
+        print(f"Deleted task with id: {task_id}")
         return json.dumps({
             'code': 0,
             'msg': '删除成功',

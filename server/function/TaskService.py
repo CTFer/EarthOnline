@@ -168,6 +168,7 @@ class TaskService:
                 JOIN task t ON pt.task_id = t.id
                 WHERE pt.player_id = ? 
                 AND (pt.endtime > ? or pt.endtime is null)
+                AND pt.status = 'IN_PROGRESS'
                 ORDER BY pt.starttime DESC
             ''', (player_id, current_timestamp))
 
@@ -220,10 +221,10 @@ class TaskService:
                     'data': None
                 })
 
-            # 检查是否已接受该任务
+            # 检查是否已接受该任务,状态为进行中
             cursor.execute('''
                 SELECT * FROM player_task 
-                WHERE player_id = ? AND task_id = ?
+                WHERE player_id = ? AND task_id = ? AND status = 'IN_PROGRESS'
             ''', (player_id, task_id))
             
             if cursor.fetchone():
@@ -300,11 +301,12 @@ class TaskService:
             conn = self.get_db()
             cursor = conn.cursor()
             
-            # 首先检查任务是否存在且属于该玩家
+            # 首先检查任务是否存在且属于该玩家，同时获取任务类型
             cursor.execute('''
-                SELECT status 
-                FROM player_task 
-                WHERE player_id = ? AND id = ?
+                SELECT pt.status, t.task_type 
+                FROM player_task pt
+                JOIN task t ON pt.task_id = t.id
+                WHERE pt.player_id = ? AND pt.id = ?
             ''', (player_id, task_id))
             
             task = cursor.fetchone()
@@ -312,6 +314,14 @@ class TaskService:
                 return json.dumps({
                     'code': 1,
                     'msg': '任务不存在或不属于该玩家',
+                    'data': None
+                })
+            
+            # 检查是否为主线任务
+            if task['task_type'] == 'MAIN':
+                return json.dumps({
+                    'code': 1,
+                    'msg': '主线任务不能放弃',
                     'data': None
                 })
             

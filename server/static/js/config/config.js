@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:31
- * @LastEditTime: 2025-02-22 20:42:59
+ * @LastEditTime: 2025-02-22 22:59:44
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -57,8 +57,8 @@ export const AUDIO_CONFIG = {
       path: "/static/audio/error.mp3",
       preload: true, // 错误提示音最好预加载
     },
-    ABANDON: {
-      path: "/static/audio/abandon.mp3",
+    ABANDONED: {
+      path: "/static/audio/abandoned.mp3",
       preload: false,
     },
     CHECKING: {
