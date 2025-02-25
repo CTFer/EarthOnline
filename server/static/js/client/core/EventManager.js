@@ -44,7 +44,7 @@ class EventManager {
         this.live2dService = live2dService;
         this.notificationService = notificationService;
 
-        Logger.info('EventManager', '初始化事件管理器');
+        Logger.info('EventManager', 'constructor:47', '初始化事件管理器');
 
         this.initializeEventListeners();
     }
@@ -54,7 +54,7 @@ class EventManager {
      * @private
      */
     handleError(context, error, userMessage) {
-        Logger.error('EventManager', `${context}:`, error);
+        Logger.error('EventManager', 'handleError:57', `${context}:`, error);
         this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
             type: 'ERROR',
             message: userMessage || '操作失败'
@@ -66,7 +66,7 @@ class EventManager {
      * 初始化所有事件监听
      */
     initializeEventListeners() {
-        Logger.info('EventManager', '开始设置事件监听器');
+        Logger.info('EventManager', 'initializeEventListeners:69', '开始设置事件监听器');
         
         try {
             // 初始化各类事件监听
@@ -82,7 +82,7 @@ class EventManager {
             // 初始化UI组件
             this.uiService.initializeMapUI();
             
-            Logger.info('EventManager', '事件监听器设置完成');
+            Logger.info('EventManager', 'initializeEventListeners:85', '事件监听器设置完成');
         } catch (error) {
             this.handleError('初始化事件监听器', error, '初始化事件监听失败');
             throw error;
@@ -133,7 +133,7 @@ class EventManager {
         this.eventBus.on(TASK_EVENTS.STATUS_UPDATED, this.handleTaskStatusUpdate.bind(this));
         this.eventBus.on(TASK_EVENTS.ABANDONED, this.handleTaskAbandon.bind(this));
         
-        Logger.info('EventManager', '任务事件监听器设置完成');
+        Logger.info('EventManager', 'initializeTaskEvents:136', '任务事件监听器设置完成');
     }
 
     /**
@@ -162,7 +162,7 @@ class EventManager {
         this.eventBus.on(TASK_EVENTS.COMPLETED, this.handleTaskComplete.bind(this));
         this.eventBus.on(PLAYER_EVENTS.INFO_UPDATED, this.handlePlayerInfoUpdate.bind(this));
         
-        Logger.info('EventManager', '玩家事件监听器设置完成');
+        Logger.info('EventManager', 'initializePlayerEvents:155', '玩家事件监听器设置完成');
     }
 
     /**
@@ -177,18 +177,18 @@ class EventManager {
     }
 
     async handleMapRendererChange(type) {
-        Logger.debug('EventManager', '处理地图渲染器切换:', type);
+        Logger.debug('EventManager', 'handleMapRendererChange:180', '处理地图渲染器切换:', type);
         try {
             // 获取当前渲染器类型
             const currentType = localStorage.getItem('mapType') || 'ECHARTS';
             if (currentType === type) {
-                Logger.debug('EventManager', '地图类型相同，无需切换');
+                Logger.debug('EventManager', 'handleMapRendererChange:165', '地图类型相同，无需切换');
                 return;
             }
 
             // 直接调用mapService的switchRenderer方法
             await this.mapService.switchRenderer(type);
-            Logger.debug('EventManager', '地图切换完成:', type);
+            Logger.debug('EventManager', 'handleMapRendererChange:191', '地图切换完成:', type);
         } catch (error) {
             this.handleError('地图渲染器切换', error, '切换地图渲染器失败');
         }
@@ -220,7 +220,7 @@ class EventManager {
         this.eventBus.on(MAP_EVENTS.DISPLAY_MODE_CHANGED, this.handleMapDisplayModeChange.bind(this));
         this.eventBus.on(MAP_EVENTS.TIME_RANGE_CHANGED, this.handleMapTimeRangeChange.bind(this));
         
-        Logger.info('EventManager', '地图事件监听器设置完成');
+        Logger.info('EventManager', 'initializeMapEvents:223', '地图事件监听器设置完成');
     }
 
     /**
@@ -263,7 +263,7 @@ class EventManager {
         // 玩家相关UI事件
         this.eventBus.on(PLAYER_EVENTS.INFO_UPDATED, this.handleUIPlayerInfoUpdate.bind(this));
         
-        Logger.info('EventManager', 'UI事件监听器设置完成');
+        Logger.info('EventManager', 'initializeUIEvents:266', 'UI事件监听器设置完成');
     }
 
     /**
@@ -299,7 +299,7 @@ class EventManager {
         this.eventBus.on(AUDIO_EVENTS.STOP, this.handleStopSound.bind(this));
         this.eventBus.on(AUDIO_EVENTS.VOLUME_CHANGED, this.handleVolumeChange.bind(this));
         
-        Logger.info('EventManager', '音频事件监听器设置完成');
+        Logger.info('EventManager', 'initializeAudioEvents:302', '音频事件监听器设置完成');
     }
 
     /**
@@ -317,7 +317,7 @@ class EventManager {
             this.uiService.updateWebSocketStatus('error');
         });
         
-        Logger.info('EventManager', 'WebSocket事件监听器设置完成');
+        Logger.info('EventManager', 'initializeWSEvents:320', 'WebSocket事件监听器设置完成');
     }
 
     /**
@@ -326,7 +326,7 @@ class EventManager {
     initializeLive2DEvents() {
         // Live2D相关事件监听
         this.eventBus.on(LIVE2D_EVENTS.MODEL_LOADED, () => {
-            Logger.info('EventManager', 'Live2D模型加载完成');
+            Logger.info('EventManager', 'initializeLive2DEvents:329', 'Live2D模型加载完成');
         });
     }
 
@@ -372,7 +372,7 @@ class EventManager {
             this.eventBus.on(NOTIFICATION_EVENTS.UPDATE, this.handleNotificationUpdate.bind(this));
             this.eventBus.on(NOTIFICATION_EVENTS.DELETE, this.handleNotificationDelete.bind(this));
         }
-        Logger.info('EventManager', '通知事件监听器设置完成');
+        Logger.info('EventManager', 'initializeNotificationEvents:375', '通知事件监听器设置完成');
     }
 }
 

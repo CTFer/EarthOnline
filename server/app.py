@@ -22,14 +22,15 @@ from function.PlayerService import player_service
 from function.TaskService import task_service
 from function.GPSService import gps_service
 from function.RoadmapService import roadmap_service
-from config import (
+from config.config import (
     SERVER_IP, 
     PORT, 
     DEBUG, 
     WAITRESS_CONFIG, 
     ENV,
-    PROD_SERVER  # 添加这行
+    PROD_SERVER,  # 添加这行
 )
+from config.private import AMAP_SECURITY_JS_CODE
 import requests
 from function.NotificationService import notification_service
 
@@ -927,6 +928,12 @@ def reminder():
     """提词器页面"""
     return render_template('client/reminder.html')
     # 在应用启动时调用
+@app.route('/api/amap/security-config')
+def get_amap_security_config():
+    """获取高德地图安全配置"""
+    return jsonify({
+        'securityJsCode': AMAP_SECURITY_JS_CODE
+    })
 if __name__ == '__main__':
     logger = setup_logging()
     logger.info("Starting server initialization...")

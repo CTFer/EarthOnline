@@ -3,7 +3,7 @@ import sqlite3
 import os
 import logging
 import time
-from config import *
+from config.config import *
 from datetime import datetime, timedelta
 import numpy as np
 from flask import request

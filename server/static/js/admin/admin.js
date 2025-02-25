@@ -1,3 +1,14 @@
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @LastEditTime: 2025-02-25 14:49:41
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 管理后台主文件
+ */
+import UserAdmin from './service/userAdmin.js';
+import MedalAdmin from './service/medalAdmin.js';
+import SkillAdmin from './service/skillAdmin.js';
+import { gameUtils } from '../utils/utils.js';
+
 layui.use(["layer", "form", "element", "table"], function () {
   var layer = layui.layer;
   var form = layui.form;
@@ -13,18 +24,28 @@ layui.use(["layer", "form", "element", "table"], function () {
   let currentUsername = "";
 
   // 页面加载完成后执行
-  $(document).ready(function () {
+  $(function () {
     console.log("[Admin] 初始化管理界面");
 
     // 从页面元素获取用户名
     currentUsername = $(".admin-name").text().trim();
     console.log("[Admin] 当前用户:", currentUsername);
 
+    // 初始化用户管理模块
+    const userAdmin = new UserAdmin();
+    userAdmin.loadUsers();
+    userAdmin.loadPlayers();
+
+    // 初始化勋章和技能管理模块
+    const medalAdmin = new MedalAdmin();
+    medalAdmin.loadMedals();
+    window.showAddMedalForm = medalAdmin.showAddMedalForm.bind(medalAdmin);
+
+    const skillAdmin = new SkillAdmin();
+    skillAdmin.loadSkills();
+    window.showAddSkillForm = skillAdmin.showAddSkillForm.bind(skillAdmin);
+
     // 初始化其他功能
-    loadUsers();
-    loadPlayers();
-    loadSkills();
-    loadMedals();
     loadApiDocs();
     initTaskPanel();
     initNFCOperations();
@@ -41,148 +62,7 @@ layui.use(["layer", "form", "element", "table"], function () {
     });
   });
 
-  // 加载用户列表
-  async function loadUsers() {
-    try {
-      const response = await fetch("/admin/api/users");
-      const result = await response.json();
 
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      const users = result.data || [];
-      const tbody = document.querySelector("#userTable tbody");
-
-      tbody.innerHTML = users
-        .map(
-          (user) => `
-                <tr>
-                    <td>${user.id}</td>
-                    <td>${user.username}</td>
-                    <td>${user.created_at}</td>
-                    <td>
-                        <button class="layui-btn layui-btn-sm" onclick="editUser(${user.id})">编辑</button>
-                        <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="deleteUser(${user.id})">删除</button>
-                    </td>
-                </tr>
-            `
-        )
-        .join("");
-    } catch (error) {
-      console.error("加载用户失败:", error);
-      layer.msg("加载用户失败: " + error.message);
-    }
-  }
-  // 加载玩家列表
-  async function loadPlayers() {
-    try {
-      const response = await fetch("/admin/api/players");
-      const result = await response.json();
-      console.log(result);
-      if (result.code) {
-        throw new Error(result.msg);
-      }
-
-      const players = result.data || [];
-      const tbody = document.querySelector("#playerTable tbody");
-
-      tbody.innerHTML = players
-        .map(
-          (player) => `
-                <tr>
-                    <td>${player.player_id}</td>
-                    <td>${player.player_name}</td>
-                    <td>${player.sex === 1 ? "男" : "女"}</td>
-                    <td>${player.level}</td>
-                    <td>${player.experience}</td>
-                    <td>${player.points}</td>
-                    <td>${player.create_time}</td>
-                    <td>
-                        <button class="layui-btn layui-btn-sm" onclick="editPlayer(${player.player_id})">编辑</button>
-                        <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="deletePlayer(${player.player_id})">删除</button>
-                    </td>
-                </tr>
-            `
-        )
-        .join("");
-    } catch (error) {
-      console.error("加载玩家失败:", error);
-      layer.msg("加载玩家失败: " + error.message);
-    }
-  }
-
-  // 加载技能列表
-  async function loadSkills() {
-    try {
-      const response = await fetch("/admin/api/skills");
-      const result = await response.json();
-
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      const skills = result.data || [];
-      const tbody = document.querySelector("#skillTable tbody");
-
-      tbody.innerHTML = skills
-        .map(
-          (skill) => `
-                <tr>
-                    <td>${skill.id}</td>
-                    <td>${skill.name}</td>
-                    <td>${skill.proficiency}</td>
-                    <td>${skill.description || ""}</td>
-                    <td>
-                        <button class="layui-btn layui-btn-sm" onclick="editSkill(${skill.id})">编辑</button>
-                        <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="deleteSkill(${skill.id})">删除</button>
-                    </td>
-                </tr>
-            `
-        )
-        .join("");
-    } catch (error) {
-      console.error("加载技能失败:", error);
-      layer.msg("加载技能失败: " + error.message);
-    }
-  }
-
-  // 加载勋章列表
-  async function loadMedals() {
-    try {
-      const response = await fetch("/admin/api/medals");
-      const result = await response.json();
-
-      if (result.code !== 0) {
-        throw new Error(result.msg);
-      }
-
-      const medals = result.data || [];
-      const tbody = document.querySelector("#medalTable tbody");
-
-      tbody.innerHTML = medals
-        .map(
-          (medal) => `
-                    <tr>
-                        <td>${medal.id}</td>
-                        <td>${medal.name}</td>
-                        <td>${medal.description || ""}</td>
-                        <td>${new Date(medal.addtime * 1000).toLocaleString()}</td>
-                        <td>${medal.icon ? `<img src="${medal.icon}" alt="图标" style="width:30px;height:30px;">` : ""}</td>
-                        <td>${medal.conditions || ""}</td>
-                        <td>
-                            <button class="layui-btn layui-btn-sm" onclick="editMedal(${medal.id})">编辑</button>
-                            <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="deleteMedal(${medal.id})">删除</button>
-                        </td>
-                    </tr>
-                `
-        )
-        .join("");
-    } catch (error) {
-      console.error("加载勋章失败:", error);
-      layer.msg("加载勋章失败: " + error.message);
-    }
-  }
 
   // 加载API文档
   async function loadApiDocs() {
@@ -278,352 +158,7 @@ layui.use(["layer", "form", "element", "table"], function () {
         `;
   }
 
-  // 显示添加用户表单
-  window.showAddUserForm = function () {
-    layer.open({
-      type: 1,
-      title: "添加用户",
-      content: $("#userForm"),
-      area: ["500px", "300px"],
-      btn: ["确定", "取消"],
-      yes: function (index) {
-        // 获取表单数据
-        const username = $('input[name="username"]').val();
-        const password = $('input[name="password"]').val();
 
-        // 验证表单
-        if (!username || !password) {
-          layer.msg("请填写完整信息");
-          return;
-        }
-
-        // 发送请求
-        fetch("/admin/api/adduser", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username: username,
-            password: md5(password), // 密码MD5加密
-          }),
-        })
-          .then((response) => response.json())
-          .then((result) => {
-            if (result.error) {
-              throw new Error(result.error);
-            }
-            layer.msg("添加成功");
-            layer.close(index);
-            loadUsers(); // 重新加载用户列表
-          })
-          .catch((error) => {
-            console.error("添加用户失败:", error);
-            layer.msg("添加用户失败: " + error.message);
-          });
-      },
-    });
-  };
-  // 显示添加玩家表单
-  window.showAddPlayerForm = function () {
-    layer.open({
-      type: 1,
-      title: "添加玩家",
-      content: $("#playerForm"),
-      area: ["500px", "500px"],
-      btn: ["确定", "取消"],
-      yes: function (index) {
-        // 获取表单数据
-        const player_name = $('input[name="player_name"]').val();
-        const player_en_name = $('input[name="player_en_name"]').val();
-        const level = $('input[name="level"]').val();
-        const points = $('input[name="points"]').val();
-
-        // 验证表单
-        if (!player_name) {
-          layer.msg("请填写完整信息");
-          return;
-        }
-
-        // 发送请求
-        fetch("/admin/api/addplayer", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            player_name: player_name,
-            english_name: player_en_name,
-            level: level,
-            points: points,
-          }),
-        })
-          .then((response) => response.json())
-          .then((result) => {
-            if (result.error) {
-              throw new Error(result.error);
-            }
-            layer.msg("添加成功");
-            layer.close(index);
-            loadUsers(); // 重新加载用户列表
-          })
-          .catch((error) => {
-            console.error("添加用户失败:", error);
-            layer.msg("添加用户失败: " + error.message);
-          });
-      },
-    });
-  };
-  // 显示添加技能表单
-  window.showAddSkillForm = function () {
-    layer.open({
-      type: 1,
-      title: "添加技能",
-      content: $("#skillForm"),
-      area: ["500px", "400px"],
-      btn: ["确定", "取消"],
-      yes: function (index) {
-        const formData = {
-          name: $('input[name="name"]').val(),
-          proficiency: parseInt($('input[name="proficiency"]').val()),
-          description: $('textarea[name="description"]').val(), //todo 修改标记
-        };
-
-        fetch("/admin/api/skills", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formData),
-        })
-          .then((response) => response.json())
-          .then((result) => {
-            if (result.error) {
-              throw new Error(result.error);
-            }
-            layer.close(index);
-            layer.msg("添加成功");
-            loadSkills();
-          })
-          .catch((error) => {
-            layer.msg("添加失败: " + error.message);
-          });
-      },
-    });
-  };
-
-  // 编辑用户
-  window.editUser = function (id) {
-    fetch(`/admin/api/users/${id}`)
-      .then((response) => response.json())
-      .then((user) => {
-        $('input[name="username"]').val(user.username);
-        $('input[name="password"]').val("");
-
-        layer.open({
-          type: 1,
-          title: "编辑用户",
-          content: $("#userForm"),
-          area: ["500px", "300px"],
-          btn: ["确定", "取消"],
-          yes: function (index) {
-            const formData = {
-              username: $('input[name="username"]').val(),
-              password: $('input[name="password"]').val(),
-            };
-
-            fetch(`/admin/api/users/${id}`, {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(formData),
-            })
-              .then((response) => response.json())
-              .then((result) => {
-                if (result.error) {
-                  throw new Error(result.error);
-                }
-                layer.close(index);
-                layer.msg("更新成功");
-                loadUsers();
-              })
-              .catch((error) => {
-                layer.msg("更新失败: " + error.message);
-              });
-          },
-        });
-      });
-  };
-
-  // 删除用户
-  window.deleteUser = function (id) {
-    layer.confirm(
-      "确定要删除这个用户吗？",
-      {
-        btn: ["确定", "取消"],
-      },
-      function () {
-        fetch(`/admin/api/users/${id}`, {
-          method: "DELETE",
-        })
-          .then((response) => response.json())
-          .then((result) => {
-            if (result.error) {
-              throw new Error(result.error);
-            }
-            layer.msg("删除成功");
-            loadUsers();
-          })
-          .catch((error) => {
-            layer.msg("删除失败: " + error.message);
-          });
-      }
-    );
-  };
-  // 删除玩家
-  window.deletePlayer = function (id) {
-    layer.confirm(
-      "确定要删除这个玩家吗？",
-      {
-        btn: ["确定", "取消"],
-      },
-      function () {
-        fetch(`/admin/api/players/${id}`, {
-          method: "DELETE",
-        })
-          .then((response) => response.json())
-          .then((result) => {
-            if (result.error) {
-              throw new Error(result.error);
-            }
-            layer.msg("删除成功");
-            loadUsers();
-          })
-          .catch((error) => {
-            layer.msg("删除失败: " + error.message);
-          });
-      }
-    );
-  };
-  // 编辑玩家
-  window.editPlayer = function (id) {
-    fetch(`/admin/api/players/${id}`)
-      .then((response) => response.json())
-      .then((player) => {
-        $('input[name="player_name"]').val(player.player_name);
-        $('input[name="points"]').val(player.points);
-        $('input[name="level"]').val(player.level);
-        console.log(player);
-
-        layer.open({
-          type: 1,
-          title: "编辑玩家",
-          content: $("#playerForm"),
-          area: ["500px", "400px"],
-          btn: ["确定", "取消"],
-          yes: function (index) {
-            const formData = {
-              player_id: player.player_id,
-              player_name: $('input[name="player_name"]').val(),
-              points: $('input[name="points"]').val(),
-              level: $('input[name="level"]').val(),
-            };
-
-            fetch(`/admin/api/players/${id}`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(formData),
-            })
-              .then((response) => response.json())
-              .then((result) => {
-                if (result.error) {
-                  throw new Error(result.error);
-                }
-                layer.close(index);
-                layer.msg("更新成功");
-                loadPlayers();
-              })
-              .catch((error) => {
-                layer.msg("更新失败: " + error.message);
-              });
-          },
-        });
-      });
-  };
-  // 编辑技能
-  window.editSkill = function (id) {
-    fetch(`/admin/api/skills/${id}`)
-      .then((response) => response.json())
-      .then((skill) => {
-        $('input[name="name"]').val(skill.name);
-        $('input[name="proficiency"]').val(skill.proficiency);
-        $('textarea[name="description"]').val(skill.description);
-
-        layer.open({
-          type: 1,
-          title: "编辑技能",
-          content: $("#skillForm"),
-          area: ["500px", "400px"],
-          btn: ["确定", "取消"],
-          yes: function (index) {
-            const formData = {
-              name: $('input[name="name"]').val(),
-              proficiency: parseInt($('input[name="proficiency"]').val()),
-              description: $('textarea[name="description"]').val(),
-            };
-
-            fetch(`/admin/api/skills/${id}`, {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(formData),
-            })
-              .then((response) => response.json())
-              .then((result) => {
-                if (result.error) {
-                  throw new Error(result.error);
-                }
-                layer.close(index);
-                layer.msg("更新成功");
-                loadSkills();
-              })
-              .catch((error) => {
-                layer.msg("更新失败: " + error.message);
-              });
-          },
-        });
-      });
-  };
-
-  // 删除技能
-  window.deleteSkill = function (id) {
-    layer.confirm(
-      "确定要删除这个技能吗？",
-      {
-        btn: ["确定", "取消"],
-      },
-      function () {
-        fetch(`/admin/api/skills/${id}`, {
-          method: "DELETE",
-        })
-          .then((response) => response.json())
-          .then((result) => {
-            if (result.error) {
-              throw new Error(result.error);
-            }
-            layer.msg("删除成功");
-            loadSkills();
-          })
-          .catch((error) => {
-            layer.msg("删除失败: " + error.message);
-          });
-      }
-    );
-  };
 
   // 编辑任务
   window.editTask = function (id) {
@@ -661,151 +196,6 @@ layui.use(["layer", "form", "element", "table"], function () {
               layui.table.reload("taskTable");
             } else {
               throw new Error(result.msg || result.error);
-            }
-          })
-          .catch((error) => {
-            layer.msg("删除失败: " + error.message);
-          });
-      }
-    );
-  };
-
-  // 显示添加勋章表单
-  window.showAddMedalForm = function () {
-    layer.open({
-      type: 1,
-      title: "添加勋章",
-      content: $("#medalForm"),
-      area: ["500px", "600px"],
-      btn: ["确定", "取消"],
-      yes: function (index) {
-        const formData = {
-          name: $('input[name="medal-name"]').val(),
-          description: $('textarea[name="medal-description"]').val(),
-          icon: $('input[name="medal-icon"]').val(),
-          conditions: $('textarea[name="medal-conditions"]').val(),
-        };
-        console.log(formData);
-
-        fetch("/admin/api/medals", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formData),
-        })
-          .then((response) => response.json())
-          .then((result) => {
-            if (result.code === 0) {
-              layer.close(index);
-              layer.msg("添加成功");
-              loadMedals();
-            } else {
-              throw new Error(result.msg);
-            }
-          })
-          .catch((error) => {
-            layer.msg("添加失败: " + error.message);
-          });
-      },
-    });
-  };
-
-  // 编辑勋章
-  window.editMedal = function (id) {
-    fetch(`/admin/api/medals/${id}`)
-      .then((response) => response.json())
-      .then((result) => {
-        if (result.code === 0) {
-          const medal = result.data;
-          console.log("Retrieved medal data:", medal); // 添加调试信息
-
-          // 清空表单
-          $("#medalForm form")[0].reset();
-
-          // 填充表单数据
-          const form = $("#medalForm form");
-          form.find('input[name="medal-name"]').val(medal.name);
-          form.find('textarea[name="medal-description"]').val(medal.description);
-          form.find('input[name="medal-icon"]').val(medal.icon);
-          form.find('textarea[name="medal-conditions"]').val(medal.conditions);
-
-          console.log("Form values after setting:", {
-            // 添加调试信息
-            name: form.find('input[name="medal-name"]').val(),
-            description: form.find('textarea[name="medal-description"]').val(),
-            icon: form.find('input[name="medal-icon"]').val(),
-            conditions: form.find('textarea[name="medal-conditions"]').val(),
-          });
-
-          layer.open({
-            type: 1,
-            title: "编辑勋章",
-            content: $("#medalForm"),
-            area: ["500px", "600px"],
-            btn: ["确定", "取消"],
-            yes: function (index) {
-              const formData = {
-                name: form.find('input[name="medal-name"]').val(),
-                description: form.find('textarea[name="medal-description"]').val(),
-                icon: form.find('input[name="medal-icon"]').val(),
-                conditions: form.find('textarea[name="medal-conditions"]').val(),
-              };
-
-              console.log("Submitting medal data:", formData); // 添加调试信息
-
-              fetch(`/admin/api/medals/${id}`, {
-                method: "PUT",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify(formData),
-              })
-                .then((response) => response.json())
-                .then((result) => {
-                  console.log("Update result:", result); // 添加调试信息
-                  if (result.code === 0) {
-                    layer.close(index);
-                    layer.msg("更新成功");
-                    loadMedals();
-                  } else {
-                    throw new Error(result.msg);
-                  }
-                })
-                .catch((error) => {
-                  console.error("Update error:", error); // 添加调试信息
-                  layer.msg("更新失败: " + error.message);
-                });
-            },
-          });
-        } else {
-          throw new Error(result.msg);
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to get medal data:", error); // 添加调试信息
-        layer.msg("获取勋章数据失败: " + error.message);
-      });
-  };
-
-  // 删除勋章
-  window.deleteMedal = function (id) {
-    layer.confirm(
-      "确定要删除这个勋章吗？",
-      {
-        btn: ["确定", "取消"],
-      },
-      function () {
-        fetch(`/admin/api/medals/${id}`, {
-          method: "DELETE",
-        })
-          .then((response) => response.json())
-          .then((result) => {
-            if (result.code === 0) {
-              layer.msg("删除成功");
-              loadMedals();
-            } else {
-              throw new Error(result.msg);
             }
           })
           .catch((error) => {
@@ -932,7 +322,7 @@ layui.use(["layer", "form", "element", "table"], function () {
   }
 
   // 在页面加载完成后初始化所有面板
-  document.addEventListener("DOMContentLoaded", function () {
+  $(function () {
     // ... existing initialization code ...
 
     // 初始化任务面板
@@ -1286,7 +676,8 @@ layui.use(["layer", "form", "element", "table"], function () {
             title: "添加时间",
             width: 160,
             templet: function (d) {
-              return d.addtime ? new Date(d.addtime * 1000).toLocaleString() : "";
+              const formattedTime = gameUtils.formatTimestamp(d.addtime);
+              return formattedTime;
             },
           },
           { title: "操作", width: 200, toolbar: "#nfcCardTableBar" },
@@ -1735,7 +1126,8 @@ layui.use(["layer", "form", "element", "table"], function () {
               width: 160,
               templet: function (d) {
                 console.log("渲染时间字段:", d.addtime);
-                return d.addtime ? new Date(d.addtime * 1000).toLocaleString() : "";
+                const formattedTime = gameUtils.formatTimestamp(d.addtime);
+                return formattedTime;
               },
             },
             { field: "description", title: "描述" },
@@ -1767,7 +1159,7 @@ layui.use(["layer", "form", "element", "table"], function () {
   }
 
   // 确保在页面加载完成后初始化表格
-  $(document).ready(function () {
+  $(function () {
     console.log("文档加载完成");
     console.log("检查NFC表格容器:", document.getElementById("nfcCardTable"));
 
@@ -1881,7 +1273,7 @@ layui.use(["layer", "form", "element", "table"], function () {
   }
 
   // 页面加载完成后初始化NFC操作
-  $(document).ready(function () {
+  $(function () {
     console.log("[NFC] 初始化NFC功能");
     initNFCOperations();
   });

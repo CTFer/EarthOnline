@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:40:28
- * @LastEditTime: 2025-02-22 17:25:41
+ * @LastEditTime: 2025-02-25 21:50:58
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -26,9 +26,15 @@
     <script src="/static/js/jquery.min.js"></script>
     <!-- 高德地图配置项 -->
     <script type="text/javascript">
-      window._AMapSecurityConfig = {
-        securityJsCode: "a64ba8d506a1154e41b9ca50a6113c55", // 安全密钥
-      };
+      // 从后端获取安全密钥
+      fetch('/api/amap/security-config')
+        .then(response => response.json())
+        .then(data => {
+          window._AMapSecurityConfig = {
+            securityJsCode: data.securityJsCode
+          };
+        
+        });
     </script>
     <script src="https://webapi.amap.com/maps?v=2.0&key=16de1da59d44d6967f9a6bf5248963c5&plugin=AMap.Scale,AMap.ToolBar"></script>
     <script src="/static/js/echarts-extension-amap.min.js"></script>

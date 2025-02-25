@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:31
- * @LastEditTime: 2025-02-22 22:59:44
+ * @LastEditTime: 2025-02-25 23:09:13
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -27,7 +27,7 @@ export const Character_image = {
 export const LOG_CONFIG = {
   enableConsoleLog: true, // 是否启用控制台输出
   logLevel: "debug", // 日志级别: 'debug', 'info', 'warn', 'error'
-  allowedModules: ['EventManager','WebSocketService','GameManager','UIService'], // 允许输出日志的模块，为空输出全部模块（白名单优先级高于黑名单）
+  allowedModules: ['EventManager','MapService','GameManager','AMapRenderer','UIService'], // 允许输出日志的模块，为空输出全部模块（白名单优先级高于黑名单）
   blockedModules: ["Utils"], // 禁止输出日志的模块（黑名单）
   alwaysError: true, // 是否总是输出error级别的日志
   timeFormat: true, // 是否在日志中显示时间

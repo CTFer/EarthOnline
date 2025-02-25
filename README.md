@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-12 16:39:10
- * @LastEditTime: 2025-02-18 20:55:32
+ * @LastEditTime: 2025-02-25 20:28:58
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -127,19 +127,27 @@ git clone https://github.com/yourusername/earthonline.git
 cd earthonline
 ```
 
-2.安装依赖
+2.新增配置
+在config目录下新建private.py文件，存放了高德地图的KEY
+
+```python
+AMAP_SECURITY_JS_CODE = "您的安全密钥"  # 您的安全密钥
+
+```
+
+3.安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3.初始化数据库
+4.初始化数据库
 
 ```bash
 python init_db.py
 ```
 
-4.启动服务
+5.启动服务
 
 ```bash
 python app.py
@@ -219,5 +227,3 @@ chore: 构建过程或辅助工具的变动
 - 项目主页: [GitHub](https://github.com/yourusername/earthonline)
 - 问题反馈: [Issues](https://github.com/yourusername/earthonline/issues)
 - 邮件联系: [775639471@qq.com](mailto:775639471@qq.com)
-
-

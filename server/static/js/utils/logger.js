@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-13 19:10:14
- * @LastEditTime: 2025-02-17 13:26:24
+ * @LastEditTime: 2025-02-25 22:39:00
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -25,17 +25,77 @@ class Logger {
         return `[${now.toLocaleTimeString('zh-CN', { hour12: false })}:${now.getMilliseconds().toString().padStart(3, '0')}]`;
     }
 
+    static getCallerInfo() {
+        try {
+            const err = new Error();
+            const stackLines = err.stack.split('\n');
+            
+            // 遍历调用栈，找到第一个非Logger类的调用
+            for (let i = 0; i < stackLines.length; i++) {
+                const line = stackLines[i];
+                if (line.includes('Logger.') || line.includes('new Error')) {
+                    continue;
+                }
+                
+                // 提取函数名、文件名和行号
+                const matches = line.match(/at\s+(?:([^\s(]+)\s+\()?([^:]+):(\d+):/);
+                if (matches) {
+                    const [, funcName = 'anonymous', fileName, lineNum] = matches;
+                    // 提取文件名中的最后一部分
+                    const shortFileName = fileName.split('/').pop();
+                    return {
+                        function: funcName,
+                        file: shortFileName,
+                        line: lineNum
+                    };
+                }
+            }
+            return null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    static parseLocationInfo(firstArg) {
+        // 检查是否包含位置信息（格式如 'constructor:47'）
+        const locationMatch = typeof firstArg === 'string' && firstArg.match(/^([^:]+):(\d+)$/);
+        if (locationMatch) {
+            return {
+                function: locationMatch[1],
+                line: locationMatch[2]
+            };
+        }
+        return null;
+    }
+
     static formatMessage(module, level, ...args) {
         const timeStr = this.getTimeString();
         const moduleStr = `[${module}]`;
         const levelStr = `[${level.toUpperCase()}]`;
         
-        if (LOG_CONFIG.styleOutput) {
-            const style = LOG_CONFIG.styles[level];
-            return [`${timeStr}${moduleStr}${levelStr}`, style, ...args];
+        // 检查第一个参数是否包含位置信息
+        const locationInfo = this.parseLocationInfo(args[0]);
+        let messageArgs = args;
+        let callerStr = '';
+        
+        if (locationInfo) {
+            // 如果第一个参数是位置信息，使用它并移除
+            callerStr = ` [${locationInfo.function}:${locationInfo.line}]`;
+            messageArgs = args.slice(1);
+        } else {
+            // 否则使用调用栈信息
+            const callerInfo = this.getCallerInfo();
+            if (callerInfo) {
+                callerStr = ` [${callerInfo.function}@${callerInfo.file}:${callerInfo.line}]`;
+            }
         }
         
-        return [`${timeStr}${moduleStr}${levelStr}`, ...args];
+        if (LOG_CONFIG.styleOutput) {
+            const style = LOG_CONFIG.styles[level];
+            return [`${timeStr}${moduleStr}${levelStr}${callerStr}`, style, ...messageArgs];
+        }
+        
+        return [`${timeStr}${moduleStr}${levelStr}${callerStr}`, ...messageArgs];
     }
 
     static shouldLog(module, level) {

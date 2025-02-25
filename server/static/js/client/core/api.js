@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:01
- * @LastEditTime: 2025-02-17 18:37:20
+ * @LastEditTime: 2025-02-25 21:41:45
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -253,6 +253,10 @@ class APIClient {
             method: 'POST',
             body: JSON.stringify(stats)
         });
+    }
+    async getSecurityCode() {
+        Logger.info('API', '获取高德地图安全密钥');
+        return this.request('/api/amap/security-config');
     }
 }
 

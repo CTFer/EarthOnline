@@ -9,7 +9,6 @@
 export const RENDER_TYPE = 'AMAP';  // 'AMAP' | 'ECHARTS'
 // 地图渲染配置
 export const MAP_CONFIG = {
-
     backgroundOpacity: 0.8,                    // 默认背景透明度
     RENDER_TYPE: localStorage.getItem("mapType") || "ECHARTS", // 从本地存储读取上次的选择
     AMAP: {
@@ -18,6 +17,7 @@ export const MAP_CONFIG = {
       features: ["bg", "building", "road"],
       viewMode: "2D",
       pitch: 0,
+
     },
     ECHARTS: {
       zoom: 14,
@@ -27,7 +27,8 @@ export const MAP_CONFIG = {
         borderWidth: 1,
       },
     },
-  };
+};
+
 // 高德地图配置
 export const AMAP_CONFIG = {
     // 地图基础配置
@@ -37,7 +38,7 @@ export const AMAP_CONFIG = {
     showIndoorMap: false,        // 是否在有矢量底图的时候自动展示室内地图
     showBuildingBlock: false,     // 是否显示3D楼块
     viewMode: '2D',              // 地图视图模式
-    features: ['bg', 'road'],    // 地图显示要素
+    features: ['bg', 'road', "building",],    // 地图显示要素
     mapStyle: 'amap://styles/dark',  // 地图样式
     pitch: 0,                    // 俯仰角度
 
@@ -52,13 +53,16 @@ export const AMAP_CONFIG = {
         opacity: 1,              // 路网图层透明度
         zIndex: 5,               // 图层叠加顺序
     },
-
-    // 安全配置
-    securityJsCode: 'a64ba8d506a1154e41b9ca50a6113c55',  // 安全密钥
+      // 轨迹纠偏配置
+      GRASP_ROAD_CONFIG: {
+        enabled: false, // 是否开启轨迹纠偏 当前存在BUG
+        defaultParams: {
+            speed: 10, // 默认速度
+            angle: 0,  // 默认角度
+        }
+    },
     key: '16de1da59d44d6967f9a6bf5248963c5',            // API密钥
 };
-
-
 
 // Echarts地图配置
 export const ECHARTS_CONFIG = {

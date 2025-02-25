@@ -5,7 +5,7 @@ import os
 from flask import session, request
 import hashlib
 import requests
-from config import PROD_SERVER, ENV,SYNC_TIME
+from config.config import PROD_SERVER, ENV,Roadmap_SYNC_TIME
 
 class RoadmapService:
     def __init__(self):
@@ -363,7 +363,7 @@ class RoadmapService:
         1. 本地环境
         2. 距离上次同步超过5分钟
         """
-        if ENV == 'local' and time.time() - self.last_sync_time > SYNC_TIME:  # 5分钟同步一次
+        if ENV == 'local' and time.time() - self.last_sync_time > Roadmap_SYNC_TIME:  # 5分钟同步一次
             print("[Sync] 自动同步触发")
             return self.sync_from_prod()
         return None

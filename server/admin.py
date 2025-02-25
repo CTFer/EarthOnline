@@ -9,12 +9,13 @@ from datetime import datetime
 import time
 from function.PlayerService import player_service
 from flask_socketio import SocketIO
-from config import ENV
+from config.config import ENV
 if ENV == 'local':
     from function.NFC_Device import NFC_Device
 from function.admin_service import admin_service
 import threading
 from function.NotificationService import notification_service
+from function.MedalService import medal_service
 
 # 创建蓝图
 admin_bp = Blueprint('admin', __name__)
@@ -289,7 +290,7 @@ def get_skills():
         cursor = conn.cursor()
         cursor.execute('SELECT id, name, proficiency, description FROM skills')
         skills = [dict(row) for row in cursor.fetchall()]
-        return json.dumps({"data": skills})
+        return json.dumps({"code": 0, "data": skills, "msg": "获取技能成功"})
     except Exception as e:
         print(f"Error in get_skills: {str(e)}")
         return json.dumps({'error': str(e)}), 500
@@ -314,7 +315,7 @@ def add_skill():
         skill_id = cursor.lastrowid
         conn.commit()
 
-        return json.dumps({"id": skill_id}), 201
+        return json.dumps({"code": 0, "data": {"id": skill_id}, "msg": "添加成功"}), 201
     except Exception as e:
         print(f"Error in add_skill: {str(e)}")
         return json.dumps({'error': str(e)}), 500
@@ -336,7 +337,7 @@ def get_skill(skill_id):
         if skill is None:
             return json.dumps({'error': 'Skill not found'}), 404
 
-        return json.dumps(dict(skill))
+        return json.dumps({"code": 0, "data": dict(skill), "msg": "获取技能成功"})
     except Exception as e:
         print(f"Error in get_skill: {str(e)}")
         return json.dumps({'error': str(e)}), 500
@@ -360,7 +361,7 @@ def update_skill(skill_id):
         ''', (data['name'], data['proficiency'], data.get('description', ''), skill_id))
 
         conn.commit()
-        return json.dumps({"success": True})
+        return json.dumps({"code": 0, "data": null, "msg": "更新成功"})
     except Exception as e:
         print(f"Error in update_skill: {str(e)}")
         return json.dumps({'error': str(e)}), 500
@@ -384,7 +385,7 @@ def delete_skill(skill_id):
         cursor.execute('DELETE FROM skills WHERE id = ?', (skill_id,))
 
         conn.commit()
-        return json.dumps({"success": True})
+        return json.dumps({"code": 0, "data": null, "msg": "删除成功"})
     except Exception as e:
         print(f"Error in delete_skill: {str(e)}")
         return json.dumps({'error': str(e)}), 500
@@ -1127,245 +1128,47 @@ def delete_player_task(task_id):
 @admin_bp.route('/api/medals', methods=['GET'])
 @admin_required
 def get_medals():
-    try:
-        # 获取分页参数
-        page = request.args.get('page', 1, type=int)
-        limit = request.args.get('limit', 20, type=int)
-
-        # 计算偏移量
-        offset = (page - 1) * limit
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # 获取总数
-        cursor.execute('SELECT COUNT(*) FROM medals')
-        total = cursor.fetchone()[0]
-
-        # 获取分页数据
-        cursor.execute('''
-            SELECT 
-                id,
-                name,
-                description,
-                addtime,
-                icon,
-                conditions
-            FROM medals 
-            ORDER BY id DESC 
-            LIMIT ? OFFSET ?
-        ''', (limit, offset))
-
-        medals = []
-        for row in cursor.fetchall():
-            medals.append({
-                'id': row[0],
-                'name': row[1],
-                'description': row[2],
-                'addtime': row[3],
-                'icon': row[4],
-                'conditions': row[5]
-            })
-
-        conn.close()
-
-        return json.dumps({
-            'code': 0,
-            'msg': '',
-            'count': total,
-            'data': medals
-        })
-
-    except Exception as e:
-        return json.dumps({
-            'code': 500,
-            'msg': str(e),
-            'count': 0,
-            'data': []
-        }), 500
+    """获取勋章列表"""
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 20, type=int)
+    return jsonify(medal_service.get_medals(page, limit))
 
 @admin_bp.route('/api/medals/<int:medal_id>', methods=['GET'])
 @admin_required
 def get_medal(medal_id):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        cursor.execute('''
-            SELECT 
-                id,
-                name,
-                description,
-                addtime,
-                icon,
-                conditions
-            FROM medals 
-            WHERE id = ?
-        ''', (medal_id,))
-
-        row = cursor.fetchone()
-        if row is None:
-            return json.dumps({
-                'code': 404,
-                'msg': '勋章不存在',
-                'data': None
-            }), 404
-
-        medal = {
-            'id': row[0],
-            'name': row[1],
-            'description': row[2],
-            'addtime': row[3],
-            'icon': row[4],
-            'conditions': row[5]
-        }
-
-        conn.close()
-        return json.dumps({
-            'code': 0,
-            'msg': '',
-            'data': medal
-        })
-
-    except Exception as e:
-        return json.dumps({
-            'code': 500,
-            'msg': str(e),
-            'data': None
-        }), 500
+    """获取单个勋章信息"""
+    return jsonify(medal_service.get_medal(medal_id))
 
 @admin_bp.route('/api/medals', methods=['POST'])
 @admin_required
 def create_medal():
-    try:
-        data = request.get_json()
-        current_time = int(time.time())
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        cursor.execute('''
-            INSERT INTO medals (
-                name, description, addtime, icon, conditions
-            ) VALUES (?, ?, ?, ?, ?)
-        ''', (
-            data.get('name'),
-            data.get('description'),
-            current_time,
-            data.get('icon'),
-            data.get('conditions')
-        ))
-
-        medal_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-
-        return json.dumps({
-            'code': 0,
-            'msg': '创建成功',
-            'data': {'id': medal_id}
-        }), 201
-
-    except Exception as e:
-        return json.dumps({
-            'code': 500,
-            'msg': str(e),
-            'data': None
-        }), 500
+    """创建新勋章"""
+    data = request.get_json()
+    return jsonify(medal_service.create_medal(data))
 
 @admin_bp.route('/api/medals/<int:medal_id>', methods=['PUT'])
 @admin_required
 def update_medal(medal_id):
-    try:
-        data = request.get_json()
-        print(f"Received medal update data: {data}")  # 添加调试信息
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # 先获取当前数据
-        cursor.execute('SELECT * FROM medals WHERE id = ?', (medal_id,))
-        current_medal = cursor.fetchone()
-        print(f"Current medal data: {dict(current_medal) if current_medal else None}")  # 添加调试信息
-
-        update_data = {
-            'name': data.get('name'),
-            'description': data.get('description'),
-            'icon': data.get('icon'),
-            'conditions': data.get('conditions')
-        }
-        print(f"Update data to be applied: {update_data}")  # 添加调试信息
-
-        cursor.execute('''
-            UPDATE medals
-            SET name = ?,
-                description = ?,
-                icon = ?,
-                conditions = ?
-            WHERE id = ?
-        ''', (
-            update_data['name'],
-            update_data['description'],
-            update_data['icon'],
-            update_data['conditions'],
-            medal_id
-        ))
-
-        if cursor.rowcount == 0:
-            print(f"No rows updated for medal_id: {medal_id}")  # 添加调试信息
-            conn.close()
-            return json.dumps({
-                'code': 404,
-                'msg': '未找到要更新的勋章',
-                'data': None
-            }), 404
-
-        conn.commit()
-        
-        # 获取更新后的数据
-        cursor.execute('SELECT * FROM medals WHERE id = ?', (medal_id,))
-        updated_medal = cursor.fetchone()
-        print(f"Updated medal data: {dict(updated_medal)}")  # 添加调试信息
-        
-        conn.close()
-
-        return json.dumps({
-            'code': 0,
-            'msg': '更新成功',
-            'data': dict(updated_medal) if updated_medal else None
-        })
-
-    except Exception as e:
-        print(f"Error updating medal: {str(e)}")  # 添加调试信息
-        return json.dumps({
-            'code': 500,
-            'msg': str(e),
-            'data': None
-        }), 500
+    """更新勋章信息"""
+    data = request.get_json()
+    return jsonify(medal_service.update_medal(medal_id, data))
 
 @admin_bp.route('/api/medals/<int:medal_id>', methods=['DELETE'])
 @admin_required
 def delete_medal(medal_id):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+    """删除勋章"""
+    return jsonify(medal_service.delete_medal(medal_id))
 
-        cursor.execute('DELETE FROM medals WHERE id = ?', (medal_id,))
-        conn.commit()
-        conn.close()
-
-        return json.dumps({
-            'code': 0,
-            'msg': '删除成功',
-            'data': None
-        })
-
-    except Exception as e:
-        return json.dumps({
-            'code': 500,
-            'msg': str(e),
-            'data': None
-        }), 500
+@admin_bp.route('/api/medal_img', methods=['GET'])
+@admin_required
+def medal_img():
+    """返回勋章图标列表"""
+    icons = medal_service.get_icon_list()
+    return jsonify({
+        'code': 0,
+        'msg': '',
+        'data': icons
+    })
 
 # NFC卡管理相关路由
 @admin_bp.route('/api/nfc/cards', methods=['GET'])
