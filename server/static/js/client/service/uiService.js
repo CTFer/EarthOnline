@@ -1,12 +1,12 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-02-22 22:46:40
+ * @LastEditTime: 2025-02-26 23:46:50
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
 import Logger from "../../utils/logger.js";
-import { TASK_EVENTS, UI_EVENTS, AUDIO_EVENTS, MAP_EVENTS,WS_EVENTS, PLAYER_EVENTS } from "../config/events.js";
+import { TASK_EVENTS, UI_EVENTS, AUDIO_EVENTS, MAP_EVENTS,WS_EVENTS, PLAYER_EVENTS, SHOP_EVENTS } from "../config/events.js";
 import {  WS_STATE, WS_CONFIG } from "../config/wsConfig.js";
 import {gameUtils} from "../../utils/utils.js";
 
@@ -27,6 +27,12 @@ class UIService {
     this.customEndTime = null;
 
     this.playerId = playerService.getPlayerId(); // 在构造函数中获取 playerId
+
+    // 初始化状态
+    this.initialized = false;
+
+    // 默认商品图片的 base64 编码
+    this.DEFAULT_ITEM_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNmMGYwZjAiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj7mmoLml6Dlm77niYc8L3RleHQ+PC9zdmc+';
   }
 
   /**
@@ -60,13 +66,32 @@ class UIService {
     Logger.debug("UIService", "初始化事件监听");
 
     this.setupEventListeners();
+    this.initShopEvents();
 
     Logger.info("UIService", "事件监听初始化完成");
   }
 
+  /**
+   * 设置事件监听器
+   */
   setupEventListeners() {
-    // 移除WebSocket相关的事件监听
-    // 其他事件监听保持不变
+    Logger.info('UIService', 'setupEventListeners', '设置UI事件监听器');
+    
+    try {
+      // 绑定商城入口点击事件
+      document.addEventListener('click', (e) => {
+        const shopEntrance = e.target.closest('.shop-entrance');
+        if (shopEntrance) {
+          Logger.info('UIService', 'handleShopEntranceClick', '点击商城入口');
+          this.eventBus.emit(SHOP_EVENTS.ENTER);
+        }
+      });
+
+      // 其他事件监听保持不变
+    } catch (error) {
+      Logger.error('UIService', 'setupEventListeners', '设置UI事件监听器失败:', error);
+      throw error;
+    }
   }
 
   updateWebSocketStatus(status) {
@@ -1062,6 +1087,121 @@ class UIService {
     if (startTime >= endTime) return false;
     
     return true;
+  }
+
+  /**
+   * 初始化商城相关事件
+   */
+  initShopEvents() {
+    Logger.debug("UIService", "初始化商城相关事件");
+    try {
+      // 初始化商城入口点击事件
+      const shopEntrance = document.querySelector('.shop-entrance');
+      if (shopEntrance) {
+        shopEntrance.addEventListener('click', () => {
+          Logger.info('UIService', 'initShopEvents', '点击商城入口，触发进入商城事件');
+          this.eventBus.emit(SHOP_EVENTS.ENTER);
+        });
+      }
+      Logger.info("UIService", "商城事件初始化完成");
+    } catch (error) {
+      Logger.error("UIService", "初始化商城事件失败:", error);
+      this.showNotification({
+        type: "ERROR",
+        message: "初始化商城功能失败"
+      });
+    }
+  }
+
+  /**
+   * 处理商城相关UI更新
+   */
+  handleShopUIUpdate(data) {
+    Logger.info('UIService', 'handleShopUIUpdate', '更新商城UI');
+    
+    if (data.points !== undefined) {
+        // 更新积分显示
+        const pointsElement = document.getElementById('userPoints');
+        if (pointsElement) {
+            pointsElement.textContent = data.points;
+        }
+    }
+    
+    if (data.items !== undefined) {
+        // 更新商品列表
+        const container = document.getElementById('shopItems');
+        if (!container) {
+            Logger.error('UIService', 'handleShopUIUpdate', '找不到商品容器元素');
+            return;
+        }
+        
+        // 清空现有内容
+        container.innerHTML = '';
+        
+        // 创建商品卡片
+        data.items.forEach(item => {
+            const card = this.createShopItemCard(item);
+            container.appendChild(card);
+        });
+        
+        Logger.info('UIService', 'handleShopUIUpdate', `渲染了 ${data.items.length} 个商品`);
+    }
+  }
+
+  /**
+   * 创建商品卡片DOM元素
+   */
+  createShopItemCard(item) {
+    const card = document.createElement('div');
+    card.className = 'shop-item-card';
+    
+    // 使用默认图片作为备选
+    const imageUrl = item.image_url || this.DEFAULT_ITEM_IMAGE;
+    
+    card.innerHTML = `
+        <div class="item-image">
+            <img src="${imageUrl}" alt="${item.name}" onerror="this.src='${this.DEFAULT_ITEM_IMAGE}'"/>
+        </div>
+        <div class="item-info">
+            <h3 class="item-name">${item.name}</h3>
+            <p class="item-desc">${item.description}</p>
+            <div class="item-price">
+                <span class="price-icon">
+                    <i class="layui-icon layui-icon-diamond"></i>
+                </span>
+                <span class="price-number">${item.price}</span>
+            </div>
+            <div class="item-stock">库存: ${item.stock}</div>
+            <button class="layui-btn layui-btn-normal" onclick="window.shopService.purchaseItem(${JSON.stringify(item)})">购买</button>
+        </div>
+    `;
+    
+    return card;
+  }
+
+  /**
+   * 显示商品购买确认对话框
+   */
+  showPurchaseConfirmDialog(itemData) {
+    Logger.debug("UIService", "显示购买确认对话框:", itemData);
+    try {
+      layer.confirm(
+        `确定要购买 ${itemData.name} 吗？需要消耗 ${itemData.price} 积分`,
+        {
+          title: "购买确认",
+          btn: ["确定", "取消"]
+        },
+        () => {
+          this.eventBus.emit(SHOP_EVENTS.PURCHASE, itemData);
+        }
+      );
+    } catch (error) {
+      Logger.error("UIService", "显示购买确认对话框失败:", error);
+      this.showNotification({
+        type: "ERROR",
+        message: "显示购买确认失败"
+      });
+    }
   }
 }
 

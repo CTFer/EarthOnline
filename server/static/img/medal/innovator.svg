@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- 勋章底座 -->
+    <circle cx="100" cy="100" r="90" fill="#95E1D3" stroke="#7FCDC0" stroke-width="4"/>
+    
+    <!-- 灯泡主体 -->
+    <path d="M80 120 
+             C80 80 120 80 120 120
+             L120 130 
+             C120 140 80 140 80 130
+             L80 120" 
+          fill="#FFE66D"/>
+    
+    <!-- 灯泡底座 -->
+    <path d="M85 130 
+             C85 135 115 135 115 130" 
+          stroke="#2C3E50" stroke-width="4"/>
+    <path d="M90 135 
+             C90 140 110 140 110 135" 
+          stroke="#2C3E50" stroke-width="4"/>
+    
+    <!-- 光芒效果 -->
+    <path d="M100 50 L100 70" stroke="#FFE66D" stroke-width="4"/>
+    <path d="M70 80 L85 95" stroke="#FFE66D" stroke-width="4"/>
+    <path d="M130 80 L115 95" stroke="#FFE66D" stroke-width="4"/>
+    
+    <!-- 创意火花 -->
+    <circle cx="100" cy="95" r="20" fill="#FFFFFF"/>
+    <path d="M90 90 L110 100" stroke="#FF6B6B" stroke-width="4"/>
+    <path d="M90 100 L110 90" stroke="#FF6B6B" stroke-width="4"/>
+</svg>

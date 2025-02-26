@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-02-25 22:36:11
+ * @LastEditTime: 2025-02-26 22:45:33
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -25,8 +25,10 @@ import AudioService from "./service/audioService.js";
 import Live2DService from "./service/Live2DService.js";
 import WebSocketService from "./service/websocketService.js";
 import { gameUtils } from "../utils/utils.js";
-import { TASK_EVENTS, PLAYER_EVENTS, MAP_EVENTS, UI_EVENTS, WS_EVENTS, AUDIO_EVENTS, LIVE2D_EVENTS } from "./config/events.js";
+import { TASK_EVENTS, PLAYER_EVENTS, MAP_EVENTS, UI_EVENTS, WS_EVENTS, AUDIO_EVENTS, LIVE2D_EVENTS, SHOP_EVENTS, ROUTE_EVENTS } from "./config/events.js";
 import EventManager from "./core/EventManager.js";
+import Router from "./core/router.js";
+import ShopService from "./service/ShopService.js";
 
 // 在文件开头声明全局变量
 let taskManager;
@@ -34,7 +36,7 @@ let taskManager;
 // 游戏管理类，程序入口
 class GameManager {
   constructor() {
-    Logger.info('GameManager', 'constructor:37', '开始初始化游戏管理器');
+    Logger.info("GameManager", "constructor:37", "开始初始化游戏管理器");
 
     // 确保核心组件最先初始化
     // this.eventBus = new EventBus();
@@ -44,7 +46,7 @@ class GameManager {
     this.initialized = false;
     this.initializationPromise = null;
 
-    Logger.info('GameManager', 'constructor:47', '核心组件初始化完成');
+    Logger.info("GameManager", "constructor:47", "核心组件初始化完成");
 
     try {
       // 1. 初始化核心组件
@@ -59,23 +61,23 @@ class GameManager {
       // 4. 初始化服务
       this.initializeServices()
         .then(() => {
-          Logger.info('GameManager', 'initializeServices:62', '游戏管理器初始化完成');
+          Logger.info("GameManager", "initializeServices:62", "游戏管理器初始化完成");
           this.initialized = true;
         })
         .catch((error) => {
-          Logger.error('GameManager', 'initializeServices:66', '游戏管理器初始化失败:', error);
+          Logger.error("GameManager", "initializeServices:66", "游戏管理器初始化失败:", error);
           layer.msg("初始化失败，请刷新页面重试", { icon: 2 });
         });
     } catch (error) {
-      Logger.error('GameManager', 'constructor:70', '游戏管理器初始化失败:', error);
+      Logger.error("GameManager", "constructor:70", "游戏管理器初始化失败:", error);
       layer.msg("初始化失败，请刷新页面重试", { icon: 2 });
       throw error;
     }
   }
 
   // 初始化核心组件
-  initializeCoreComponents() {
-    Logger.info('GameManager', 'initializeCoreComponents:78', '初始化核心组件');
+  async initializeCoreComponents() {
+    Logger.info("GameManager", "initializeCoreComponents:78", "初始化核心组件");
 
     try {
       // 初始化API客户端
@@ -87,50 +89,77 @@ class GameManager {
       // 初始化数据存储
       this.store = new Store();
 
-      Logger.info('GameManager', 'initializeCoreComponents:90', '核心组件初始化完成');
+      Logger.info("GameManager", "initializeCoreComponents:90", "核心组件初始化完成");
     } catch (error) {
-      Logger.error('GameManager', 'initializeCoreComponents:92', '核心组件初始化失败:', error);
+      Logger.error("GameManager", "initializeCoreComponents:92", "核心组件初始化失败:", error);
       throw error;
     }
   }
 
   // 初始化服务
   async initializeServices() {
-    Logger.info('GameManager', 'initializeServices:99', '初始化服务组件');
+    Logger.info("GameManager", "[initializeServices:99]", "初始化服务组件");
 
     try {
       // 1. 初始化基础服务（无依赖）
       this.templateService = new TemplateService();
 
-      // 2. 初始化WebSocket服务（依赖：eventBus）
+      // 2. 初始化路由（优先处理，加载必要的DOM）
+      this.router = new Router(this.eventBus);
+      await this.router.initialize();
+
+      // 3. 等待路由加载完成DOM
+      await this.router.handleRoute(window.location.pathname);
+
+      // 4. 等待DOM完全加载
+      await new Promise((resolve) => {
+        const checkDom = () => {
+          const container = document.querySelector(".game-container");
+          if (container && container.children.length > 0) {
+            resolve();
+          } else {
+            setTimeout(checkDom, 100);
+          }
+        };
+        checkDom();
+      });
+
+      Logger.info("GameManager", "[initializeServices:120]", "DOM加载完成");
+
+      // 5. 初始化WebSocket服务（依赖：eventBus）
       this.websocketService = new WebSocketService(this.eventBus);
       await this.websocketService.initialize();
 
-      // 3. 初始化玩家服务（依赖：api, eventBus, store）
+      // 6. 初始化玩家服务（依赖：api, eventBus, store）
       this.playerService = new PlayerService(this.api, this.eventBus, this.store);
 
-      // 4. 初始化任务服务（依赖：api, eventBus, store, playerService, templateService）
+      // 7. 初始化任务服务（依赖：api, eventBus, store, playerService, templateService）
       this.taskService = new TaskService(this.api, this.eventBus, this.store, this.playerService, this.templateService);
 
-      // 5. 初始化UI服务（依赖：eventBus, store, templateService, taskService,playerService）
-      this.uiService = new UIService(this.eventBus, this.store, this.templateService, this.taskService,this.playerService);
-      // 等待UI服务初始化完成
-      await this.uiService.initialize?.();
+      // 8. 初始化UI服务（依赖：eventBus, store, templateService, taskService, playerService）
+      this.uiService = new UIService(this.eventBus, this.store, this.templateService, this.taskService, this.playerService);
+      await this.uiService.initialize();
 
-      // 6. 初始化地图服务（依赖：api, eventBus, uiService）
+      // 9. 初始化商城服务（依赖：eventBus, api, playerService, router）
+      this.shopService = new ShopService(this.eventBus, this.api, this.playerService, this.router);
+
+      // 10. 初始化地图服务（依赖：api, eventBus, uiService）
       await this.initializeMapService();
+      if (this.mapService) {
+        await this.mapService.initMap();
+      }
 
-      // 7. 初始化其他服务
+      // 11. 初始化其他服务
       await this.initializeOtherServices();
 
-      // 8. 设置事件监听器
+      // 12. 设置事件监听器
       await this.setupEventListeners();
       await this.websocketService.connect();
 
       this.initialized = true;
-      Logger.info('GameManager', 'initializeServices:131', '服务组件初始化完成');
+      Logger.info("GameManager", "[initializeServices:131]", "服务组件初始化完成");
     } catch (error) {
-      Logger.error('GameManager', 'initializeServices:133', '初始化服务组件失败:', error);
+      Logger.error("GameManager", "[initializeServices]", "服务初始化失败:", error);
       throw error;
     }
   }
@@ -139,7 +168,6 @@ class GameManager {
   async initializeMapService() {
     // 只创建MapService实例，不立即初始化地图
     this.mapService = new MapService(this.api, this.eventBus, this.uiService);
-    // 不再调用initMap
   }
 
   // 初始化其他服务
@@ -175,11 +203,11 @@ class GameManager {
 
     this.initializationPromise = (async () => {
       try {
-        Logger.info('GameManager', 'initializeApplication:178', '初始化应用开始');
+        Logger.info("GameManager", "[initializeApplication:178]", "初始化应用开始");
 
         // 等待所有服务初始化完成
         if (!this.initialized) {
-          Logger.info('GameManager', 'initializeApplication:182', '等待服务初始化完成');
+          Logger.info("GameManager", "[initializeApplication:182]", "等待服务初始化完成");
           await new Promise((resolve) => {
             const checkInit = () => {
               if (this.initialized) {
@@ -192,29 +220,19 @@ class GameManager {
           });
         }
 
-        // 1. 首先加载玩家信息
-        Logger.info('GameManager', 'initializeApplication:196', '开始加载玩家信息');
+        // 1. 加载玩家信息
+        Logger.info("GameManager", "[initializeApplication:196]", "开始加载玩家信息");
         await this.playerService.loadPlayerInfo();
-        Logger.info('GameManager', 'initializeApplication:198', '玩家信息加载完成');
+        Logger.info("GameManager", "[initializeApplication:198]", "玩家信息加载完成");
 
-        // 2. 初始化地图服务（只初始化一次）
-        if (this.mapService && !this.mapService.isInitialized) {
-          Logger.info('GameManager', 'initializeApplication:202', '开始初始化地图服务');
-          await this.mapService.initMap();
-          this.mapService.isInitialized = true;
-          Logger.info('GameManager', 'initializeApplication:204', '地图服务初始化完成');
-        } else {
-          Logger.warn('GameManager', 'initializeApplication:206', '地图服务未就绪或已初始化，跳过初始化');
-        }
-
-        // 3. 设置WebSocket订阅
+        // 2. 设置WebSocket订阅
         const playerId = this.playerService.getPlayerId();
         if (playerId && this.websocketService && this.mapService) {
           this.websocketService.subscribeToPlayerEvents(playerId);
           this.mapService.setWebSocketManager(this.websocketService.getWSManager());
         }
 
-        // 4. 加载任务数据
+        // 3. 加载任务数据
         if (this.taskService && this.uiService) {
           await Promise.all([
             this.taskService.loadTasks().then((tasks) => {
@@ -224,20 +242,20 @@ class GameManager {
               this.uiService.renderCurrentTasks(currentTasks);
             }),
           ]);
-          Logger.info('GameManager', 'initializeApplication:226', '任务数据加载完成');
+          Logger.info("GameManager", "[initializeApplication:226]", "任务数据加载完成");
         }
 
-        // 5. 初始化滑动组件
+        // 4. 初始化滑动组件
         if (this.swiperService) {
           this.swiperService.initSwipers();
         }
 
-        // 6. 初始化文字云
+        // 5. 初始化文字云
         await this.initWordCloud();
 
-        Logger.info('GameManager', 'initializeApplication:237', '初始化应用完成');
+        Logger.info("GameManager", "[initializeApplication:237]", "初始化应用完成");
       } catch (error) {
-        Logger.error('GameManager', 'initializeApplication:239', '初始化应用失败:', error);
+        Logger.error("GameManager", "[initializeApplication]", "初始化应用失败:", error);
         layer.msg("初始化应用失败，请刷新页面重试", { icon: 2 });
         ErrorHandler.handle(error, "GameManager.initializeApplication");
         throw error;
@@ -315,7 +333,7 @@ class GameManager {
 
   // 设置事件监听器
   async setupEventListeners() {
-    Logger.info("GameManager", "开始设置事件监听器");
+    Logger.info("GameManager", "setupEventListeners:318", "设置事件监听器");
 
     try {
       // 检查必要服务是否已初始化
@@ -329,9 +347,9 @@ class GameManager {
       // 初始化事件管理器
       await this.initializeEventManager();
 
-      Logger.info("GameManager", "事件监听器设置完成");
+      Logger.info("GameManager", "setupEventListeners:330", "事件监听器设置完成");
     } catch (error) {
-      Logger.error("GameManager", "设置事件监听器失败:", error);
+      Logger.error("GameManager", "setupEventListeners:332", "设置事件监听器失败:", error);
       throw error;
     }
   }
@@ -351,6 +369,9 @@ class GameManager {
         mapService: this.mapService,
         audioService: this.audioService,
         websocketService: this.websocketService,
+        shopService: this.shopService,
+        wordcloudService: this.wordcloudService,
+        router: this.router
       });
     } catch (error) {
       Logger.error("GameManager", "初始化事件管理器失败:", error);

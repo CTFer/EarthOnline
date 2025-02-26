@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- 勋章底座 -->
+    <circle cx="100" cy="100" r="90" fill="#273060" stroke="#1E2749" stroke-width="4"/>
+    
+    <!-- 游戏手柄主体 -->
+    <path d="M50 80 
+             C50 70 150 70 150 80
+             L160 110 
+             C160 130 40 130 40 110
+             L50 80" 
+          fill="#FFFFFF"/>
+    
+    <!-- 左侧按钮组 -->
+    <circle cx="80" cy="95" r="8" fill="#FF6B6B"/>
+    <circle cx="60" cy="95" r="8" fill="#4ECDC4"/>
+    
+    <!-- 右侧按钮组 -->
+    <circle cx="120" cy="95" r="8" fill="#FFE66D"/>
+    <circle cx="140" cy="95" r="8" fill="#95E1D3"/>
+    
+    <!-- 中央装饰 -->
+    <circle cx="100" cy="95" r="12" fill="#2C3E50"/>
+    <circle cx="100" cy="95" r="5" fill="#FFFFFF"/>
+</svg>

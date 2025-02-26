@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- 票券底座 -->
+    <rect x="30" y="60" width="140" height="80" rx="10" fill="#FFD700" stroke="#DAA520" stroke-width="4"/>
+    
+    <!-- 票券虚线装饰 -->
+    <line x1="30" y1="80" x2="170" y2="80" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="8 4"/>
+    <line x1="30" y1="120" x2="170" y2="120" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="8 4"/>
+    
+    <!-- 循环箭头符号 -->
+    <path d="M100 90 A20 20 0 1 1 80 110 L90 110 L80 120 L70 110 L80 110 A30 30 0 1 0 110 90 L100 90Z" fill="#FFFFFF"/>
+</svg>

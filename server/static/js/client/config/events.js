@@ -11,6 +11,17 @@
  * @description 事件常量配置文件
  */
 
+/**
+ * 路由相关事件
+ */
+export const ROUTE_EVENTS = {
+    // 路由变化前
+    BEFORE_CHANGE: 'route:before:change',
+    // 路由变化时
+    CHANGED: 'route:changed',
+    // 路由变化后
+    AFTER_CHANGE: 'route:after:change'
+}; 
 // 任务相关事件
 export const TASK_EVENTS = {
     // 任务状态更新
@@ -153,4 +164,20 @@ export const NOTIFICATION_EVENTS = {
     READ: 'notification:read',
     // 通知清空
     CLEAR: 'notification:clear'
+};
+
+// 商城相关事件
+export const SHOP_EVENTS = {
+    // 进入商城
+    ENTER: 'shop:enter',
+    // 离开商城
+    LEAVE: 'shop:leave',
+    // 商品列表更新
+    ITEMS_UPDATED: 'shop:items:updated',
+    // 购买商品
+    PURCHASE: 'shop:purchase',
+    // 购买成功
+    PURCHASE_SUCCESS: 'shop:purchase:success',
+    // 购买失败
+    PURCHASE_FAILED: 'shop:purchase:failed'
 }; 

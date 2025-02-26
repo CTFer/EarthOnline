@@ -109,4 +109,144 @@ api_registry.register(
     }
 )
 
-# ... 继续注册其他API ... 
+# 注册玩家相关API
+api_registry.register(
+    path="/api/player/<player_id>",
+    method="GET",
+    description="获取角色信息",
+    response={
+        "name": "角色名称",
+        "title": "称号",
+        "stamina": "体力值",
+        "intelligence": "智力值",
+        "sex": "性别"
+    }
+)
+
+api_registry.register(
+    path="/api/get_players",
+    method="GET",
+    description="获取所有玩家列表",
+    response={
+        "data": [
+            {
+                "player_id": "玩家ID",
+                "name": "玩家名称",
+                "title": "称号",
+                "stamina": "体力值",
+                "intelligence": "智力值",
+                "sex": "性别"
+            }
+        ]
+    }
+)
+
+# 注册任务相关API
+api_registry.register(
+    path="/api/tasks/available/<player_id>",
+    method="GET",
+    description="获取可用任务列表",
+    response={
+        "data": [
+            {
+                "id": "任务ID",
+                "name": "任务名称",
+                "description": "任务描述",
+                "task_type": "任务类型",
+                "task_status": "任务状态",
+                "stamina_cost": "体力消耗",
+                "task_rewards": "任务奖励"
+            }
+        ]
+    }
+)
+
+api_registry.register(
+    path="/api/tasks/current/<player_id>",
+    method="GET",
+    description="获取用户当前未过期的任务列表",
+    response={
+        "data": [
+            {
+                "id": "任务ID",
+                "name": "任务名称",
+                "description": "任务描述",
+                "status": "任务状态",
+                "starttime": "开始时间",
+                "endtime": "结束时间"
+            }
+        ]
+    }
+)
+
+api_registry.register(
+    path="/api/tasks/accept",
+    method="POST",
+    description="接受任务",
+    parameters=[
+        {
+            "name": "player_id",
+            "type": "integer",
+            "required": True,
+            "description": "玩家ID"
+        },
+        {
+            "name": "task_id",
+            "type": "integer",
+            "required": True,
+            "description": "任务ID"
+        }
+    ],
+    response={
+        "code": "状态码",
+        "msg": "处理结果信息"
+    }
+)
+
+api_registry.register(
+    path="/api/tasks/abandon",
+    method="POST",
+    description="放弃任务",
+    parameters=[
+        {
+            "name": "player_id",
+            "type": "integer",
+            "required": True,
+            "description": "玩家ID"
+        },
+        {
+            "name": "task_id",
+            "type": "integer",
+            "required": True,
+            "description": "任务ID"
+        }
+    ],
+    response={
+        "code": "状态码",
+        "msg": "处理结果信息"
+    }
+)
+
+api_registry.register(
+    path="/api/tasks/complete",
+    method="POST",
+    description="完成任务",
+    parameters=[
+        {
+            "name": "player_id",
+            "type": "integer",
+            "required": True,
+            "description": "玩家ID"
+        },
+        {
+            "name": "task_id",
+            "type": "integer",
+            "required": True,
+            "description": "任务ID"
+        }
+    ],
+    response={
+        "code": "状态码",
+        "msg": "处理结果信息"
+    }
+)

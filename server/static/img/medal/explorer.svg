@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- 勋章底座 -->
+    <circle cx="100" cy="100" r="90" fill="#4ECDC4" stroke="#45B7AF" stroke-width="4"/>
+    
+    <!-- 指南针外圈 -->
+    <circle cx="100" cy="100" r="70" fill="#FFFFFF" stroke="#2C3E50" stroke-width="3"/>
+    
+    <!-- 指南针刻度 -->
+    <path d="M100 40 L100 50" stroke="#2C3E50" stroke-width="3"/>
+    <path d="M100 150 L100 160" stroke="#2C3E50" stroke-width="3"/>
+    <path d="M40 100 L50 100" stroke="#2C3E50" stroke-width="3"/>
+    <path d="M150 100 L160 100" stroke="#2C3E50" stroke-width="3"/>
+    
+    <!-- 指南针指针 -->
+    <path d="M100 45 L110 100 L100 155 L90 100 Z" fill="#FF6B6B"/>
+    <circle cx="100" cy="100" r="8" fill="#2C3E50"/>
+    
+    <!-- 装饰性星星 -->
+    <circle cx="70" cy="70" r="4" fill="#FFE66D"/>
+    <circle cx="130" cy="70" r="4" fill="#FFE66D"/>
+    <circle cx="70" cy="130" r="4" fill="#FFE66D"/>
+    <circle cx="130" cy="130" r="4" fill="#FFE66D"/>
+</svg>

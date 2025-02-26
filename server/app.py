@@ -446,49 +446,33 @@ def record():
 
 
 @app.route('/')
-def index():
-    """客户端首页"""
+@app.route('/shop')
+def spa_index():
+    """单页应用入口"""
+    return render_template('/client/base.html')
+
+# API路由 - 获取模板片段
+@app.route('/api/templates/<template_name>')
+def get_template(template_name):
+    """获取模板片段
+    
+    Args:
+        template_name: 模板名称，如 home, shop 等
+    """
     try:
-        template_path = os.path.join(TEMPLATE_DIR, 'index.html')
-
-        # 获取过滤参数
-        method_filter = request.args.get('method', '').upper()
-        path_filter = request.args.get('path', '')
-
-        # 过滤日志
-        filtered_logs = request_logs
-        if method_filter:
-            filtered_logs = [
-                log for log in filtered_logs if log['method'] == method_filter]
-        if path_filter:
-            filtered_logs = [
-                log for log in filtered_logs if path_filter in log['path']]
-
+        # 安全检查：确保template_name不包含目录遍历
+        if '..' in template_name or template_name.startswith('/'):
+            return "非法的模板名称", 400
+            
+        template_path = os.path.join(TEMPLATE_DIR, f'client/{template_name}.html')
+        if not os.path.exists(template_path):
+            return "模板不存在", 404
+            
         with open(template_path, 'r', encoding='utf-8') as f:
-            template = f.read()
-
-        # 生成请求记录HTML
-        logs_html = ''
-        for log in filtered_logs:
-            logs_html += f"""
-                <div class="request-log">
-                    <div class="timestamp">{log['timestamp']}</div>
-                    <div>
-                        <span class="method {log['method']}">{log['method']}</span>
-                        <span class="path">{log['path']}</span>
-                        <span class="ip">from {log['remote_addr']}</span>
-                    </div>
-                    <pre>{json.dumps(log, indent=2, ensure_ascii=False)}</pre>
-                </div>
-            """
-
-        # 替换模板中的占位符
-        html = template.replace('{{request_logs}}', logs_html)
-        return html
-
+            return f.read()
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return f"Error: {str(e)}", 500
+        logger.error(f"读取模板失败: {str(e)}")
+        return "模板加载失败", 500
 
 # 添加清除日志的路由
 
@@ -934,6 +918,30 @@ def get_amap_security_config():
     return jsonify({
         'securityJsCode': AMAP_SECURITY_JS_CODE
     })
+
+# 单页化改动
+@app.route('/api/templates/home')
+def get_home_template():
+    """获取首页模板"""
+    try:
+        template_path = os.path.join(TEMPLATE_DIR, 'client/home.html')
+        with open(template_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception as e:
+        logger.error(f"读取首页模板失败: {str(e)}")
+        return "模板加载失败", 500
+
+@app.route('/api/templates/shop')
+def get_shop_template():
+    """获取商城页面模板"""
+    try:
+        template_path = os.path.join(TEMPLATE_DIR, 'client/shop.html')
+        with open(template_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception as e:
+        logger.error(f"读取商城模板失败: {str(e)}")
+        return "模板加载失败", 500
+
 if __name__ == '__main__':
     logger = setup_logging()
     logger.info("Starting server initialization...")

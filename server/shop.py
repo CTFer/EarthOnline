@@ -1,13 +1,14 @@
 import eventlet
 eventlet.monkey_patch()
 
-from flask import Blueprint, request, render_template, current_app
+from flask import Blueprint, request, render_template, current_app, jsonify
 from admin import admin_required
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 import sqlite3
 import os
 import logging
+import json
 
 # 配置日志
 logging.basicConfig(level=logging.DEBUG)
@@ -96,11 +97,28 @@ class Shop:
                 query += f" ORDER BY {sort_field} {sort_order}"
                 
                 cursor.execute(query, (current_timestamp, current_timestamp))
-                return [dict(row) for row in cursor.fetchall()]
+                items = cursor.fetchall()
+                logger.info(f"查询到 {len(items)} 个商品")
+                
+                # 将 sqlite3.Row 对象转换为字典列表
+                items_list = [{
+                    'id': item['id'],
+                    'name': item['name'],
+                    'description': item['description'],
+                    'price': item['price'],
+                    'stock': item['stock'],
+                    'product_type': item['product_type'],
+                    'image_url': item['image_url'],
+                    'online_time': item['online_time'],
+                    'offline_time': item['offline_time'],
+                    'create_time': item['create_time']
+                } for item in items]
+                
+                return {"code": 0, "data": items_list, "msg": "success"}
                 
         except Exception as e:
             logger.error(f"获取商品列表失败: {str(e)}")
-            raise
+            return {"code": 1, "data": None, "msg": str(e)}
         
     def add_item(self, name: str, description: str, price: int, stock: int, 
                  image_url: str, product_type: str, online_time: int = None, 
@@ -317,18 +335,38 @@ def on_blueprint_registered(state):
 
 @shop_bp.route('/api/shop/items')
 def get_items():
-    """获取商品列表API"""
+    """获取商品列表"""
     try:
-        logger.debug("收到获取商品列表请求")
+        logger.info("收到获取商品列表请求")
+        logger.info(f"请求参数: {request.args}")
+        
+        # 获取请求参数
         sort_by = request.args.get('sort', 'price')
         order = request.args.get('order', 'asc')
         enabled_only = request.args.get('enabled_only', '1') == '1'
         
-        items = shop.get_items(sort_by, order, enabled_only)
-        return json.dumps({"code": 0, "data": items})
+        logger.info(f"查询参数: sort_by={sort_by}, order={order}, enabled_only={enabled_only}")
+        
+        # 获取商品列表
+        shop_instance = Shop()
+        result = shop_instance.get_items(sort_by, order, enabled_only)
+        logger.info(f"查询结果: {result}")
+        
+        # 返回JSON响应
+        response = jsonify(result)
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        return response
+        
     except Exception as e:
         logger.error(f"处理请求失败: {str(e)}")
-        return json.dumps({"code": 1, "msg": str(e)}), 500
+        logger.exception("详细错误信息:")
+        error_response = jsonify({
+            "code": 1,
+            "data": None,
+            "msg": str(e)
+        })
+        error_response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        return error_response, 400
 
 @shop_bp.route('/api/shop/items', methods=['POST'])
 @admin_required

@@ -27,7 +27,7 @@ export const Character_image = {
 export const LOG_CONFIG = {
   enableConsoleLog: true, // 是否启用控制台输出
   logLevel: "debug", // 日志级别: 'debug', 'info', 'warn', 'error'
-  allowedModules: ['EventManager','MapService','GameManager','AMapRenderer','UIService'], // 允许输出日志的模块，为空输出全部模块（白名单优先级高于黑名单）
+  allowedModules: ['EventManager','API','GameManager','AMapRenderer','UIService'], // 允许输出日志的模块，为空输出全部模块（白名单优先级高于黑名单）
   blockedModules: ["Utils"], // 禁止输出日志的模块（黑名单）
   alwaysError: true, // 是否总是输出error级别的日志
   timeFormat: true, // 是否在日志中显示时间

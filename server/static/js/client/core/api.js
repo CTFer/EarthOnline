@@ -12,22 +12,22 @@ import Logger from '../../utils/logger.js';
 // API 请求封装
 class APIClient {
     constructor(baseURL) {
-        this.baseURL = baseURL;
-        Logger.info('API', '初始化 API 客户端:', baseURL);
+        // 确保baseURL末尾没有斜杠
+        this.baseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+        Logger.info('API', '初始化 API 客户端:', this.baseURL);
     }
 
     async request(endpoint, options = {}) {
         Logger.debug('API', `发起请求: ${endpoint}`, options);
         try {
-            const url = `${this.baseURL}${endpoint}`;
+            // 确保endpoint开头有斜杠
+            const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+            const url = `${this.baseURL}${normalizedEndpoint}`;
             Logger.debug('API', '请求:', url);
             
             const response = await fetch(url, {
                 ...options,
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...options.headers
-                }
+                headers: options.headers || {}
             });
 
             if (!response.ok) {

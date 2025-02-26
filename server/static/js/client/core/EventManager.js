@@ -13,7 +13,9 @@ import {
     AUDIO_EVENTS,
     WS_EVENTS,
     LIVE2D_EVENTS,
-    NOTIFICATION_EVENTS
+    NOTIFICATION_EVENTS,
+    SHOP_EVENTS,
+    ROUTE_EVENTS
 } from "../config/events.js";
 import { WS_EVENT_TYPES,WS_STATE } from '../config/wsConfig.js';
 
@@ -28,7 +30,9 @@ class EventManager {
         websocketService,
         wordcloudService,
         live2dService,
-        notificationService
+        notificationService,
+        shopService,
+        router
     }) {
         // 事件总线
         this.eventBus = eventBus;
@@ -43,6 +47,8 @@ class EventManager {
         this.wordcloudService = wordcloudService;
         this.live2dService = live2dService;
         this.notificationService = notificationService;
+        this.shopService = shopService;
+        this.router = router;
 
         Logger.info('EventManager', 'constructor:47', '初始化事件管理器');
 
@@ -70,6 +76,7 @@ class EventManager {
         
         try {
             // 初始化各类事件监听
+            this.initializeRouteEvents();
             this.initializeTaskEvents();
             this.initializePlayerEvents();
             this.initializeMapEvents();
@@ -78,6 +85,7 @@ class EventManager {
             this.initializeWSEvents();
             this.initializeLive2DEvents();
             this.initializeNotificationEvents();
+            this.initializeShopEvents();
             
             // 初始化UI组件
             this.uiService.initializeMapUI();
@@ -85,6 +93,75 @@ class EventManager {
             Logger.info('EventManager', 'initializeEventListeners:85', '事件监听器设置完成');
         } catch (error) {
             this.handleError('初始化事件监听器', error, '初始化事件监听失败');
+            throw error;
+        }
+    }
+
+    /**
+     * 初始化路由相关事件
+     */
+    initializeRouteEvents() {
+        // 路由变化事件监听
+        this.eventBus.on(ROUTE_EVENTS.CHANGED, async (event) => {
+            const { from, to } = event;
+            Logger.info('EventManager', 'handleRouteChange', `路由变化: ${from} -> ${to}`);
+            
+            try {
+                switch (to) {
+                    case '/':
+                        await this.handleHomeRoute();
+                        break;
+                    case '/shop':
+                        await this.handleShopRoute();
+                        break;
+                }
+            } catch (error) {
+                Logger.error('EventManager', 'handleRouteChange', '处理路由变化失败:', error);
+                this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+                    type: 'ERROR',
+                    message: '页面加载失败，请刷新重试'
+                });
+            }
+        });
+        
+        Logger.info('EventManager', 'initializeRouteEvents', '路由事件监听器设置完成');
+    }
+
+    /**
+     * 处理首页路由
+     */
+    async handleHomeRoute() {
+        try {
+            Logger.info('EventManager', 'handleHomeRoute', '处理首页路由');
+            await Promise.all([
+                this.taskService.loadTasks(),
+                this.playerService.loadPlayerInfo(),
+                this.mapService.initMap()
+            ]);
+            this.wordcloudService.updateWordCloud();
+        } catch (error) {
+            Logger.error('EventManager', 'handleHomeRoute', '处理首页路由失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 处理商城路由
+     */
+    async handleShopRoute() {
+        try {
+            Logger.info('EventManager', 'handleShopRoute', '处理商城路由');
+            
+            // 初始化商城
+            if (this.shopService) {
+                await this.shopService.initializeShop();
+                Logger.info('EventManager', 'handleShopRoute', '商城初始化完成');
+            } else {
+                throw new Error('商城服务未初始化');
+            }
+        } catch (error) {
+            Logger.error('EventManager', 'handleShopRoute', '处理商城路由失败:', error);
+            this.uiService.showErrorMessage('商城加载失败，请刷新重试');
             throw error;
         }
     }
@@ -373,6 +450,74 @@ class EventManager {
             this.eventBus.on(NOTIFICATION_EVENTS.DELETE, this.handleNotificationDelete.bind(this));
         }
         Logger.info('EventManager', 'initializeNotificationEvents:375', '通知事件监听器设置完成');
+    }
+
+    /**
+     * 处理进入商城事件
+     */
+    handleShopEnter() {
+        try {
+            Logger.info('EventManager', 'handleShopEnter', '处理进入商城事件');
+            this.router.navigate('/shop');
+        } catch (error) {
+            this.handleError('进入商城', error, '进入商城失败');
+        }
+    }
+
+    /**
+     * 处理离开商城事件
+     */
+    handleShopLeave() {
+        try {
+            Logger.info('EventManager', 'handleShopLeave', '处理离开商城事件');
+            this.router.navigate('/');
+        } catch (error) {
+            this.handleError('离开商城', error, '离开商城失败');
+        }
+    }
+
+    handleShopPurchase(data) {
+        try {
+            Logger.info('EventManager', 'handleShopPurchase:405', '处理商品购买事件:', data);
+            this.shopService.purchaseItem(data);
+        } catch (error) {
+            this.handleError('购买商品', error, '购买商品失败');
+        }
+    }
+
+    /**
+     * 初始化商城事件
+     */
+    initializeShopEvents() {
+        if (this.shopService) {
+            this.eventBus.on(SHOP_EVENTS.ENTER, this.handleShopEnter.bind(this));
+            this.eventBus.on(SHOP_EVENTS.LEAVE, this.handleShopLeave.bind(this));
+            this.eventBus.on(SHOP_EVENTS.PURCHASE, this.handleShopPurchase.bind(this));
+        }
+        Logger.info('EventManager', 'initializeShopEvents', '商城事件监听器设置完成');
+        // 监听商品列表更新事件
+        this.eventBus.on(SHOP_EVENTS.ITEMS_UPDATED, (data) => {
+            Logger.info('EventManager', 'initializeShopEvents', '商品列表更新');
+            this.uiService.handleShopUIUpdate(data);
+        });
+
+        // 监听购买成功事件
+        this.eventBus.on(SHOP_EVENTS.PURCHASE_SUCCESS, (data) => {
+            Logger.info('EventManager', 'initializeShopEvents', '购买成功');
+            this.uiService.showNotification({
+                type: 'SUCCESS',
+                message: data.message || '购买成功'
+            });
+        });
+
+        // 监听购买失败事件
+        this.eventBus.on(SHOP_EVENTS.PURCHASE_FAILED, (data) => {
+            Logger.info('EventManager', 'initializeShopEvents', '购买失败');
+            this.uiService.showNotification({
+                type: 'ERROR',
+                message: data.message || '购买失败'
+            });
+        });
     }
 }
 

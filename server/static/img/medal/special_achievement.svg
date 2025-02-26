@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- 勋章底座 -->
+    <circle cx="100" cy="100" r="90" fill="#FFD700" stroke="#DAA520" stroke-width="4"/>
+    
+    <!-- 中心大星星 -->
+    <path d="M100 40 L115 85 L165 85 L125 115 L140 160 L100 130 L60 160 L75 115 L35 85 L85 85 Z" fill="#FFFFFF"/>
+    
+    <!-- 装饰光芒 -->
+    <path d="M100 30 L105 15 L100 0 L95 15 Z" fill="#FFFFFF" transform="rotate(0 100 100)"/>
+    <path d="M100 30 L105 15 L100 0 L95 15 Z" fill="#FFFFFF" transform="rotate(72 100 100)"/>
+    <path d="M100 30 L105 15 L100 0 L95 15 Z" fill="#FFFFFF" transform="rotate(144 100 100)"/>
+    <path d="M100 30 L105 15 L100 0 L95 15 Z" fill="#FFFFFF" transform="rotate(216 100 100)"/>
+    <path d="M100 30 L105 15 L100 0 L95 15 Z" fill="#FFFFFF" transform="rotate(288 100 100)"/>
+</svg>

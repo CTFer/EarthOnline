@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- 勋章底座 -->
+    <circle cx="100" cy="100" r="90" fill="#FFD700" stroke="#DAA520" stroke-width="4"/>
+    
+    <!-- 新手标志 -->
+    <path d="M100 40 C80 40 65 55 65 75 C65 95 80 110 100 110 C120 110 135 95 135 75 C135 55 120 40 100 40 Z M100 120 L85 150 L115 150 Z" fill="#FFFFFF" stroke="#DAA520" stroke-width="2"/>
+    
+    <!-- 星星装饰 -->
+    <path d="M60 60 L65 65 L70 60 L65 55 Z" fill="#FFFFFF"/>
+    <path d="M130 60 L135 65 L140 60 L135 55 Z" fill="#FFFFFF"/>
+    <path d="M95 160 L100 165 L105 160 L100 155 Z" fill="#FFFFFF"/>
+</svg>
