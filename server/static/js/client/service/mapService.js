@@ -1,7 +1,16 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:42
- * @LastEditTime: 2025-02-27 15:02:22
+ * @LastEditTime: 2025-02-27 23:16:31
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2025 迷舍
+ */
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-15 13:47:42
+ * @LastEditTime: 2025-02-27 21:16:00
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -19,13 +28,12 @@ import EchartsRenderer from "./map/echartsRenderer.js";
 import { MAP_EVENTS, UI_EVENTS } from "../config/events.js";
 import { WS_EVENT_TYPES } from "../config/wsConfig.js";
 class MapService {
-  constructor(api, eventBus, uiService) {
-    Logger.info('MapService', 'constructor:23', '开始初始化地图服务');
+  constructor(api, eventBus, uiService, playerService, store) {
+    Logger.info("MapService", "constructor:23", "开始初始化地图服务");
 
     // 检查必要的依赖
-    if (!api || !eventBus || !uiService) {
+    if (!api || !eventBus || !uiService || !playerService) {
       Logger.error("MapService", "初始化失败：缺少必要的依赖");
-      throw new Error("MapService requires api, eventBus, and uiService dependencies");
     }
 
     // 检查uiService是否为正确的实例
@@ -38,73 +46,97 @@ class MapService {
     this.api = api;
     this.eventBus = eventBus;
     this.uiService = uiService;
-    this.isInitialized = false; // 添加初始化状态标记
-    
-    Logger.debug("MapService", "constructor:43", this.uiService);
+    this.playerService = playerService;
+    this.store = store; // 确保这里有 store
+    this.componentId = "mapService"; // 添加组件ID
 
+    // 初始化默认状态
+    this.defaultState = {
+      renderType: localStorage.getItem("mapType") || MAP_CONFIG.RENDER_TYPE,
+      timeRange: localStorage.getItem("mapTimeRange") || "today",
+      customStartTime: null,
+      customEndTime: null,
+      displayMode: "path",
+      backgroundOpacity: MAP_CONFIG.backgroundOpacity || localStorage.getItem("mapBackgroundOpacity"),
+      isInitialized: false,
+    };
+
+    // 从store获取保存的状态或使用默认状态
+    this.state = this.loadState();
+
+    // 初始化其他属性
+    this.currentRenderer = null;
+    this.wsManager = null;
+    this._isToggling = false;
+
+    // 绑定方法
+    this.handleDisplayModeSwitch = this.handleDisplayModeSwitch.bind(this);
+    this.handleMapSwitch = this.handleMapSwitch.bind(this);
+    this.handleTimeRangeChange = this.handleTimeRangeChange.bind(this);
+    this.handleGPSUpdate = this.handleGPSUpdate.bind(this);
+
+    Logger.info("MapService", "constructor:70", "地图服务初始化完成");
+  }
+
+  // 加载状态
+  loadState() {
     try {
-      // 渲染器相关初始化
-      Logger.debug("MapService",'constructor:47', "初始化渲染器配置");
-      this.currentRenderer = null;
-      this.renderType = localStorage.getItem("mapType") || MAP_CONFIG.RENDER_TYPE;
-
-      // 初始化时间范围
-      Logger.debug("MapService",'constructor:52', "初始化时间范围配置");
-      this.timeRange = localStorage.getItem("mapTimeRange");
-      if (!this.timeRange) {
-        this.timeRange = "today";
-        localStorage.setItem("mapTimeRange", "today");
-        Logger.debug("MapService",'constructor:57', "设置默认时间范围: today");
-      }
-
-      // 初始化自定义时间范围
-      this.customStartTime = null;
-      this.customEndTime = null;
-
-      // 初始化WebSocket管理器引用
-      this.wsManager = null;
-
-      // 初始化背景透明度
-      this.backgroundOpacity = MAP_CONFIG.backgroundOpacity || localStorage.getItem("mapBackgroundOpacity");
-
-      // 绑定事件处理方法到实例
-      this.handleDisplayModeSwitch = this.handleDisplayModeSwitch.bind(this);
-      this.handleMapSwitch = this.handleMapSwitch.bind(this);
-      this.handleTimeRangeChange = this.handleTimeRangeChange.bind(this);
-      this.handleGPSUpdate = this.handleGPSUpdate.bind(this);
-
-      // 添加防重复触发标志
-      this._isToggling = false;
-
-      Logger.info("MapService",'constructor:70', "地图服务初始化完成");
+      const savedState = this.store?.getComponentState(this.componentId);
+      return { ...this.defaultState, ...savedState };
     } catch (error) {
-      Logger.error("MapService",'constructor:72', "地图服务初始化失败:", error);
-      throw error;
+      Logger.warn("MapService", "从Store加载状态失败，使用默认状态", error);
+      return { ...this.defaultState };
     }
   }
 
+  // 保存状态
+  saveState() {
+    try {
+      if (this.store) {
+        const stateToSave = {
+          renderType: this.state.renderType,
+          timeRange: this.state.timeRange,
+          customStartTime: this.state.customStartTime,
+          customEndTime: this.state.customEndTime,
+          displayMode: this.currentRenderer?.displayMode || "path",
+          backgroundOpacity: this.state.backgroundOpacity,
+          isInitialized: this.state.isInitialized,
+        };
+        this.store.setComponentState(this.componentId, stateToSave);
+        Logger.debug("MapService", "状态保存成功", stateToSave);
+      }
+    } catch (error) {
+      Logger.error("MapService", "保存状态失败:", error);
+    }
+  }
+
+  // 更新状态
+  updateState(partialState) {
+    this.state = { ...this.state, ...partialState };
+    this.saveState();
+  }
+
   async initMap() {
-    if (this.isInitialized) {
-      Logger.info('MapService','initMap:79', '地图已经初始化，跳过初始化过程');
+    if (this.state.isInitialized) {
+      Logger.info("MapService", "initMap:79", "地图已经初始化，跳过初始化过程");
       return;
     }
 
-    Logger.info('MapService', 'initMap:76', '开始初始化地图');
+    Logger.info("MapService", "initMap:76", "开始初始化地图");
 
     try {
       // 初始化地图UI组件
-      Logger.info('MapService','initMap:82', '初始化地图UI组件');
+      Logger.info("MapService", "initMap:82", "初始化地图UI组件");
       await this.initializeUI();
-      Logger.info('MapService','initMap:84', '地图UI组件初始化完成');
 
       // 再次确认时间范围设置
       Logger.debug("MapService", "确认时间范围设置");
-      if (!this.timeRange) {
-        this.timeRange = "today";
+      if (!this.state.timeRange) {
+        this.state.timeRange = "today";
         localStorage.setItem("mapTimeRange", "today");
         Logger.debug("MapService", "重新设置默认时间范围: today");
       }
-      Logger.debug("MapService", "当前时间范围:", this.timeRange);
+      Logger.debug("MapService", "当前时间范围:", this.state.timeRange);
 
       // 从localStorage获取渲染器类型
       const rendererType = localStorage.getItem("mapType") || "ECHARTS";
@@ -118,13 +150,13 @@ class MapService {
       this.updateDisplayModeButtonText();
 
       // 更新地图数据
-      Logger.debug("MapService", "initMap:112", "开始更新地图数据，时间范围:", this.timeRange);
+      Logger.debug("MapService", "initMap:112", "开始更新地图数据，时间范围:", this.state.timeRange);
       await this.updateMapData();
 
-      this.isInitialized = true; // 设置初始化完成标记
-      Logger.info('MapService', 'initMap:116', '地图初始化完成');
+      this.updateState({ isInitialized: true });
+      Logger.info("MapService", "initMap:116", "地图初始化完成");
     } catch (error) {
-      Logger.error('MapService', 'initMap:118', '地图初始化失败:', error);
+      Logger.error("MapService", "initMap:118", "地图初始化失败:", error);
       this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
         type: "ERROR",
         message: "地图初始化失败: " + error.message,
@@ -150,9 +182,6 @@ class MapService {
    * 初始化地图UI组件
    */
   async initializeUI() {
-    Logger.info('MapService', 'initializeUI:134', '初始化地图UI组件');
-    Logger.debug("MapService", "当前uiService:", this.uiService);
-
     if (!this.uiService) {
       Logger.error("MapService", "uiService未初始化");
       throw new Error("uiService未初始化");
@@ -162,7 +191,7 @@ class MapService {
       await this.uiService.initializeMapUI();
       Logger.info("MapService", "地图UI组件初始化完成");
     } catch (error) {
-      Logger.error('MapService', 'initializeUI:146', '初始化地图UI组件失败:', error);
+      Logger.error("MapService", "initializeUI:146", "初始化地图UI组件失败:", error);
       this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
         type: "ERROR",
         message: "初始化地图UI组件失败",
@@ -185,7 +214,7 @@ class MapService {
       const savedTimeRange = localStorage.getItem("mapTimeRange");
       if (savedTimeRange) {
         timeRangeSelect.value = savedTimeRange;
-        this.timeRange = savedTimeRange;
+        this.state.timeRange = savedTimeRange;
         Logger.debug("MapService", `设置时间范围选择器值为: ${savedTimeRange}`);
       }
 
@@ -209,17 +238,17 @@ class MapService {
     const applyButton = document.getElementById("applyCustomRange");
 
     if (startInput && endInput) {
-      if (this.timeRange === "custom" && this.customStartTime && this.customEndTime) {
-        startInput.value = this.customStartTime;
-        endInput.value = this.customEndTime;
+      if (this.state.timeRange === "custom" && this.state.customStartTime && this.state.customEndTime) {
+        startInput.value = this.state.customStartTime;
+        endInput.value = this.state.customEndTime;
       }
 
       startInput.addEventListener("change", () => {
-        this.customStartTime = startInput.value;
+        this.state.customStartTime = startInput.value;
       });
 
       endInput.addEventListener("change", () => {
-        this.customEndTime = endInput.value;
+        this.state.customEndTime = endInput.value;
       });
 
       if (applyButton) {
@@ -232,8 +261,8 @@ class MapService {
             return;
           }
 
-          this.customStartTime = startInput.value;
-          this.customEndTime = endInput.value;
+          this.state.customStartTime = startInput.value;
+          this.state.customEndTime = endInput.value;
           this.updateMapData();
         });
       }
@@ -298,18 +327,17 @@ class MapService {
   updateCustomTimeRangeVisibility() {
     const customDateRange = document.getElementById("customDateRange");
     if (customDateRange) {
-      customDateRange.style.display = this.timeRange === "custom" ? "block" : "none";
+      customDateRange.style.display = this.state.timeRange === "custom" ? "block" : "none";
     }
   }
 
   async handleTimeRangeChange(range) {
-    Logger.debug('MapService', 'handleTimeRangeChange:283', '处理时间范围变化:', range);
+    Logger.debug("MapService", "handleTimeRangeChange", "处理时间范围变化:", range);
     try {
-      this.timeRange = range;
-      localStorage.setItem("mapTimeRange", range);
+      this.updateState({ timeRange: range });
 
       if (range === "custom") {
-        if (!this.customStartTime || !this.customEndTime) {
+        if (!this.state.customStartTime || !this.state.customEndTime) {
           this.setDefaultCustomTimeRange();
         }
         return;
@@ -317,7 +345,7 @@ class MapService {
 
       await this.updateMapData();
     } catch (error) {
-      Logger.error('MapService', 'handleTimeRangeChange:297', '更新时间范围失败:', error);
+      Logger.error("MapService", "handleTimeRangeChange", "更新时间范围失败:", error);
       this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
         type: "ERROR",
         message: "更新时间范围失败",
@@ -330,14 +358,14 @@ class MapService {
     const startTime = new Date(now.setHours(0, 0, 0, 0));
     const endTime = new Date(now.setHours(23, 59, 59, 999));
 
-    this.customStartTime = startTime.toISOString().slice(0, 16);
-    this.customEndTime = endTime.toISOString().slice(0, 16);
+    this.state.customStartTime = startTime.toISOString().slice(0, 16);
+    this.state.customEndTime = endTime.toISOString().slice(0, 16);
 
     const startInput = document.getElementById("startTime");
     const endInput = document.getElementById("endTime");
 
-    if (startInput) startInput.value = this.customStartTime;
-    if (endInput) endInput.value = this.customEndTime;
+    if (startInput) startInput.value = this.state.customStartTime;
+    if (endInput) endInput.value = this.state.customEndTime;
   }
 
   validateGPSData(data) {
@@ -348,26 +376,26 @@ class MapService {
   }
 
   async handleMapSwitch(type) {
-    Logger.debug('MapService', 'handleMapSwitch:328', '切换地图类型:', type);
+    Logger.debug("MapService", "handleMapSwitch:328", "切换地图类型:", type);
     // 确保从 localStorage 获取当前渲染器类型
     const currentRenderType = localStorage.getItem("mapType");
     // 判断当前渲染器类型是否为ECHARTS 是则切换为AMAP 否则切换为ECHARTS
     Logger.debug("MapService", "currentRenderType:", currentRenderType);
     if (currentRenderType === "ECHARTS") {
-      this.renderType = "AMAP";
+      this.state.renderType = "AMAP";
     } else {
-      this.renderType = "ECHARTS";
+      this.state.renderType = "ECHARTS";
     }
     Logger.debug("MapService", "收到地图切换请求:", type);
     try {
       this.switchRenderer(type).catch((error) => {
-        Logger.error('MapService', 'handleMapSwitch:341', '切换地图失败:', error);
+        Logger.error("MapService", "handleMapSwitch:341", "切换地图失败:", error);
         this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
           type: "ERROR",
           message: "地图切换失败",
         });
 
-        this.switchRenderer(this.renderType);
+        this.switchRenderer(this.state.renderType);
       });
     } catch (error) {
       Logger.error("MapService", "处理地图切换请求失败:", error);
@@ -379,28 +407,30 @@ class MapService {
       e.preventDefault();
       e.stopPropagation();
     }
-    
-    Logger.debug('MapService', 'handleDisplayModeSwitch:355', '切换显示模式');
+
+    Logger.debug("MapService", "handleDisplayModeSwitch", "切换显示模式");
     try {
-      // 防止重复触发
       if (this._isToggling) {
-        Logger.debug("MapService", "显示模式切换正在进行中，跳过重复操作");
         return;
       }
-      
+
       this._isToggling = true;
 
       if (this.currentRenderer && typeof this.currentRenderer.toggleDisplayMode === "function") {
         const previousMode = this.currentRenderer.displayMode;
         this.currentRenderer.toggleDisplayMode();
         const newMode = this.currentRenderer.displayMode;
+
+        // 保存新的显示模式
+        this.updateState({ displayMode: newMode });
+
         Logger.debug("MapService", `显示模式从 ${previousMode} 切换到 ${newMode}`);
         this.updateDisplayModeButtonText();
       } else {
         Logger.warn("MapService", "当前渲染器不支持切换显示模式");
       }
     } catch (error) {
-      Logger.error('MapService', 'handleDisplayModeSwitch:367', '切换显示模式失败:', error);
+      Logger.error("MapService", "handleDisplayModeSwitch", "切换显示模式失败:", error);
       this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
         type: "ERROR",
         message: "切换显示模式失败",
@@ -418,7 +448,7 @@ class MapService {
    * @private
    */
   async initRenderer(type) {
-    Logger.debug('MapService', 'initRenderer:380', '初始化渲染器:', type);
+    Logger.debug("MapService", "initRenderer:380", "初始化渲染器:", type);
 
     try {
       // 如果没有指定类型，从localStorage获取，默认为ECHARTS
@@ -455,8 +485,8 @@ class MapService {
       localStorage.setItem("mapType", normalizedType);
 
       // 设置初始透明度
-      this.setBackgroundOpacity(this.backgroundOpacity);
-      Logger.debug("MapService", "设置初始透明度:", this.backgroundOpacity);
+      this.setBackgroundOpacity(this.state.backgroundOpacity);
+      Logger.debug("MapService", "设置初始透明度:", this.state.backgroundOpacity);
 
       Logger.info("MapService", `地图渲染器(${normalizedType})初始化完成`);
 
@@ -465,7 +495,7 @@ class MapService {
 
       return normalizedType;
     } catch (error) {
-      Logger.error('MapService', 'initRenderer:427', '初始化渲染器失败:', error);
+      Logger.error("MapService", "initRenderer:427", "初始化渲染器失败:", error);
       throw error;
     }
   }
@@ -474,56 +504,54 @@ class MapService {
    * 切换地图渲染器（用于用户手动切换）
    */
   async switchRenderer(type) {
-    Logger.debug('MapService', 'switchRenderer:436', '切换渲染器:', type);
+    Logger.debug("MapService", "switchRenderer:436", "切换渲染器:", type);
 
     // 确保从 localStorage 获取当前渲染器类型
-    const currentRenderType = localStorage.getItem("mapType") || this.renderType;
-    
+    const currentRenderType = localStorage.getItem("mapType") || this.state.renderType;
+
     // 如果类型相同，直接返回
     if (currentRenderType === type) {
-        Logger.debug("MapService", "地图类型相同，无需切换");
-        return;
+      Logger.debug("MapService", "地图类型相同，无需切换");
+      return;
     }
 
     Logger.info("MapService", `切换地图渲染器: ${type}`);
     try {
-        // 清理现有渲染器
-        if (this.currentRenderer) {
-            Logger.debug("MapService", "清理现有渲染器");
-            await this.currentRenderer.destroy();
-        }
+      // 清理现有渲染器
+      if (this.currentRenderer) {
+        Logger.debug("MapService", "清理现有渲染器");
+        await this.currentRenderer.destroy();
+      }
 
-        // 更新存储的渲染器类型
-        this.renderType = type;
-        localStorage.setItem("mapType", type);
+      // 更新存储的渲染器类型
+      this.state.renderType = type;
+      localStorage.setItem("mapType", type);
 
-        // 初始化新渲染器
-        await this.initRenderer(type);
-        
-        // 更新地图数据
-        await this.updateMapData();
+      // 初始化新渲染器
+      await this.initRenderer(type);
 
-        // 切换成功后发送通知
-        this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-            type: "SUCCESS",
-            message: "地图切换成功",
-        });
+      // 更新地图数据
+      await this.updateMapData();
 
-        Logger.info("MapService", "地图渲染器切换完成");
+      // 切换成功后发送通知
+      this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+        type: "SUCCESS",
+        message: "地图切换成功",
+      });
+
+      Logger.info("MapService", "地图渲染器切换完成");
     } catch (error) {
-        Logger.error('MapService', 'switchRenderer:473', '切换渲染器失败:', error);
-        // 切换失败时回退到Echarts
-        if (type === "AMAP") {
-            Logger.warn("MapService", "切换到高德地图失败，回退到Echarts");
-            this.renderType = "ECHARTS";
-            localStorage.setItem("mapType", "ECHARTS");
-            await this.initRenderer("ECHARTS");
-        }
-        throw error;
+      Logger.error("MapService", "switchRenderer:473", "切换渲染器失败:", error);
+      // 切换失败时回退到Echarts
+      if (type === "AMAP") {
+        Logger.warn("MapService", "切换到高德地图失败，回退到Echarts");
+        this.state.renderType = "ECHARTS";
+        localStorage.setItem("mapType", "ECHARTS");
+        await this.initRenderer("ECHARTS");
+      }
+      throw error;
     }
   }
-
-
 
   // 设置WebSocket管理器
   setWebSocketManager(wsManager) {
@@ -543,7 +571,7 @@ class MapService {
     try {
       // 使用新的订阅方法
       this.wsManager.subscribe(WS_EVENT_TYPES.BUSINESS.GPS_UPDATE, (data) => {
-        Logger.debug('MapService', 'handleGPSUpdate:505', '处理GPS更新:', data);
+        Logger.debug("MapService", "handleGPSUpdate:505", "处理GPS更新:", data);
         this.handleGPSUpdate(data);
       });
 
@@ -572,13 +600,13 @@ class MapService {
 
       Logger.debug("MapService", "GPS数据更新成功");
     } catch (error) {
-      Logger.error('MapService', 'handleGPSUpdate:534', '处理GPS更新失败:', error);
+      Logger.error("MapService", "handleGPSUpdate:534", "处理GPS更新失败:", error);
     }
   }
 
   // 更新地图数据
   async updateMapData() {
-    Logger.debug('MapService', 'updateMapData:540', '更新地图数据');
+    Logger.debug("MapService", "updateMapData:540", "更新地图数据");
 
     // 检查渲染器是否已初始化
     if (!this.currentRenderer) {
@@ -587,14 +615,14 @@ class MapService {
     }
 
     // 验证时间范围
-    if (!this.timeRange) {
+    if (!this.state.timeRange) {
       Logger.warn("MapService", "时间范围未设置，使用默认值: today");
-      this.timeRange = "today";
+      this.state.timeRange = "today";
       localStorage.setItem("mapTimeRange", "today");
     }
-    Logger.debug("MapService", `当前时间范围: ${this.timeRange}`);
+    Logger.debug("MapService", `当前时间范围: ${this.state.timeRange}`);
 
-    const playerId = localStorage.getItem("playerId");
+    const playerId = this.playerService.getPlayerId();
     if (!playerId) {
       Logger.error("MapService", "无法更新地图数据: 未找到玩家ID");
       this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
@@ -606,13 +634,13 @@ class MapService {
     }
 
     try {
-      Logger.debug("MapService", `准备获取GPS数据，时间范围: ${this.timeRange}, 玩家ID: ${playerId}`);
+      Logger.debug("MapService", `准备获取GPS数据，时间范围: ${this.state.timeRange}, 玩家ID: ${playerId}`);
       const params = new URLSearchParams();
       const now = Date.now();
       let startTime, endTime;
 
       // 计算时间范围
-      switch (this.timeRange) {
+      switch (this.state.timeRange) {
         case "today":
           startTime = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
           endTime = Math.floor(new Date().setHours(23, 59, 59, 999) / 1000);
@@ -631,9 +659,9 @@ class MapService {
           endTime = Math.floor(now / 1000);
           break;
         case "custom":
-          if (this.customStartTime && this.customEndTime) {
-            startTime = Math.floor(new Date(this.customStartTime).getTime() / 1000);
-            endTime = Math.floor(new Date(this.customEndTime).getTime() / 1000);
+          if (this.state.customStartTime && this.state.customEndTime) {
+            startTime = Math.floor(new Date(this.state.customStartTime).getTime() / 1000);
+            endTime = Math.floor(new Date(this.state.customEndTime).getTime() / 1000);
           } else {
             Logger.warn("MapService", "自定义时间范围未设置，使用今天作为默认值");
             startTime = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
@@ -641,13 +669,13 @@ class MapService {
           }
           break;
         default:
-          Logger.error("MapService", `不支持的时间范围类型: ${JSON.stringify(this.timeRange, null, 2)}`);
+          Logger.error("MapService", `不支持的时间范围类型: ${JSON.stringify(this.state.timeRange, null, 2)}`);
           this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
             type: "ERROR",
-            message: `不支持的时间范围: ${this.timeRange}，已重置为today`,
+            message: `不支持的时间范围: ${this.state.timeRange}，已重置为today`,
             duration: 5000,
           });
-          this.timeRange = "today";
+          this.state.timeRange = "today";
           localStorage.setItem("mapTimeRange", "today");
           startTime = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
           endTime = Math.floor(new Date().setHours(23, 59, 59, 999) / 1000);
@@ -675,7 +703,7 @@ class MapService {
 
         // 更新渲染器数据
         await this.currentRenderer.updateMapData({
-          timeRange: this.timeRange,
+          timeRange: this.state.timeRange,
           startTime: startTime,
           endTime: endTime,
           gpsData: result.data.records.sort((a, b) => a.addtime - b.addtime),
@@ -688,7 +716,7 @@ class MapService {
         throw new Error(result.msg || "获取GPS数据失败");
       }
     } catch (error) {
-      Logger.error('MapService', 'updateMapData:650', '更新地图数据失败:', error);
+      Logger.error("MapService", "updateMapData:650", "更新地图数据失败:", error);
       this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
         type: "ERROR",
         message: `更新地图数据失败: ${error.message}`,
@@ -746,41 +774,94 @@ class MapService {
    * 初始化地图服务
    */
   async initialize() {
-    Logger.info('MapService', 'initialize', '初始化地图服务');
+    if (!this.store) {
+        Logger.error("MapService", "initialize", "store 未定义");
+        throw new Error("store 未定义");
+    }
+    Logger.info("MapService", "initialize", "初始化地图服务");
     try {
-        // 初始化地图实例
+      // 从保存的状态恢复
+      if (this.state.isInitialized) {
+        Logger.info("MapService", "initialize", "从保存的状态恢复地图");
+        await this.restoreFromState();
+      } else {
+        // 首次初始化
         await this.initMap();
-        // 加载地图配置
-        // await this.loadMapConfig();
-        // 初始化地图控件
-        // this.initMapControls();
-        // 绑定地图事件应该在EventManager中进行
-        // this.bindMapEvents();
-        
-        Logger.info('MapService', 'initialize', '地图服务初始化完成');
+        this.updateState({ isInitialized: true });
+      }
+
+      // 从状态中恢复时间范围
+      const timeRange = this.store.getComponentState(this.componentId).timeRange || "today";
+      this.setTimeRangeSelect(timeRange);
+
+      Logger.info("MapService", "initialize", "地图服务初始化完成");
     } catch (error) {
-        Logger.error('MapService', 'initialize', '地图服务初始化失败:', error);
-        throw error;
+      Logger.error("MapService", "initialize", "地图服务初始化失败:", error);
+      throw error;
     }
   }
-
+  /**
+   * 设置时间范围选择器
+   * @param {string} timeRange - 时间范围
+   */
+  setTimeRangeSelect(timeRange) {
+    // 设置选择器timeRangeSelect的显示
+    const timeRangeSelect = document.getElementById("timeRangeSelect");
+    if (timeRangeSelect) {
+      timeRangeSelect.value = timeRange;
+    }
+  }
   /**
    * 清理地图服务
    */
   cleanup() {
-    Logger.info('MapService', 'cleanup', '清理地图服务');
+    Logger.info("MapService", "cleanup", "清理地图服务");
     try {
-        // 移除地图事件监听应该在EventManager中进行
-        // this.unbindMapEvents();
-        // 销毁地图实例
-        if (this.map) {
-            this.map.destroy();
-            this.map = null;
-        }
-        Logger.info('MapService', 'cleanup', '地图服务清理完成');
+      // 保存当前状态
+      this.saveState();
+
+      // 销毁地图实例
+      if (this.currentRenderer) {
+        this.currentRenderer.destroy();
+        this.currentRenderer = null;
+      }
+
+      Logger.info("MapService", "cleanup", "地图服务清理完成");
     } catch (error) {
-        Logger.error('MapService', 'cleanup', '地图服务清理失败:', error);
-        throw error;
+      Logger.error("MapService", "cleanup", "地图服务清理失败:", error);
+      throw error;
+    }
+  }
+
+  // 从状态恢复
+  async restoreFromState() {
+    try {
+      // 初始化渲染器
+      await this.initRenderer(this.state.renderType);
+
+      // 恢复显示模式
+      if (this.currentRenderer && this.state.displayMode) {
+        this.currentRenderer.displayMode = this.state.displayMode;
+        this.updateDisplayModeButtonText();
+      }
+
+      // 恢复时间范围
+      this.state.timeRange = this.state.timeRange;
+      if (this.state.timeRange === "custom") {
+        this.state.customStartTime = this.state.customStartTime;
+        this.state.customEndTime = this.state.customEndTime;
+      }
+
+      // 恢复透明度
+      this.setBackgroundOpacity(this.state.backgroundOpacity);
+
+      // 更新地图数据
+      await this.updateMapData();
+
+      Logger.info("MapService", "restoreFromState", "地图状态恢复完成");
+    } catch (error) {
+      Logger.error("MapService", "restoreFromState", "恢复地图状态失败:", error);
+      throw error;
     }
   }
 

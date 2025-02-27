@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:31
- * @LastEditTime: 2025-02-27 13:01:59
+ * @LastEditTime: 2025-02-27 21:00:45
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -9,7 +9,7 @@
  */
 
 // 声明配置变量
-export const SERVER = "http://192.168.5.18/";
+export const SERVER = "http://192.168.1.4/";
 
 export const Live2D_MODE = true;
 // 角色图片配置，使用player_id作为key

@@ -6,8 +6,7 @@
  */
 
 import Logger from "../../utils/logger.js";
-import { SHOP_EVENTS } from '../config/events.js';
-import { UI_EVENTS } from '../config/events.js';
+import { SHOP_EVENTS,UI_EVENTS } from '../config/events.js';
 
 class ShopService {
     constructor(eventBus, api, playerService, router) {
@@ -39,7 +38,7 @@ class ShopService {
      */
     async loadUserPoints() {
         try {
-            const currentPlayerId = localStorage.getItem('playerId');
+            const currentPlayerId = this.playerService.getPlayerId();
             const response = await this.api.request(`/api/player/${currentPlayerId}`);
             
             if (response.code === 0) {
@@ -117,7 +116,7 @@ class ShopService {
      */
     async purchaseItem(itemData) {
         try {
-            const currentPlayerId = localStorage.getItem('playerId');
+            const currentPlayerId = this.playerService.getPlayerId();
             const quantity = itemData.quantity || 1;
             
             Logger.debug('ShopService', 'purchaseItem', '准备购买商品:', {

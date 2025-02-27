@@ -1,36 +1,181 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-02-27 13:48:52
+ * @LastEditTime: 2025-02-27 23:30:16
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
 import Logger from "../../utils/logger.js";
-import { TASK_EVENTS, UI_EVENTS, AUDIO_EVENTS, MAP_EVENTS,WS_EVENTS, PLAYER_EVENTS, SHOP_EVENTS } from "../config/events.js";
-import {  WS_STATE, WS_CONFIG } from "../config/wsConfig.js";
-import {gameUtils} from "../../utils/utils.js";
-
+import { TASK_EVENTS, UI_EVENTS, AUDIO_EVENTS, MAP_EVENTS, WS_EVENTS, PLAYER_EVENTS, SHOP_EVENTS } from "../config/events.js";
+import { WS_STATE, WS_CONFIG } from "../config/wsConfig.js";
+import { gameUtils } from "../../utils/utils.js";
+import NotificationService from "./notificationService.js";
 class UIService {
-  constructor(eventBus, store, templateService, taskService,playerService) {
+  constructor(eventBus, store, templateService, taskService, playerService, notificationService) {
     this.eventBus = eventBus;
     this.store = store;
     this.templateService = templateService;
     this.taskService = taskService;
     this.playerService = playerService;
+    this.notificationService = new NotificationService();
     this.observers = new Map();
-    Logger.info("UIService", "初始化UI服务");
+    this.componentId = "uiService";
 
+    // 初始化默认状态
+    this.defaultState = {
+      initialized: false,
+      notifications: [],
+      taskCards: new Map(),
+      modals: new Map(),
+      wsStatus: "disconnected",
+      uiComponents: {
+        taskList: {
+          visible: true,
+          expanded: false,
+        },
+        notifications: {
+          visible: true,
+          position: "top-right",
+        },
+        modals: {
+          activeModal: null,
+        },
+        playerInfo: {
+          visible: true,
+          loading: false,
+          error: null,
+        },
+      },
+    };
+
+    // 初始化状态
+    this.state = this.loadState();
+
+    // 设置状态监听
+    this.setupStateListeners();
     // 地图相关状态
     this.mapRenderType = localStorage.getItem('mapType') || 'ECHARTS';
     this.mapTimeRange = localStorage.getItem('mapTimeRange') || 'today';
     this.customStartTime = null;
     this.customEndTime = null;
 
-    this.playerId = playerService.getPlayerId(); // 在构造函数中获取 playerId
+    Logger.info("UIService", "初始化UI服务");
+  }
 
-    // 初始化状态
-    this.initialized = false;
+  // 加载状态
+  loadState() {
+    const savedState = this.store.getComponentState(this.componentId);
+    return { 
+        ...this.defaultState, 
+        ...savedState,
+        mapRenderType: savedState.mapRenderType || 'ECHARTS',
+        mapTimeRange: savedState.mapTimeRange || 'today',
+        customStartTime: savedState.customStartTime || null,
+        customEndTime: savedState.customEndTime || null,
+    };
+  }
 
+  // 保存状态
+  saveState() {
+    this.store.setComponentState(this.componentId, {
+        ...this.state,
+        mapRenderType: this.state.mapRenderType,
+        mapTimeRange: this.state.mapTimeRange,
+        customStartTime: this.state.customStartTime,
+        customEndTime: this.state.customEndTime,
+    });
+  }
+
+  // 设置状态监听器
+  setupStateListeners() {
+    this.store.subscribe("component", this.componentId, (newState, oldState) => {
+      Logger.debug("UIService", "状态更新:", { old: oldState, new: newState });
+
+      // 处理通知状态变化
+      if (newState.notifications !== oldState.notifications) {
+        this.handleNotificationsStateChange(newState.notifications);
+      }
+
+      // 处理任务卡片状态变化
+      if (newState.taskCards !== oldState.taskCards) {
+        this.handleTaskCardsStateChange(newState.taskCards);
+      }
+
+      // 处理UI组件状态变化
+      if (newState.uiComponents !== oldState.uiComponents) {
+        this.handleUIComponentsStateChange(newState.uiComponents);
+      }
+    });
+  }
+
+  // 更新状态
+  updateState(newState) {
+    this.state = { ...this.state, ...newState };
+    this.saveState();
+  }
+
+  // 处理通知状态变化
+  handleNotificationsStateChange(notifications) {
+    try {
+      // 更新通知UI
+      this.renderNotifications(notifications);
+    } catch (error) {
+      Logger.error("UIService", "处理通知状态变化失败:", error);
+    }
+  }
+
+  // 处理任务卡片状态变化
+  handleTaskCardsStateChange(taskCards) {
+    try {
+      // 更新任务卡片UI
+      this.renderTaskCards(taskCards);
+    } catch (error) {
+      Logger.error("UIService", "处理任务卡片状态变化失败:", error);
+    }
+  }
+
+  // 处理UI组件状态变化
+  handleUIComponentsStateChange(uiComponents) {
+    try {
+      // 更新任务列表可见性
+      if (uiComponents.taskList) {
+        const taskListContainer = document.querySelector(".task-list-container");
+        if (taskListContainer) {
+          taskListContainer.style.display = uiComponents.taskList.visible ? "block" : "none";
+          taskListContainer.classList.toggle("expanded", uiComponents.taskList.expanded);
+        }
+      }
+
+      // 更新通知面板位置
+      if (uiComponents.notifications) {
+        const notificationPanel = document.querySelector(".notification-panel");
+        if (notificationPanel) {
+          notificationPanel.className = `notification-panel ${uiComponents.notifications.position}`;
+          notificationPanel.style.display = uiComponents.notifications.visible ? "block" : "none";
+        }
+      }
+
+      // 处理模态框状态
+      if (uiComponents.modals && uiComponents.modals.activeModal) {
+        this.handleModalState(uiComponents.modals.activeModal);
+      }
+    } catch (error) {
+      Logger.error("UIService", "处理UI组件状态变化失败:", error);
+    }
+  }
+
+  // 处理模态框状态
+  handleModalState(modalState) {
+    try {
+      const { id, visible, data } = modalState;
+      if (visible) {
+        this.showModal(id, data);
+      } else {
+        this.hideModal(id);
+      }
+    } catch (error) {
+      Logger.error("UIService", "处理模态框状态失败:", error);
+    }
   }
 
   /**
@@ -48,7 +193,14 @@ class UIService {
       this.initEvents();
       // 初始化任务事件
       this.initTaskEvents();
-      
+      // 初始化玩家信息UI
+      await this.initPlayerInfoUI();
+
+      this.mapRenderType = this.state.mapRenderType;
+      this.mapTimeRange = this.state.mapTimeRange;
+      this.customStartTime = this.state.customStartTime;
+      this.customEndTime = this.state.customEndTime;
+
       Logger.info("UIService", "UI服务初始化完成");
     } catch (error) {
       Logger.error("UIService", "UI服务初始化失败:", error);
@@ -65,6 +217,7 @@ class UIService {
 
     this.setupEventListeners();
     this.initShopEvents();
+    this.initPlayerEvents();
 
     Logger.info("UIService", "事件监听初始化完成");
   }
@@ -73,57 +226,50 @@ class UIService {
    * 设置事件监听器
    */
   setupEventListeners() {
-    Logger.info('UIService', 'setupEventListeners', '设置UI事件监听器');
-    
+    Logger.info("UIService", "setupEventListeners", "设置UI事件监听器");
+
     try {
       // 绑定商城入口点击事件
-      document.addEventListener('click', (e) => {
-        const shopEntrance = e.target.closest('.shop-entrance');
+      document.addEventListener("click", (e) => {
+        const shopEntrance = e.target.closest(".shop-entrance");
         if (shopEntrance) {
-          Logger.info('UIService', 'handleShopEntranceClick', '点击商城入口');
+          Logger.info("UIService", "handleShopEntranceClick", "点击商城入口");
           this.eventBus.emit(SHOP_EVENTS.ENTER);
         }
       });
 
       // 其他事件监听保持不变
     } catch (error) {
-      Logger.error('UIService', 'setupEventListeners', '设置UI事件监听器失败:', error);
+      Logger.error("UIService", "setupEventListeners", "设置UI事件监听器失败:", error);
       throw error;
     }
   }
 
   updateWebSocketStatus(status) {
-    const statusDot = document.querySelector('.status-dot');
-    const statusText = document.querySelector('.status-text');
-   // 移除所有状态类
-   statusDot.classList.remove(
-    'connected', 
-    'disconnected', 
-    'connecting', 
-    'error', 
-    'reconnecting'
-  );
-    if (status === 'connected') {
-        statusDot.classList.add('connected');
-        statusText.textContent = 'WebSocket连接成功';
-    } else if (status === 'disconnected') {
-        statusDot.classList.add('disconnected');
-        statusText.textContent = 'WebSocket已断开';
-    } else if (status === 'error') {
-        statusDot.classList.add('error');
-        statusText.textContent = 'WebSocket连接错误';
+    const statusDot = document.querySelector(".status-dot");
+    const statusText = document.querySelector(".status-text");
+    // 移除所有状态类
+    statusDot.classList.remove("connected", "disconnected", "connecting", "error", "reconnecting");
+    if (status === "connected") {
+      statusDot.classList.add("connected");
+      statusText.textContent = "WebSocket连接成功";
+    } else if (status === "disconnected") {
+      statusDot.classList.add("disconnected");
+      statusText.textContent = "WebSocket已断开";
+    } else if (status === "error") {
+      statusDot.classList.add("error");
+      statusText.textContent = "WebSocket连接错误";
     }
   }
 
   initStatusElements() {
     // 获取状态显示元素
-    this.statusDot = document.querySelector('.status-dot');
-    this.statusText = document.querySelector('.status-text');
-    Logger.debug('UIService', 'WebSocket状态显示元素:', this.statusDot, this.statusText);
+    this.statusDot = document.querySelector(".status-dot");
+    this.statusText = document.querySelector(".status-text");
+    Logger.debug("UIService", "WebSocket状态显示元素:", this.statusDot, this.statusText);
     if (!this.statusDot || !this.statusText) {
-      Logger.warn('UIService', 'WebSocket状态显示元素未找到');
+      Logger.warn("UIService", "WebSocket状态显示元素未找到");
     }
-   
   }
 
   /**
@@ -155,22 +301,16 @@ class UIService {
     const config = { childList: true, subtree: true };
 
     // 监听相关容器
-    const containers = [
-      document.getElementById("taskList"), 
-      document.querySelector(".active-tasks-swiper .swiper-wrapper"),
-      document.querySelector(".tasks-list")
-    ].filter(Boolean);
+    const containers = [document.getElementById("taskList"), document.querySelector(".active-tasks-swiper .swiper-wrapper"), document.querySelector(".tasks-list")].filter(Boolean);
 
     containers.forEach((container) => {
       taskObserver.observe(container, config);
       // 初始化已存在的任务卡片
-      Array.from(container.getElementsByClassName("task-card")).forEach((card) => 
-        this.initializeTaskCard(card)
-      );
+      Array.from(container.getElementsByClassName("task-card")).forEach((card) => this.initializeTaskCard(card));
     });
 
     // 存储观察器实例以便后续清理
-    this.observers.set('taskObserver', taskObserver);
+    this.observers.set("taskObserver", taskObserver);
   }
 
   /**
@@ -200,11 +340,11 @@ class UIService {
    */
   destroy() {
     Logger.info("UIService", "开始清理UI服务");
-    
+
     // 清理所有观察器
-    this.observers.forEach(observer => observer.disconnect());
+    this.observers.forEach((observer) => observer.disconnect());
     this.observers.clear();
-    
+
     Logger.info("UIService", "UI服务清理完成");
   }
 
@@ -660,20 +800,20 @@ class UIService {
    * 初始化任务相关事件监听
    */
   initTaskEvents() {
-    Logger.info('UIService', 'initTaskEvents', '初始化任务事件');
+    Logger.info("UIService", "initTaskEvents", "初始化任务事件");
     try {
-        // 绑定任务相关事件
-        document.querySelectorAll('.task-card').forEach(taskCard => {
-            this.initializeTaskCard(taskCard);
-        });
+      // 绑定任务相关事件
+      document.querySelectorAll(".task-card").forEach((taskCard) => {
+        this.initializeTaskCard(taskCard);
+      });
 
-        // 绑定全局任务事件
-        document.addEventListener('click', this.handleDocumentClick);
-        
-        Logger.info('UIService', 'initTaskEvents', '任务事件初始化完成');
+      // 绑定全局任务事件
+      document.addEventListener("click", this.handleDocumentClick);
+
+      Logger.info("UIService", "initTaskEvents", "任务事件初始化完成");
     } catch (error) {
-        Logger.error('UIService', 'initTaskEvents', '任务事件初始化失败:', error);
-        throw error;
+      Logger.error("UIService", "initTaskEvents", "任务事件初始化失败:", error);
+      throw error;
     }
   }
 
@@ -681,29 +821,29 @@ class UIService {
    * 移除任务事件
    */
   removeTaskEvents() {
-    Logger.info('UIService', 'removeTaskEvents', '移除任务事件');
+    Logger.info("UIService", "removeTaskEvents", "移除任务事件");
     try {
-        // 移除所有任务卡片的事件监听
-        document.querySelectorAll('.task-card').forEach(taskCard => {
-            const acceptBtn = taskCard.querySelector('.accept-task-btn');
-            const abandonBtn = taskCard.querySelector('.abandon-task');
-            
-            if (acceptBtn) {
-                acceptBtn.removeEventListener('click', this.handleTaskAccept);
-            }
-            if (abandonBtn) {
-                abandonBtn.removeEventListener('click', this.handleTaskAbandon);
-            }
-            taskCard.removeEventListener('click', this.handleTaskClick);
-        });
+      // 移除所有任务卡片的事件监听
+      document.querySelectorAll(".task-card").forEach((taskCard) => {
+        const acceptBtn = taskCard.querySelector(".accept-task-btn");
+        const abandonBtn = taskCard.querySelector(".abandon-task");
 
-        // 移除全局任务事件
-        document.removeEventListener('click', this.handleDocumentClick);
-        
-        Logger.info('UIService', 'removeTaskEvents', '任务事件移除完成');
+        if (acceptBtn) {
+          acceptBtn.removeEventListener("click", this.handleTaskAccept);
+        }
+        if (abandonBtn) {
+          abandonBtn.removeEventListener("click", this.handleTaskAbandon);
+        }
+        taskCard.removeEventListener("click", this.handleTaskClick);
+      });
+
+      // 移除全局任务事件
+      document.removeEventListener("click", this.handleDocumentClick);
+
+      Logger.info("UIService", "removeTaskEvents", "任务事件移除完成");
     } catch (error) {
-        Logger.error('UIService', 'removeTaskEvents', '任务事件移除失败:', error);
-        throw error;
+      Logger.error("UIService", "removeTaskEvents", "任务事件移除失败:", error);
+      throw error;
     }
   }
 
@@ -838,6 +978,18 @@ class UIService {
       // 更新等级和经验值
       this.updateLevelAndExp(playerData);
 
+      // 更新状态
+      this.updateState({
+        uiComponents: {
+          ...this.state.uiComponents,
+          playerInfo: {
+            ...this.state.uiComponents.playerInfo,
+            visible: true,
+            error: null,
+          },
+        },
+      });
+
       Logger.debug("UIService", "玩家UI更新完成");
     } catch (error) {
       Logger.error("UIService", "更新玩家UI失败:", error);
@@ -884,12 +1036,12 @@ class UIService {
       // 更新UI显示
       this.showNotification({
         type: "SUCCESS",
-        message: `任务完成！获得 ${taskData.rewards?.points || 0} 点经验`
+        message: `任务完成！获得 ${taskData.rewards?.points || 0} 点经验`,
       });
-      
+
       // 播放完成音效
       this.eventBus.emit(AUDIO_EVENTS.PLAY, "COMPLETE");
-      
+
       // 刷新任务列表
       this.taskService.refreshTasks().then(() => {
         Logger.debug("UIService", "任务列表已刷新");
@@ -898,7 +1050,7 @@ class UIService {
       Logger.error("UIService", "处理任务完成事件失败:", error);
       this.showNotification({
         type: "ERROR",
-        message: "处理任务完成失败"
+        message: "处理任务完成失败",
       });
     }
   }
@@ -908,7 +1060,7 @@ class UIService {
     Logger.error("UIService", "任务错误:", error);
     this.showNotification({
       type: "ERROR",
-      message: error.message || "任务操作失败"
+      message: error.message || "任务操作失败",
     });
     this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
   }
@@ -963,19 +1115,19 @@ class UIService {
    * 初始化地图UI组件
    */
   async initializeMapUI() {
-    Logger.info('UIService', '初始化地图UI组件');
+    Logger.info("UIService", "初始化地图UI组件");
     try {
-      Logger.debug('UIService', '开始初始化各个UI组件');
+      Logger.debug("UIService", "开始初始化各个UI组件");
       this.initMapSwitchButton();
       this.initTimeRangeSelector();
       this.initCustomTimeRange();
       this.initDisplayModeButton();
-      Logger.info('UIService', '地图UI组件初始化完成');
+      Logger.info("UIService", "地图UI组件初始化完成");
     } catch (error) {
-      Logger.error('UIService', '初始化地图UI组件失败:', error);
+      Logger.error("UIService", "初始化地图UI组件失败:", error);
       this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-        type: 'ERROR',
-        message: '初始化地图控件失败'
+        type: "ERROR",
+        message: "初始化地图控件失败",
       });
       throw error; // 抛出错误以便上层处理
     }
@@ -985,36 +1137,36 @@ class UIService {
    * 初始化地图切换按钮
    */
   initMapSwitchButton() {
-    Logger.debug('UIService', '初始化地图切换按钮');
-    const mapSwitchBtn = document.getElementById('switchMapType');
+    Logger.debug("UIService", "初始化地图切换按钮");
+    const mapSwitchBtn = document.getElementById("switchMapType");
     if (!mapSwitchBtn) {
-        Logger.error('UIService', '找不到地图切换按钮');
-        return;
+      Logger.error("UIService", "找不到地图切换按钮");
+      return;
     }
 
     // 移除可能存在的旧事件监听器
-    mapSwitchBtn.removeEventListener('click', this.handleMapSwitchClick);
-    
+    mapSwitchBtn.removeEventListener("click", this.handleMapSwitchClick);
+
     // 使用箭头函数保持this上下文
     this.handleMapSwitchClick = () => {
-        const currentType = localStorage.getItem('mapType') || 'ECHARTS';
-        const newType = currentType === 'AMAP' ? 'ECHARTS' : 'AMAP';
-        Logger.debug("UIService", "触发地图切换事件:", newType);
-        this.eventBus.emit(MAP_EVENTS.RENDERER_CHANGED, newType);
+      const currentType = localStorage.getItem("mapType") || "ECHARTS";
+      const newType = currentType === "AMAP" ? "ECHARTS" : "AMAP";
+      Logger.debug("UIService", "触发地图切换事件:", newType);
+      this.eventBus.emit(MAP_EVENTS.RENDERER_CHANGED, newType);
     };
 
-    mapSwitchBtn.addEventListener('click', this.handleMapSwitchClick);
+    mapSwitchBtn.addEventListener("click", this.handleMapSwitchClick);
   }
 
   /**
    * 初始化时间范围选择器
    */
   initTimeRangeSelector() {
-    Logger.debug('UIService', '初始化时间范围选择器');
-    const timeRangeSelect = document.getElementById('timeRangeSelect');
-    
+    Logger.debug("UIService", "初始化时间范围选择器");
+    const timeRangeSelect = document.getElementById("timeRangeSelect");
+
     if (!timeRangeSelect) {
-      Logger.warn('UIService', '找不到时间范围选择器');
+      Logger.warn("UIService", "找不到时间范围选择器");
       return;
     }
 
@@ -1023,15 +1175,19 @@ class UIService {
       timeRangeSelect.value = this.mapTimeRange;
 
       // 添加change事件监听
-      timeRangeSelect.addEventListener('change', (e) => {
+      timeRangeSelect.addEventListener("change", (e) => {
         const newValue = e.target.value;
-        Logger.debug('UIService', `时间范围变更为: ${newValue}`);
+        Logger.debug("UIService", `时间范围变更为: ${newValue}`);
+        this.mapTimeRange = newValue;
+        this.store.setComponentState(this.componentId, { mapTimeRange: newValue }); // 更新到store
+        // mapTimeRange是否需要同步更新到localstorage
+
         this.eventBus.emit(MAP_EVENTS.TIME_RANGE_CHANGED, newValue);
       });
 
       this.updateCustomTimeRangeVisibility();
     } catch (error) {
-      Logger.error('UIService', '初始化时间范围选择器失败:', error);
+      Logger.error("UIService", "初始化时间范围选择器失败:", error);
     }
   }
 
@@ -1039,41 +1195,41 @@ class UIService {
    * 初始化自定义时间范围
    */
   initCustomTimeRange() {
-    const startInput = document.getElementById('startTime');
-    const endInput = document.getElementById('endTime');
-    const applyButton = document.getElementById('applyCustomRange');
-    
+    const startInput = document.getElementById("startTime");
+    const endInput = document.getElementById("endTime");
+    const applyButton = document.getElementById("applyCustomRange");
+
     if (startInput && endInput) {
-      if (this.mapTimeRange === 'custom' && this.customStartTime && this.customEndTime) {
+      if (this.mapTimeRange === "custom" && this.customStartTime && this.customEndTime) {
         startInput.value = this.customStartTime;
         endInput.value = this.customEndTime;
       }
-      
-      startInput.addEventListener('change', () => {
+
+      startInput.addEventListener("change", () => {
         this.customStartTime = startInput.value;
       });
-      
-      endInput.addEventListener('change', () => {
+
+      endInput.addEventListener("change", () => {
         this.customEndTime = endInput.value;
       });
-      
+
       if (applyButton) {
-        applyButton.addEventListener('click', () => {
+        applyButton.addEventListener("click", () => {
           if (!this.validateTimeRange(startInput.value, endInput.value)) {
             this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-              type: 'WARNING',
-              message: '请选择有效的时间范围'
+              type: "WARNING",
+              message: "请选择有效的时间范围",
             });
             return;
           }
-          
+
           this.customStartTime = startInput.value;
           this.customEndTime = endInput.value;
-          this.eventBus.emit(MAP_EVENTS.TIME_RANGE_CHANGED, 'custom');
+          this.eventBus.emit(MAP_EVENTS.TIME_RANGE_CHANGED, "custom");
         });
       }
     }
-    
+
     this.updateCustomTimeRangeVisibility();
   }
 
@@ -1081,14 +1237,14 @@ class UIService {
    * 初始化显示模式按钮
    */
   initDisplayModeButton() {
-    Logger.debug('UIService', '初始化显示模式切换按钮');
-    const displayModeSwitchBtn = document.getElementById('switchDisplayMode');
+    Logger.debug("UIService", "初始化显示模式切换按钮");
+    const displayModeSwitchBtn = document.getElementById("switchDisplayMode");
     if (!displayModeSwitchBtn) {
-      Logger.warn('UIService', '找不到显示模式切换按钮');
+      Logger.warn("UIService", "找不到显示模式切换按钮");
       return;
     }
 
-    displayModeSwitchBtn.addEventListener('click', () => {
+    displayModeSwitchBtn.addEventListener("click", () => {
       this.eventBus.emit(MAP_EVENTS.DISPLAY_MODE_CHANGED);
     });
   }
@@ -1097,9 +1253,9 @@ class UIService {
    * 更新自定义时间范围的显示状态
    */
   updateCustomTimeRangeVisibility() {
-    const customDateRange = document.getElementById('customDateRange');
+    const customDateRange = document.getElementById("customDateRange");
     if (customDateRange) {
-      customDateRange.style.display = this.mapTimeRange === 'custom' ? 'block' : 'none';
+      customDateRange.style.display = this.mapTimeRange === "custom" ? "block" : "none";
     }
   }
 
@@ -1108,13 +1264,13 @@ class UIService {
    */
   validateTimeRange(start, end) {
     if (!start || !end) return false;
-    
+
     const startTime = new Date(start);
     const endTime = new Date(end);
-    
+
     if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) return false;
     if (startTime >= endTime) return false;
-    
+
     return true;
   }
 
@@ -1122,61 +1278,61 @@ class UIService {
    * 初始化商城相关事件
    */
   initShopEvents() {
-    Logger.info('UIService', 'initShopEvents', '初始化商城事件');
+    Logger.info("UIService", "initShopEvents", "初始化商城事件");
     // 绑定商城入口点击事件
-    const shopEntrance = document.querySelector('.shop-entrance');
+    const shopEntrance = document.querySelector(".shop-entrance");
     if (shopEntrance) {
-        shopEntrance.addEventListener('click', this.handleShopEntranceClick);
+      shopEntrance.addEventListener("click", this.handleShopEntranceClick);
     }
   }
 
   // 移除商城事件监听器
   removeShopEvents() {
-    Logger.info('UIService', 'removeShopEvents', '移除商城事件');
-    const shopEntrance = document.querySelector('.shop-entrance');
+    Logger.info("UIService", "removeShopEvents", "移除商城事件");
+    const shopEntrance = document.querySelector(".shop-entrance");
     if (shopEntrance) {
-        shopEntrance.removeEventListener('click', this.handleShopEntranceClick);
+      shopEntrance.removeEventListener("click", this.handleShopEntranceClick);
     }
   }
 
   // 处理商城入口点击
   handleShopEntranceClick = () => {
-    Logger.info('UIService', 'handleShopEntranceClick', '点击商城入口');
+    Logger.info("UIService", "handleShopEntranceClick", "点击商城入口");
     this.eventBus.emit(SHOP_EVENTS.ENTER);
-  }
+  };
 
   /**
    * 处理商城相关UI更新
    */
   handleShopUIUpdate(data) {
-    Logger.info('UIService', 'handleShopUIUpdate', '更新商城UI');
-    
+    Logger.info("UIService", "handleShopUIUpdate", "更新商城UI");
+
     if (data.points !== undefined) {
-        // 更新积分显示
-        const pointsElement = document.getElementById('userPoints');
-        if (pointsElement) {
-            pointsElement.textContent = data.points;
-        }
+      // 更新积分显示
+      const pointsElement = document.getElementById("userPoints");
+      if (pointsElement) {
+        pointsElement.textContent = data.points;
+      }
     }
-    
+
     if (data.items !== undefined) {
-        // 更新商品列表
-        const container = document.getElementById('shopItems');
-        if (!container) {
-            Logger.error('UIService', 'handleShopUIUpdate', '找不到商品容器元素');
-            return;
-        }
-        
-        // 清空现有内容
-        container.innerHTML = '';
-        
-        // 创建商品卡片
-        data.items.forEach(item => {
-            const card = this.createShopItemCard(item);
-            container.appendChild(card);
-        });
-        
-        Logger.info('UIService', 'handleShopUIUpdate', `渲染了 ${data.items.length} 个商品`);
+      // 更新商品列表
+      const container = document.getElementById("shopItems");
+      if (!container) {
+        Logger.error("UIService", "handleShopUIUpdate", "找不到商品容器元素");
+        return;
+      }
+
+      // 清空现有内容
+      container.innerHTML = "";
+
+      // 创建商品卡片
+      data.items.forEach((item) => {
+        const card = this.createShopItemCard(item);
+        container.appendChild(card);
+      });
+
+      Logger.info("UIService", "handleShopUIUpdate", `渲染了 ${data.items.length} 个商品`);
     }
   }
 
@@ -1184,14 +1340,15 @@ class UIService {
    * 创建商品卡片DOM元素
    */
   createShopItemCard(item) {
-    Logger.debug('UIService', 'createShopItemCard', '创建商品卡片:', item);
-    
-    const itemElement = document.createElement('div');
-    itemElement.className = 'shop-item';
-    itemElement.setAttribute('data-item-id', item.id);
-    
+    Logger.debug("UIService", "createShopItemCard", "创建商品卡片:", item);
+
+    const itemElement = document.createElement("div");
+    itemElement.className = "shop-item";
+    itemElement.setAttribute("data-item-id", item.id);
+
     // 使用base64默认图片
-    const DEFAULT_ITEM_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiMxQTFBMUEiLz4KICA8cGF0aCBkPSJNMTAwIDY1QzkwLjUwODggNjUgODEuMzMyMyA2OC42ODc1IDc0LjQ4NTMgNzUuNDg1M0M2Ny42ODc1IDgyLjMzMjMgNjQgOTEuNTA4OCA2NCAxMDFDNjQgMTEwLjQ5MSA2Ny42ODc1IDExOS42NjggNzQuNDg1MyAxMjYuNTE1QzgxLjMzMjMgMTMzLjMxMiA5MC41MDg4IDEzNyAxMDAgMTM3QzEwOS40OTEgMTM3IDExOC42NjggMTMzLjMxMiAxMjUuNTE1IDEyNi41MTVDMTMyLjMxMiAxMTkuNjY4IDEzNiAxMTAuNDkxIDEzNiAxMDFDMTM2IDkxLjUwODggMTMyLjMxMiA4Mi4zMzIzIDEyNS41MTUgNzUuNDg1M0MxMTguNjY4IDY4LjY4NzUgMTA5LjQ5MSA2NSAxMDAgNjVaTTg2IDkzQzg2IDkwLjc5MzkgODYuODQyOCA4OC42NzcxIDg4LjM0MzEgODcuMTcxN0M4OS44NDM1IDg1LjY2NjMgOTEuOTU2NSA4NC44MjM1IDk0LjE1ODggODQuODIzNUM5Ni4zNjEyIDg0LjgyMzUgOTguNDc0MiA4NS42NjYzIDk5Ljk3NDUgODcuMTcxN0MxMDEuNDc1IDg4LjY3NzEgMTAyLjMxOCA5MC43OTM5IDEwMi4zMTggOTNDMTAyLjMxOCA5NS4yMDYxIDEwMS40NzUgOTcuMzIyOSA5OS45NzQ1IDk4LjgyODNDOTguNDc0MiAxMDAuMzM0IDk2LjM2MTIgMTAxLjE3NiA5NC4xNTg4IDEwMS4xNzZDOTEuOTU2NSAxMDEuMTc2IDg5Ljg0MzUgMTAwLjMzNCA4OC4zNDMxIDk4LjgyODNDODYuODQyOCA5Ny4zMjI5IDg2IDk1LjIwNjEgODYgOTNaTTExNS44NDEgOTNDMTE1Ljg0MSA5MC43OTM5IDExNi42ODQgODguNjc3MSAxMTguMTg0IDg3LjE3MTdDMTE5LjY4NSA4NS42NjYzIDEyMS43OTggODQuODIzNSAxMjQgODQuODIzNUMxMjYuMjAyIDg0LjgyMzUgMTI4LjMxNSA4NS42NjYzIDEyOS44MTYgODcuMTcxN0MxMzEuMzE2IDg4LjY3NzEgMTMyLjE1OSA5MC43OTM5IDEzMi4xNTkgOTNDMTMyLjE1OSA5NS4yMDYxIDEzMS4zMTYgOTcuMzIyOSAxMjkuODE2IDk4LjgyODNDMTI4LjMxNSAxMDAuMzM0IDEyNi4yMDIgMTAxLjE3NiAxMjQgMTAxLjE3NkMxMjEuNzk4IDEwMS4xNzYgMTE5LjY4NSAxMDAuMzM0IDExOC4xODQgOTguODI4M0MxMTYuNjg0IDk3LjMyMjkgMTE1Ljg0MSA5NS4yMDYxIDExNS44NDEgOTNaTTEwMCAxMjAuMjM1QzkzLjE1NzkgMTIwLjIzNSA4Ny4xNTc5IDExNy4xMTggODMuNzg5NSAxMTIuMjM1SDExNi4yMUMxMTIuODQyIDExNy4xMTggMTA2Ljg0MiAxMjAuMjM1IDEwMCAxMjAuMjM1WiIgZmlsbD0iIzhBQTJDMSIvPgo8L3N2Zz4=';
+    const DEFAULT_ITEM_IMAGE =
+      "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiMxQTFBMUEiLz4KICA8cGF0aCBkPSJNMTAwIDY1QzkwLjUwODggNjUgODEuMzMyMyA2OC42ODc1IDc0LjQ4NTMgNzUuNDg1M0M2Ny42ODc1IDgyLjMzMjMgNjQgOTEuNTA4OCA2NCAxMDFDNjQgMTEwLjQ5MSA2Ny42ODc1IDExOS42NjggNzQuNDg1MyAxMjYuNTE1QzgxLjMzMjMgMTMzLjMxMiA5MC41MDg4IDEzNyAxMDAgMTM3QzEwOS40OTEgMTM3IDExOC42NjggMTMzLjMxMiAxMjUuNTE1IDEyNi41MTVDMTMyLjMxMiAxMTkuNjY4IDEzNiAxMTAuNDkxIDEzNiAxMDFDMTM2IDkxLjUwODggMTMyLjMxMiA4Mi4zMzIzIDEyNS41MTUgNzUuNDg1M0MxMTguNjY4IDY4LjY4NzUgMTA5LjQ5MSA2NSAxMDAgNjVaTTg2IDkzQzg2IDkwLjc5MzkgODYuODQyOCA4OC42NzcxIDg4LjM0MzEgODcuMTcxN0M4OS44NDM1IDg1LjY2NjMgOTEuOTU2NSA4NC44MjM1IDk0LjE1ODggODQuODIzNUM5Ni4zNjEyIDg0LjgyMzUgOTguNDc0MiA4NS42NjYzIDk5Ljk3NDUgODcuMTcxN0MxMDEuNDc1IDg4LjY3NzEgMTAyLjMxOCA5MC43OTM5IDEwMi4zMTggOTNDMTAyLjMxOCA5NS4yMDYxIDEwMS40NzUgOTcuMzIyOSA5OS45NzQ1IDk4LjgyODNDOTguNDc0MiAxMDAuMzM0IDk2LjM2MTIgMTAxLjE3NiA5NC4xNTg4IDEwMS4xNzZDOTEuOTU2NSAxMDEuMTc2IDg5Ljg0MzUgMTAwLjMzNCA4OC4zNDMxIDk4LjgyODNDODYuODQyOCA5Ny4zMjI5IDg2IDk1LjIwNjEgODYgOTNaTTExNS44NDEgOTNDMTE1Ljg0MSA5MC43OTM5IDExNi42ODQgODguNjc3MSAxMTguMTg0IDg3LjE3MTdDMTE5LjY4NSA4NS42NjYzIDEyMS43OTggODQuODIzNSAxMjQgODQuODIzNUMxMjYuMjAyIDg0LjgyMzUgMTI4LjMxNSA4NS42NjYzIDEyOS44MTYgODcuMTcxN0MxMzEuMzE2IDg4LjY3NzEgMTMyLjE1OSA5MC43OTM5IDEzMi4xNTkgOTNDMTMyLjE1OSA5NS4yMDYxIDEzMS4zMTYgOTcuMzIyOSAxMjkuODE2IDk4LjgyODNDMTI4LjMxNSAxMDAuMzM0IDEyNi4yMDIgMTAxLjE3NiAxMjQgMTAxLjE3NkMxMjEuNzk4IDEwMS4xNzYgMTE5LjY4NSAxMDAuMzM0IDExOC4xODQgOTguODI4M0MxMTYuNjg0IDk3LjMyMjkgMTE1Ljg0MSA5NS4yMDYxIDExNS44NDEgOTNaTTEwMCAxMjAuMjM1QzkzLjE1NzkgMTIwLjIzNSA4Ny4xNTc5IDExNy4xMTggODMuNzg5NSAxMTIuMjM1SDExNi4yMUMxMTIuODQyIDExNy4xMTggMTA2Ljg0MiAxMjAuMjM1IDEwMCAxMjAuMjM1WiIgZmlsbD0iIzhBQTJDMSIvPgo8L3N2Zz4=";
 
     itemElement.innerHTML = `
         <div class="item-image">
@@ -1210,8 +1367,8 @@ class UIService {
     `;
 
     // 点击商品卡片显示详情
-    itemElement.addEventListener('click', () => {
-        this.showItemDetail(item);
+    itemElement.addEventListener("click", () => {
+      this.showItemDetail(item);
     });
 
     return itemElement;
@@ -1256,15 +1413,17 @@ class UIService {
       </div>
     `;
 
-    layer.confirm(content, {
-      title: '购买确认',
-      btn: ['确认购买', '取消'],
-      area: ['400px', '500px'],
-      skin: 'purchase-confirm-dialog',
-      success: (layero) => {
-        // 添加自定义样式
-        const style = document.createElement('style');
-        style.textContent = `
+    layer.confirm(
+      content,
+      {
+        title: "购买确认",
+        btn: ["确认购买", "取消"],
+        area: ["400px", "500px"],
+        skin: "purchase-confirm-dialog",
+        success: (layero) => {
+          // 添加自定义样式
+          const style = document.createElement("style");
+          style.textContent = `
           .purchase-confirm-dialog .layui-layer-content {
             padding: 20px;
           }
@@ -1315,20 +1474,23 @@ class UIService {
             font-weight: bold;
           }
         `;
-        document.head.appendChild(style);
+          document.head.appendChild(style);
+        },
+      },
+      (index) => {
+        // 确认回调
+        if (options.onConfirm) {
+          options.onConfirm(index);
+        }
+      },
+      (index) => {
+        // 取消回调
+        if (options.onCancel) {
+          options.onCancel(index);
+        }
+        layer.close(index);
       }
-    }, (index) => {
-      // 确认回调
-      if (options.onConfirm) {
-        options.onConfirm(index);
-      }
-    }, (index) => {
-      // 取消回调
-      if (options.onCancel) {
-        options.onCancel(index);
-      }
-      layer.close(index);
-    });
+    );
   }
 
   /**
@@ -1336,18 +1498,18 @@ class UIService {
    * @param {Object} item - 商品信息
    */
   showItemDetail(item) {
-    Logger.debug('UIService', 'showItemDetail', '显示商品详情:', item);
-    
+    Logger.debug("UIService", "showItemDetail", "显示商品详情:", item);
+
     try {
       // 更新模态框内容
-      const modalImage = document.getElementById('modalItemImage');
-      const modalName = document.getElementById('modalItemName');
-      const modalDescription = document.getElementById('modalItemDescription');
-      const modalPrice = document.getElementById('modalItemPrice');
-      const modalStock = document.getElementById('modalItemStock');
-      const modalDate = document.getElementById('modalItemDate');
-      const quantityInput = document.getElementById('itemQuantity');
-      const purchaseBtn = document.getElementById('purchaseBtn');
+      const modalImage = document.getElementById("modalItemImage");
+      const modalName = document.getElementById("modalItemName");
+      const modalDescription = document.getElementById("modalItemDescription");
+      const modalPrice = document.getElementById("modalItemPrice");
+      const modalStock = document.getElementById("modalItemStock");
+      const modalDate = document.getElementById("modalItemDate");
+      const quantityInput = document.getElementById("itemQuantity");
+      const purchaseBtn = document.getElementById("purchaseBtn");
 
       if (modalImage) modalImage.src = item.image_url || DEFAULT_ITEM_IMAGE;
       if (modalName) modalName.textContent = item.name;
@@ -1359,12 +1521,12 @@ class UIService {
         const offlineTime = new Date(item.offline_time).toLocaleString();
         modalDate.textContent = `上架时间: ${onlineTime}\n下架时间: ${offlineTime}`;
       }
-      if (quantityInput) quantityInput.value = '1';
+      if (quantityInput) quantityInput.value = "1";
 
       // 绑定数量控制按钮事件
-      const decreaseBtn = document.getElementById('decreaseQty');
-      const increaseBtn = document.getElementById('increaseQty');
-      
+      const decreaseBtn = document.getElementById("decreaseQty");
+      const increaseBtn = document.getElementById("increaseQty");
+
       if (decreaseBtn) {
         decreaseBtn.onclick = () => {
           const currentValue = parseInt(quantityInput.value);
@@ -1373,7 +1535,7 @@ class UIService {
           }
         };
       }
-      
+
       if (increaseBtn) {
         increaseBtn.onclick = () => {
           const currentValue = parseInt(quantityInput.value);
@@ -1393,13 +1555,13 @@ class UIService {
             onConfirm: (index) => {
               this.eventBus.emit(SHOP_EVENTS.PURCHASE_REQUESTED, {
                 item: item,
-                quantity: quantity
+                quantity: quantity,
               });
               layer.close(index);
             },
             onCancel: (index) => {
               layer.close(index);
-            }
+            },
           });
         };
       }
@@ -1408,19 +1570,191 @@ class UIService {
       layer.open({
         type: 1,
         title: false,
-        content: $('#itemDetailModal'),
-        area: ['800px', '500px'],
+        content: $("#itemDetailModal"),
+        area: ["800px", "500px"],
         shadeClose: true,
         success: () => {
-          Logger.debug('UIService', 'showItemDetail', '商品详情模态框打开成功');
-        }
+          Logger.debug("UIService", "showItemDetail", "商品详情模态框打开成功");
+        },
       });
     } catch (error) {
-      Logger.error('UIService', 'showItemDetail', '显示商品详情失败:', error);
+      Logger.error("UIService", "showItemDetail", "显示商品详情失败:", error);
       this.showNotification({
-        type: 'ERROR',
-        message: '显示商品详情失败'
+        type: "ERROR",
+        message: "显示商品详情失败",
       });
+    }
+  }
+
+  /**
+   * 初始化玩家信息UI
+   */
+  async initPlayerInfoUI() {
+    Logger.info("UIService", "初始化玩家信息UI");
+    try {
+      // 更新状态
+      this.updateState({
+        uiComponents: {
+          ...this.state.uiComponents,
+          playerInfo: {
+            ...this.state.uiComponents.playerInfo,
+            loading: true,
+          },
+        },
+      });
+
+      // 加载玩家信息
+      await this.playerService.loadPlayerInfo();
+      const playerData = this.playerService.getPlayerData();
+
+      if (playerData) {
+        this.updatePlayerInfo(playerData);
+      } else {
+        throw new Error("无法获取玩家信息");
+      }
+
+      // 更新状态
+      this.updateState({
+        uiComponents: {
+          ...this.state.uiComponents,
+          playerInfo: {
+            ...this.state.uiComponents.playerInfo,
+            loading: false,
+            error: null,
+          },
+        },
+      });
+
+      Logger.info("UIService", "玩家信息UI初始化完成");
+    } catch (error) {
+      Logger.error("UIService", "初始化玩家信息UI失败:", error);
+      this.updateState({
+        uiComponents: {
+          ...this.state.uiComponents,
+          playerInfo: {
+            ...this.state.uiComponents.playerInfo,
+            loading: false,
+            error: error.message,
+          },
+        },
+      });
+      this.showPlayerError("加载失败");
+    }
+  }
+
+  /**
+   * 显示玩家错误消息
+   */
+  showPlayerError(message) {
+    this.showErrorMessage(message);
+  }
+
+  /**
+   * 初始化玩家相关事件
+   */
+  initPlayerEvents() {
+    Logger.info("UIService", "初始化玩家事件监听");
+
+    // 监听玩家信息更新事件
+    this.eventBus.on(PLAYER_EVENTS.INFO_UPDATED, (playerData) => {
+      this.updatePlayerInfo(playerData);
+    });
+
+    // 监听经验值更新事件
+    this.eventBus.on(PLAYER_EVENTS.EXP_UPDATED, (data) => {
+      const playerData = this.playerService.getPlayerData();
+      if (playerData) {
+        this.updateLevelAndExp(playerData);
+      }
+    });
+  }
+
+  cleanup() {
+    Logger.info("UIService", "清理UI服务");
+    try {
+      // 保存当前状态
+      this.saveState();
+
+      // 取消状态订阅
+      this.store.unsubscribe("component", this.componentId);
+
+      // 清理DOM事件监听器
+      this.removeTaskEvents();
+      this.removeShopEvents();
+
+      // 清理所有模态框
+      this.state.modals.forEach((modal, id) => {
+        this.hideModal(id);
+      });
+
+      // 重置玩家信息UI状态
+      this.updateState({
+        uiComponents: {
+          ...this.state.uiComponents,
+          playerInfo: {
+            ...this.state.uiComponents.playerInfo,
+            visible: true,
+            loading: false,
+            error: null,
+          },
+        },
+      });
+
+      Logger.info("UIService", "UI服务清理完成");
+    } catch (error) {
+      Logger.error("UIService", "UI服务清理失败:", error);
+    }
+  }
+  // store用来渲染通知列表的
+  renderNotifications(notifications) {
+    Logger.info("UIService", "开始渲染通知列表");
+    const container = document.querySelector(".notification-list");
+
+    if (!container) {
+      Logger.error("UIService", "找不到通知列表容器");
+      return;
+    }
+
+    try {
+      if (!notifications || !notifications.length) {
+        container.innerHTML = '<div class="no-notifications">无通知</div>';
+      } else {
+        const notificationItems = notifications
+          .map((notification) => {
+            return `<div class="notification-item">${notification.message}</div>`;
+          })
+          .join("");
+        container.innerHTML = notificationItems;
+      }
+    } catch (error) {
+      Logger.error("UIService", "渲染通知列表失败:", error);
+      container.innerHTML = '<div class="error-notification">加载通知失败</div>';
+    }
+  }
+  // TODO 这个函数应该是store用来恢复任务列表的 目前工作不正常
+  renderTaskCards(taskCards) {
+    Logger.info("UIService", "开始渲染任务卡片列表");
+    const container = document.querySelector(".task-card-list");
+
+    if (!container) {
+      Logger.error("UIService", "找不到任务卡片列表容器");
+      return;
+    }
+
+    try {
+      if (!taskCards || !taskCards.length) {
+        container.innerHTML = '<div class="no-task-cards">无任务卡片</div>';
+      } else {
+        const taskCardItems = taskCards
+          .map((taskCard) => {
+            return `<div class="task-card-item">${taskCard.title}</div>`;
+          })
+          .join("");
+        container.innerHTML = taskCardItems;
+      }
+    } catch (error) {
+      Logger.error("UIService", "渲染任务卡片列表失败:", error);
+      container.innerHTML = '<div class="error-task-card">加载任务卡片失败</div>';
     }
   }
 }

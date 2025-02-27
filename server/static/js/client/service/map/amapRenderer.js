@@ -371,7 +371,7 @@ class AMapRenderer {
         min-width: 20px;
         min-height: 20px;
       ">
-        <div class="marker-label" style="line-height: 1;">${index}</div>
+
       </div>
     `;
     Logger.debug("AMapRenderer", "createMarkerContent", `创建标记内容, 序号: ${index}`);

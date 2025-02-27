@@ -11,6 +11,7 @@ class WordcloudService {
         this.playerId = this.playerService.getPlayerId();
         this.playerData = null;
         this.wordCloudChart = null;
+        this.initialized = false;
         
         // 订阅相关事件
         this.handleResize = this.handleResize.bind(this);
@@ -161,15 +162,64 @@ class WordcloudService {
         }
     }
 
-    destroy() {
-        if (this.wordCloudChart) {
-            this.wordCloudChart.dispose();
-            this.wordCloudChart = null;
+    /**
+     * 初始化服务
+     */
+    async initialize() {
+        Logger.info('WordcloudService', '开始初始化服务');
+        try {
+            if (this.initialized) {
+                Logger.info('WordcloudService', '服务已经初始化');
+                return;
+            }
+
+            // 获取词云容器
+            const container = document.getElementById('wordCloudContainer');
+            if (!container) {
+                Logger.error('WordcloudService', '找不到词云容器元素');
+                return;
+            }
+
+            await this.initWordCloud();
+            this.initialized = true;
+            Logger.info('WordcloudService', '服务初始化完成');
+        } catch (error) {
+            Logger.error('WordcloudService', '服务初始化失败:', error);
+            throw error;
         }
-        // 移除事件监听
-        window.removeEventListener("resize", this.handleResize);
-        // this.eventBus.off("task:completed", this.updateWordCloud);
-        Logger.info('WordcloudService', '文字云服务已销毁');
+    }
+
+    /**
+     * 清理服务资源
+     */
+    cleanup() {
+        Logger.info('WordcloudService', '开始清理服务资源');
+        try {
+            // 销毁图表实例
+            if (this.wordCloudChart) {
+                this.wordCloudChart.dispose();
+                this.wordCloudChart = null;
+            }
+
+            // 移除事件监听
+            window.removeEventListener("resize", this.handleResize);
+            
+            this.initialized = false;
+            Logger.info('WordcloudService', '服务资源清理完成');
+        } catch (error) {
+            Logger.error('WordcloudService', '服务资源清理失败:', error);
+            throw error;
+        }
+    }
+
+    // 保留原有的 destroy 方法，但内部调用 cleanup
+    destroy() {
+        try {
+            this.cleanup();
+            Logger.info('WordcloudService', '文字云服务已销毁');
+        } catch (error) {
+            Logger.error('WordcloudService', '销毁服务失败:', error);
+        }
     }
 
     async getWordCloudData() {

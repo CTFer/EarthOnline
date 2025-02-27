@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-02-26 22:45:33
+ * @LastEditTime: 2025-02-27 22:56:38
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -143,7 +143,7 @@ class GameManager {
       // 9. 初始化商城服务（依赖：eventBus, api, playerService, router）
       this.shopService = new ShopService(this.eventBus, this.api, this.playerService, this.router);
 
-      // 10. 初始化地图服务（依赖：api, eventBus, uiService）
+      // 10. 初始化地图服务（依赖：api, eventBus, uiService,playerService）
       await this.initializeMapService();
       if (this.mapService) {
         await this.mapService.initMap();
@@ -166,8 +166,8 @@ class GameManager {
 
   // 初始化地图服务
   async initializeMapService() {
-    // 只创建MapService实例，不立即初始化地图
-    this.mapService = new MapService(this.api, this.eventBus, this.uiService);
+    // 创建MapService实例，传入store
+    this.mapService = new MapService(this.api, this.eventBus, this.uiService, this.playerService, this.store);
   }
 
   // 初始化其他服务
@@ -175,7 +175,7 @@ class GameManager {
     this.wordcloudService = new WordcloudService(this.api, this.eventBus, this.store, this.playerService);
     this.swiperService = new SwiperService();
     this.nfcService = new NFCService(this.api, this.eventBus, this.store);
-    this.audioService = new AudioService(this.eventBus);
+    this.audioService = new AudioService(this.eventBus, this.store);
     this.live2dService = new Live2DService(this.eventBus);
     // 初始化 Live2D 服务
     await this.live2dService.initialize();

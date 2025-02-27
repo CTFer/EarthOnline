@@ -12,13 +12,36 @@ import {
 } from "../config/events.js";
 
 class AudioService {
-  constructor(eventBus) {
+  constructor(eventBus, store) {
     this.eventBus = eventBus;
+    this.store = store;  // store可以是可选的
+    this.componentId = 'audioService';
     this.loadedSounds = new Map();  // 已加载的音效
     this.loading = new Map();       // 正在加载的音效
-    this.initialized = false;
-    this.volume = parseFloat(localStorage.getItem('audioVolume') || '1.0');
-    this.muted = localStorage.getItem('audioMuted') === 'true';
+    
+    // 初始化默认状态
+    const defaultState = {
+      initialized: false,
+      volume: parseFloat(localStorage.getItem('audioVolume') || '1.0'),
+      muted: localStorage.getItem('audioMuted') === 'true',
+      activeAudios: new Set()
+    };
+    
+    // 如果有store，尝试从store获取状态
+    let savedState = {};
+    if (this.store) {
+      try {
+        savedState = this.store.getComponentState(this.componentId) || {};
+      } catch (error) {
+        Logger.warn("AudioService", "从Store获取状态失败，使用默认状态", error);
+      }
+    }
+    
+    // 合并默认状态和保存的状态
+    this.state = {
+      ...defaultState,
+      ...savedState
+    };
     
     // 检查音频是否启用
     if (!AUDIO_CONFIG.enabled) {
@@ -26,7 +49,118 @@ class AudioService {
       return;
     }
     
+    // 如果有store，订阅状态变更
+    if (this.store) {
+      try {
+        this.unsubscribe = this.store.subscribe('component', this.componentId, this.handleStateChange.bind(this));
+      } catch (error) {
+        Logger.warn("AudioService", "状态订阅失败", error);
+      }
+    }
+    
     Logger.info("AudioService", "初始化音频服务");
+  }
+
+  // 状态变更处理
+  handleStateChange(newState, oldState) {
+    Logger.debug("AudioService", "状态变更:", { old: oldState, new: newState });
+    
+    // 处理音量变更
+    if (newState.volume !== oldState.volume || newState.muted !== oldState.muted) {
+      this.applyVolumeSettings();
+    }
+  }
+
+  // 更新组件状态
+  updateState(partialState) {
+    this.state = { ...this.state, ...partialState };
+    
+    // 如果有store，更新store中的状态
+    if (this.store) {
+      try {
+        this.store.setComponentState(this.componentId, this.state);
+      } catch (error) {
+        Logger.warn("AudioService", "更新Store状态失败", error);
+      }
+    }
+  }
+
+  // 检查服务状态
+  isReady() {
+    return AUDIO_CONFIG.enabled && this.state.initialized;
+  }
+
+  // 获取音效配置
+  getSoundConfig(soundId) {
+    return AUDIO_CONFIG.sounds[soundId];
+  }
+
+  // 获取音效实例
+  getSound(soundId) {
+    return this.loadedSounds.get(soundId);
+  }
+
+  // 检查音效是否正在播放
+  isPlaying(soundId) {
+    return this.state.activeAudios.has(soundId);
+  }
+
+  // 播放音频的底层实现
+  async play(soundId) {
+    if (!this.isReady()) {
+      throw new Error("音频服务未就绪");
+    }
+
+    let sound = this.getSound(soundId);
+    if (!sound) {
+      const config = this.getSoundConfig(soundId);
+      if (!config) {
+        throw new Error(`未找到音效配置: ${soundId}`);
+      }
+      sound = await this.loadSound(soundId, config.path);
+    }
+
+    sound.currentTime = 0;
+    await sound.play();
+    
+    // 更新活动音频列表
+    this.state.activeAudios.add(soundId);
+    this.updateState({ activeAudios: this.state.activeAudios });
+  }
+
+  // 停止音频的底层实现
+  stop(soundId) {
+    if (!this.isReady()) {
+      throw new Error("音频服务未就绪");
+    }
+
+    const sound = this.getSound(soundId);
+    if (sound) {
+      sound.pause();
+      sound.currentTime = 0;
+      
+      // 更新活动音频列表
+      this.state.activeAudios.delete(soundId);
+      this.updateState({ activeAudios: this.state.activeAudios });
+    }
+  }
+
+  // 设置音量的底层实现
+  setAudioVolume(volume, muted) {
+    const newState = { ...this.state };
+    
+    if (typeof volume === 'number') {
+      newState.volume = Math.max(0, Math.min(1, volume));
+      localStorage.setItem('audioVolume', newState.volume.toString());
+    }
+    
+    if (typeof muted === 'boolean') {
+      newState.muted = muted;
+      localStorage.setItem('audioMuted', muted.toString());
+    }
+    
+    this.updateState(newState);
+    this.applyVolumeSettings();
   }
 
   async init() {
@@ -37,8 +171,10 @@ class AudioService {
       if (AUDIO_CONFIG.preloadStrategy === 'IMMEDIATE') {
         await this.preloadSounds();
       }
-      this.initialized = true;
+      
+      this.updateState({ initialized: true });
       this.applyVolumeSettings();
+      
     } catch (error) {
       Logger.error("AudioService", "音频服务初始化失败:", error);
       this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
@@ -78,7 +214,7 @@ class AudioService {
         audio.preload = 'auto';
         
         // 设置音量
-        audio.volume = this.muted ? 0 : this.volume;
+        audio.volume = this.state.muted ? 0 : this.state.volume;
         
         const loadTimeout = setTimeout(() => {
           reject(new Error(`加载超时: ${id}`));
@@ -112,79 +248,10 @@ class AudioService {
     return loadPromise;
   }
 
-  async handlePlaySound(soundId) {
-    // 检查音频服务是否启用和初始化
-    if (!AUDIO_CONFIG.enabled || !this.initialized) {
-      Logger.debug("AudioService", `音频服务未启用或未初始化，跳过播放: ${soundId}`);
-      return;
-    }
-    
-    try {
-      const soundConfig = AUDIO_CONFIG.sounds[soundId];
-      if (!soundConfig) {
-        throw new Error(`未找到音效配置: ${soundId}`);
-      }
-
-      let sound = this.loadedSounds.get(soundId);
-      if (!sound) {
-        sound = await this.loadSound(soundId, soundConfig.path);
-      }
-
-      sound.currentTime = 0;
-      const playPromise = sound.play();
-      
-      if (playPromise) {
-        playPromise.catch((error) => {
-          Logger.error("AudioService", `播放音效 ${soundId} 失败:`, error);
-        });
-      }
-    } catch (error) {
-      Logger.error("AudioService", `播放音效失败: ${soundId}`, error);
-    }
-  }
-
-  handleStopSound(soundId) {
-    Logger.debug("AudioService", `处理停止音效请求: ${soundId}`);
-    try {
-      if (!this.initialized) {
-        Logger.warn("AudioService", "音频服务未初始化");
-        return;
-      }
-
-      const sound = this.loadedSounds.get(soundId);
-      if (sound) {
-        sound.pause();
-        sound.currentTime = 0;
-      }
-    } catch (error) {
-      Logger.error("AudioService", `停止音效失败: ${soundId}`, error);
-    }
-  }
-
-  handleVolumeChange(data) {
-    Logger.debug("AudioService", "处理音量变更:", data);
-    try {
-      const { volume, muted } = data;
-      
-      if (typeof volume === 'number') {
-        this.volume = Math.max(0, Math.min(1, volume));
-        localStorage.setItem('audioVolume', this.volume.toString());
-      }
-      
-      if (typeof muted === 'boolean') {
-        this.muted = muted;
-        localStorage.setItem('audioMuted', muted.toString());
-      }
-      
-      this.applyVolumeSettings();
-    } catch (error) {
-      Logger.error("AudioService", "处理音量变更失败:", error);
-    }
-  }
-
   applyVolumeSettings() {
+    const volume = this.state.muted ? 0 : this.state.volume;
     this.loadedSounds.forEach((sound) => {
-      sound.volume = this.muted ? 0 : this.volume;
+      sound.volume = volume;
     });
   }
 
@@ -198,27 +265,46 @@ class AudioService {
     this.eventBus.emit(AUDIO_EVENTS.VOLUME_CHANGED, { muted });
   }
 
+  // 保存状态快照
+  saveState() {
+    return this.store.saveComponentSnapshot(this.componentId);
+  }
+
+  // 恢复状态快照
+  restoreState(snapshot) {
+    this.store.restoreComponentSnapshot(this.componentId, snapshot);
+  }
+
   destroy() {
     try {
       // 停止所有正在播放的音频
+      this.state.activeAudios.forEach(soundId => {
+        this.stop(soundId);
+      });
+      
+      // 取消状态订阅
+      if (this.unsubscribe) {
+        this.unsubscribe();
+      }
+
       this.loadedSounds.forEach((sound) => {
         sound.pause();
         sound.currentTime = 0;
         sound.src = "";
-        
-        // 移除所有事件监听器
         sound.removeEventListener('canplaythrough', null);
         sound.removeEventListener('error', null);
       });
 
-      // 清理加载中的音频
+      // 清理资源
       this.loading.clear();
-      
-      // 清理已加载的音频
       this.loadedSounds.clear();
+      this.state.activeAudios.clear();
       
-      // 重置状态
-      this.initialized = false;
+      // 更新状态
+      this.updateState({
+        initialized: false,
+        activeAudios: new Set()
+      });
       
       Logger.info("AudioService", "音频服务已销毁");
     } catch (error) {
