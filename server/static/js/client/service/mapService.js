@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:42
- * @LastEditTime: 2025-02-25 23:15:38
+ * @LastEditTime: 2025-02-27 15:02:22
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -739,6 +739,48 @@ class MapService {
       localStorage.setItem("mapBackgroundOpacity", opacity.toString());
     } catch (error) {
       Logger.error("MapService", "设置地图透明度失败:", error);
+    }
+  }
+
+  /**
+   * 初始化地图服务
+   */
+  async initialize() {
+    Logger.info('MapService', 'initialize', '初始化地图服务');
+    try {
+        // 初始化地图实例
+        await this.initMap();
+        // 加载地图配置
+        // await this.loadMapConfig();
+        // 初始化地图控件
+        // this.initMapControls();
+        // 绑定地图事件应该在EventManager中进行
+        // this.bindMapEvents();
+        
+        Logger.info('MapService', 'initialize', '地图服务初始化完成');
+    } catch (error) {
+        Logger.error('MapService', 'initialize', '地图服务初始化失败:', error);
+        throw error;
+    }
+  }
+
+  /**
+   * 清理地图服务
+   */
+  cleanup() {
+    Logger.info('MapService', 'cleanup', '清理地图服务');
+    try {
+        // 移除地图事件监听应该在EventManager中进行
+        // this.unbindMapEvents();
+        // 销毁地图实例
+        if (this.map) {
+            this.map.destroy();
+            this.map = null;
+        }
+        Logger.info('MapService', 'cleanup', '地图服务清理完成');
+    } catch (error) {
+        Logger.error('MapService', 'cleanup', '地图服务清理失败:', error);
+        throw error;
     }
   }
 

@@ -1,5 +1,7 @@
 import Logger from '../../utils/logger.js';
 import { TASK_EVENTS } from '../config/events.js';
+
+
 class WordcloudService {
     constructor(apiClient, eventBus, store, playerService) {
         this.api = apiClient;
@@ -28,103 +30,134 @@ class WordcloudService {
         // this.eventBus.on(TASK_EVENTS.COMPLETED, this.updateWordCloud.bind(this));
     }
 
-    async initWordCloud(container) {
-        Logger.info('WordcloudService', '开始初始化文字云');
+    /**
+     * 将后端勋章数据转换为词云数据格式
+     * @param {Array} medals - 后端返回的勋章数据
+     * @returns {Array} - 转换后的词云数据
+     */
+    transformMedalsToWordCloudData(medals) {
+        Logger.debug('转换勋章数据为词云格式', medals);
+        
+        return medals.map(([name, level]) => {  // 解构数组格式的勋章数据
+            // 根据勋章等级设置不同的样式
+            let textStyle = {};
+            
+            switch(level) {
+                case 'gold':
+                    textStyle = {
+                        color: "#ffd700",  // 金色
+                        fontSize: 32,       // 较大字号
+                        fontWeight: 'bold'
+                    };
+                    break;
+                case 'silver':
+                    textStyle = {
+                        color: "#c0c0c0",  // 银色
+                        fontSize: 24        // 中等字号
+                    };
+                    break;
+                default:
+                    textStyle = {
+                        color: "#8aa2c1",  // 青色
+                        fontSize: 18        // 较小字号
+                    };
+            }
+
+            return {
+                name: name,                 // 勋章名称
+                value: 50,                  // 默认权重
+                textStyle: textStyle,       // 文字样式
+                emphasis: {                 // 鼠标悬停效果
+                    textStyle: {
+                        color: '#ff9966'    // 悬停时的颜色
+                    }
+                }
+            };
+        });
+    }
+
+    /**
+     * 初始化词云图表
+     */
+    async initWordCloud() {
+        Logger.info('开始初始化文字云');
         
         try {
-            // 初始化 ECharts 实例
+            // 获取词云容器
+            const container = document.getElementById('wordCloudContainer');
+            if (!container) {
+                Logger.error('找不到词云容器元素');
+                return;
+            }
+
+            // 初始化ECharts实例
             this.wordCloudChart = echarts.init(container);
             
-            // 模拟数据
-            const testData = [
-                // 头衔（较大字体，金色）
-                { name: "尿不湿守护者", value: 100, textStyle: { color: "#ffd700", fontSize: 32 } },
-                { name: "爬行先锋", value: 90, textStyle: { color: "#ffd700", fontSize: 28 } },
-
-                // 荣誉（中等字体，银色）
-                { name: "卫生纸摧毁达人", value: 80, textStyle: { color: "#c0c0c0" } },
-                { name: "干饭小能手", value: 75, textStyle: { color: "#c0c0c0" } },
-                { name: "玩具保护使者", value: 70, textStyle: { color: "#c0c0c0" } },
-
-                // 个人标签（较小字体，青色系）
-                { name: "热心干饭", value: 60, textStyle: { color: "#8aa2c1" } },
-                { name: "推车出行", value: 55, textStyle: { color: "#8aa2c1" } },
-                { name: "吃奶能手", value: 50, textStyle: { color: "#8aa2c1" } },
-                { name: "植树达人", value: 45, textStyle: { color: "#8aa2c1" } },
-                { name: "节水卫士", value: 40, textStyle: { color: "#8aa2c1" } },
-                { name: "夜间嚎叫者", value: 35, textStyle: { color: "#8aa2c1" } },
-                { name: "米粉爱好者", value: 30, textStyle: { color: "#8aa2c1" } },
-            ];
-
-            const option = {
-                backgroundColor: "transparent",
-                tooltip: {
-                    show: true,
-                    formatter: function (params) {
-                        return params.data.name;
+            // 从后端获取勋章数据
+            const response = await this.api.request('/api/wordcloud');
+            if (response.code === 0 && response.data) {
+                // 转换数据格式
+                const wordCloudData = this.transformMedalsToWordCloudData(response.data);
+                Logger.debug('转换后的词云数据', wordCloudData);
+                // 设置词云配置项
+                const option = {
+                    tooltip: {
+                        show: true
                     },
-                },
-                series: [
-                    {
-                        type: "wordCloud",
-                        shape: "circle",
-                        left: "center",
-                        top: "center",
-                        width: "100%",
-                        height: "100%",
-                        right: null,
-                        bottom: null,
-                        sizeRange: [16, 50],
-                        rotationRange: [-45, 45],
-                        rotationStep: 45,
-                        gridSize: 8,
-                        drawOutOfBound: false,
-                        layoutAnimation: true,
+                    series: [{
+                        type: 'wordCloud',
+                        shape: 'circle',         // 词云形状
+                        sizeRange: [12, 60],     // 字体大小范围
+                        rotationRange: [-45, 45], // 旋转角度范围
+                        gridSize: 8,             // 网格大小
+                        drawOutOfBound: false,   // 是否允许词语超出边界
+                        layoutAnimation: true,    // 启用布局动画
                         textStyle: {
-                            fontFamily: "Microsoft YaHei",
-                            fontWeight: "bold",
-                            color: function () {
-                                return "rgb(" + [
-                                    Math.round(Math.random() * 160) + 60,
-                                    Math.round(Math.random() * 160) + 60,
-                                    Math.round(Math.random() * 160) + 60
-                                ].join(",") + ")";
-                            },
+                            fontFamily: 'sans-serif',
+                            fontWeight: 'bold'
                         },
                         emphasis: {
-                            textStyle: {
-                                shadowBlur: 10,
-                                shadowColor: "rgba(255, 196, 71, 0.5)",
-                            },
+                            focus: 'self'
                         },
-                        data: testData,
-                    },
-                ],
-            };
+                        data: wordCloudData
+                    }]
+                };
 
-            this.wordCloudChart.setOption(option);
-            Logger.info('WordcloudService', '文字云初始化完成');
+                // 应用配置
+                this.wordCloudChart.setOption(option);
+                Logger.info('文字云初始化完成');
+            } else {
+                Logger.error('获取勋章数据失败:', response.msg);
+            }
         } catch (error) {
-            Logger.error('WordcloudService', '文字云初始化失败:', error);
+            Logger.error('初始化文字云失败:', error);
         }
     }
 
+    /**
+     * 更新词云数据
+     */
     async updateWordCloud() {
-        Logger.debug('WordcloudService', '开始更新文字云');
+        Logger.debug('开始更新文字云');
+        
         try {
-            const result = await this.api.getWordCloud();
-            
-            if (this.wordCloudChart && result.success) {
+            if (!this.wordCloudChart) {
+                await this.initWordCloud();
+                return;
+            }
+
+            const response = await this.api.get('/api/wordcloud');
+            if (response.code === 0 && response.data) {
+                const wordCloudData = this.transformMedalsToWordCloudData(response.data);
                 this.wordCloudChart.setOption({
                     series: [{
-                        data: result.data.tags
+                        data: wordCloudData
                     }]
                 });
-                Logger.info('WordcloudService', '文字云更新成功');
+                Logger.debug('文字云更新完成');
             }
         } catch (error) {
-            Logger.error('WordcloudService', '更新文字云失败:', error);
-            this.api.handleApiError(error, "updateWordCloud");
+            Logger.error('更新文字云失败:', error);
         }
     }
 

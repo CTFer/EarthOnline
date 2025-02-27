@@ -7,6 +7,7 @@
 
 import Logger from "../../utils/logger.js";
 import { SHOP_EVENTS } from '../config/events.js';
+import { UI_EVENTS } from '../config/events.js';
 
 class ShopService {
     constructor(eventBus, api, playerService, router) {
@@ -117,40 +118,85 @@ class ShopService {
     async purchaseItem(itemData) {
         try {
             const currentPlayerId = localStorage.getItem('playerId');
-            const response = await this.api.request('/api/shop/purchase', {
-                method: 'POST',
-                body: JSON.stringify({
-                    user_id: currentPlayerId,
-                    item_id: itemData.id,
-                    quantity: 1
-                })
+            const quantity = itemData.quantity || 1;
+            
+            Logger.debug('ShopService', 'purchaseItem', '准备购买商品:', {
+                user_id: currentPlayerId,
+                item_id: itemData.id,
+                quantity: quantity
             });
 
-            if (response.code === 0) {
-                this.eventBus.emit(SHOP_EVENTS.PURCHASE_SUCCESS, {
-                    item: itemData,
-                    message: '购买成功'
+            // 使用 Promise 包装购买流程
+            return new Promise((resolve, reject) => {
+                // 显示购买确认框
+                this.eventBus.emit(UI_EVENTS.MODAL_SHOW, {
+                    type: 'purchaseConfirm',
+                    data: {
+                        item: itemData,
+                        quantity: quantity,
+                        onConfirm: async (index) => {
+                            try {
+                                const response = await this.api.request('/api/shop/purchase', {
+                                    method: 'POST',
+                                    body: JSON.stringify({
+                                        user_id: parseInt(currentPlayerId),
+                                        item_id: itemData.id,
+                                        quantity: quantity
+                                    })
+                                });
+
+                                Logger.debug('ShopService', 'purchaseItem', '购买响应:', response);
+
+                                if (response.code === 0) {
+                                    this.eventBus.emit(SHOP_EVENTS.PURCHASE_SUCCESS, {
+                                        item: itemData,
+                                        message: '购买成功',
+                                        quantity: quantity,
+                                        totalPrice: quantity * itemData.price
+                                    });
+                                    
+                                    // 重新加载积分和商品列表
+                                    await Promise.all([
+                                        this.loadUserPoints(),
+                                        this.loadItems()
+                                    ]);
+
+                                    layer.close(index);
+                                    resolve(true);
+                                } else {
+                                    this.eventBus.emit(SHOP_EVENTS.PURCHASE_FAILED, {
+                                        item: itemData,
+                                        message: response.msg || '购买失败',
+                                        quantity: quantity,
+                                        totalPrice: quantity * itemData.price
+                                    });
+                                    layer.close(index);
+                                    resolve(false);
+                                }
+                            } catch (error) {
+                                Logger.error('ShopService', 'purchaseItem', '购买失败:', error);
+                                this.eventBus.emit(SHOP_EVENTS.PURCHASE_FAILED, {
+                                    item: itemData,
+                                    message: error.message || '购买失败',
+                                    quantity: quantity,
+                                    totalPrice: quantity * itemData.price
+                                });
+                                layer.close(index);
+                                reject(error);
+                            }
+                        },
+                        onCancel: (index) => {
+                            layer.close(index);
+                            resolve(false);
+                        }
+                    }
                 });
-                
-                // 重新加载积分和商品列表
-                await Promise.all([
-                    this.loadUserPoints(),
-                    this.loadItems()
-                ]);
-                
-                return true;
-            } else {
-                this.eventBus.emit(SHOP_EVENTS.PURCHASE_FAILED, {
-                    item: itemData,
-                    message: response.msg || '购买失败'
-                });
-                return false;
-            }
+            });
         } catch (error) {
             Logger.error('ShopService', 'purchaseItem', '购买失败:', error);
             this.eventBus.emit(SHOP_EVENTS.PURCHASE_FAILED, {
                 item: itemData,
-                message: '购买失败'
+                message: error.message || '购买失败'
             });
             throw error;
         }

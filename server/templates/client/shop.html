@@ -1,65 +1,85 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-26 21:49:27
- * @LastEditTime: 2025-02-26 23:51:15
+ * @LastEditTime: 2025-02-27 10:47:25
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
  * Copyright 2025 迷舍
 -->
 <!-- css -->
- 
-<!-- 左侧面板：积分信息和背包 -->
-<div class="side-panel panel-base">
-    <!-- 积分信息 -->
-    <div class="points-section">
-        <h2 class="panel-title">
-            <i class="layui-icon layui-icon-diamond"></i>
-            积分信息
-            <span class="title-decoration"></span>
-        </h2>
-        <div class="points-container">
-            <div class="points-balance">
-                <img src="/static/img/points.png" alt="积分">
-                <span>当前积分: </span>
-                <span id="userPoints" class="points-number">0</span>
+<style>
+    @import "/static/css/client/components/shop.less";
+</style>
+
+<div class="shop-container">
+    <!-- 左侧面板：积分信息和背包 -->
+    <div class="side-panel panel-base">
+        <!-- 积分信息 -->
+        <div class="points-section">
+            <h2 class="panel-title">
+                <i class="layui-icon layui-icon-diamond"></i>
+                积分信息
+                <span class="title-decoration"></span>
+            </h2>
+            <div class="points-container">
+                <div class="points-balance">
+                    <img src="/static/img/points.png" alt="积分">
+                    <span>当前积分: </span>
+                    <span id="userPoints" class="points-number">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 背包系统 -->
+        <div class="inventory-section">
+            <h2 class="panel-title">
+                <i class="layui-icon layui-icon-tabs"></i>
+                我的背包
+                <span class="title-decoration"></span>
+            </h2>
+            <div class="inventory-container" id="playerInventory">
+                <!-- 背包物品将通过JS动态生成 -->
             </div>
         </div>
     </div>
-    
-    <!-- 背包系统 -->
-    <div class="inventory-section">
+
+    <!-- 商品展示区 -->
+    <div class="main-content panel-base">
         <h2 class="panel-title">
-            <i class="layui-icon layui-icon-tabs"></i>
-            我的背包
+            <i class="layui-icon layui-icon-cart"></i>
+            商品列表
             <span class="title-decoration"></span>
         </h2>
-        <div class="inventory-container" id="playerInventory">
-            <!-- 背包物品将通过JS动态生成 -->
+        
+        <!-- 筛选工具栏 -->
+        <div class="shop-filter">
+            <button class="layui-btn layui-btn-normal" data-sort="price" data-order="asc">
+                <i class="layui-icon layui-icon-dollar"></i>
+                价格从低到高
+            </button>
+            <button class="layui-btn layui-btn-primary" data-sort="price" data-order="desc">
+                <i class="layui-icon layui-icon-dollar"></i>
+                价格从高到低
+            </button>
+            <button class="layui-btn layui-btn-primary" data-sort="online_time" data-order="desc">
+                <i class="layui-icon layui-icon-time"></i>
+                最新上架
+            </button>
+            <button class="layui-btn layui-btn-primary" data-sort="offline_time" data-order="asc">
+                <i class="layui-icon layui-icon-time"></i>
+                即将下架
+            </button>
+            <button class="layui-btn layui-btn-primary" data-sort="product_type" data-order="asc">
+                <i class="layui-icon layui-icon-template"></i>
+                商品类型
+            </button>
         </div>
-    </div>
-</div>
 
-<!-- 商品展示区 -->
-<div class="main-content panel-base">
-    <h2 class="panel-title">
-        <i class="layui-icon layui-icon-cart"></i>
-        商品列表
-        <span class="title-decoration"></span>
-    </h2>
-    
-    <!-- 筛选工具栏 -->
-    <div class="shop-filter">
-        <button class="layui-btn layui-btn-primary" data-sort="price" data-order="asc">价格从低到高</button>
-        <button class="layui-btn layui-btn-primary" data-sort="price" data-order="desc">价格从高到低</button>
-        <button class="layui-btn layui-btn-primary" data-sort="online_time" data-order="desc">最新上架</button>
-        <button class="layui-btn layui-btn-primary" data-sort="offline_time" data-order="asc">即将下架</button>
-        <button class="layui-btn layui-btn-primary" data-sort="product_type" data-order="asc">商品类型</button>
-    </div>
-
-    <!-- 商品列表 -->
-    <div class="shop-items" id="shopItems">
-        <!-- 商品卡片将通过JS动态生成 -->
+        <!-- 商品列表 -->
+        <div class="shop-items" id="shopItems">
+            <!-- 商品卡片将通过JS动态生成 -->
+        </div>
     </div>
 </div>
 

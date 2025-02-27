@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:01
- * @LastEditTime: 2025-02-25 21:41:45
+ * @LastEditTime: 2025-02-27 11:01:58
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -17,29 +17,47 @@ class APIClient {
         Logger.info('API', '初始化 API 客户端:', this.baseURL);
     }
 
+    /**
+     * 发送请求
+     * @param {string} endpoint - API端点
+     * @param {Object} options - 请求选项
+     * @returns {Promise<any>}
+     */
     async request(endpoint, options = {}) {
-        Logger.debug('API', `发起请求: ${endpoint}`, options);
+        const url = endpoint.startsWith('http') ? endpoint : this.baseURL + endpoint;
+        
         try {
-            // 确保endpoint开头有斜杠
-            const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-            const url = `${this.baseURL}${normalizedEndpoint}`;
-            Logger.debug('API', '请求:', url);
+            Logger.debug('API', '发送请求:', { url, options });
             
-            const response = await fetch(url, {
-                ...options,
-                headers: options.headers || {}
-            });
+            // 设置默认headers
+            const headers = {
+                ...options.headers
+            };
 
-            if (!response.ok) {
-                Logger.error('API', `请求失败: ${response.status}`, await response.text());
-                throw new Error(`HTTP error! status: ${response.status}`);
+            // 如果是POST/PUT请求且有body，自动设置Content-Type
+            if ((options.method === 'POST' || options.method === 'PUT') && options.body) {
+                headers['Content-Type'] = 'application/json';
             }
 
+            // 合并选项
+            const finalOptions = {
+                ...options,
+                headers
+            };
+
+            const response = await fetch(url, finalOptions);
+            
+            if (!response.ok) {
+                Logger.error('API', '请求失败:', response.status, await response.text());
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const data = await response.json();
-            Logger.debug('API', `请求成功: ${endpoint}`, data);
+            Logger.debug('API', '请求成功:', data);
             return data;
+            
         } catch (error) {
-            Logger.error('API', `请求异常: ${endpoint}`, error);
+            Logger.error('API', '请求异常:', endpoint, error);
             throw error;
         }
     }

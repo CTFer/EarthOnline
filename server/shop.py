@@ -337,7 +337,6 @@ def on_blueprint_registered(state):
 def get_items():
     """获取商品列表"""
     try:
-        logger.info("收到获取商品列表请求")
         logger.info(f"请求参数: {request.args}")
         
         # 获取请求参数
@@ -350,7 +349,6 @@ def get_items():
         # 获取商品列表
         shop_instance = Shop()
         result = shop_instance.get_items(sort_by, order, enabled_only)
-        logger.info(f"查询结果: {result}")
         
         # 返回JSON响应
         response = jsonify(result)
@@ -443,7 +441,7 @@ def shop_manage():
 @shop_bp.route('/shop')
 def shop_page():
     """商店页面"""
-    return render_template('shop.html')
+    return render_template('client/shop.html')
 
 # 启动时检查数据库
 try:

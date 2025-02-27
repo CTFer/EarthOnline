@@ -33,6 +33,7 @@ from config.config import (
 from config.private import AMAP_SECURITY_JS_CODE
 import requests
 from function.NotificationService import notification_service
+from function.MedalService import medal_service
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -475,8 +476,6 @@ def get_template(template_name):
         return "模板加载失败", 500
 
 # 添加清除日志的路由
-
-
 @app.route('/clear-logs', methods=['POST'])
 def clear_logs():
     """清除所有请求日志"""
@@ -918,29 +917,11 @@ def get_amap_security_config():
     return jsonify({
         'securityJsCode': AMAP_SECURITY_JS_CODE
     })
-
-# 单页化改动
-@app.route('/api/templates/home')
-def get_home_template():
-    """获取首页模板"""
-    try:
-        template_path = os.path.join(TEMPLATE_DIR, 'client/home.html')
-        with open(template_path, 'r', encoding='utf-8') as f:
-            return f.read()
-    except Exception as e:
-        logger.error(f"读取首页模板失败: {str(e)}")
-        return "模板加载失败", 500
-
-@app.route('/api/templates/shop')
-def get_shop_template():
-    """获取商城页面模板"""
-    try:
-        template_path = os.path.join(TEMPLATE_DIR, 'client/shop.html')
-        with open(template_path, 'r', encoding='utf-8') as f:
-            return f.read()
-    except Exception as e:
-        logger.error(f"读取商城模板失败: {str(e)}")
-        return "模板加载失败", 500
+# 勋章 词云相关接口
+@app.route('/api/wordcloud', methods=['GET'])
+def get_wordcloud():
+    """获取词云数据 - 展示中的勋章"""
+    return medal_service.get_wordcloud_medals()
 
 if __name__ == '__main__':
     logger = setup_logging()

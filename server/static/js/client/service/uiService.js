@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-02-26 23:46:50
+ * @LastEditTime: 2025-02-27 13:48:52
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -31,8 +31,6 @@ class UIService {
     // 初始化状态
     this.initialized = false;
 
-    // 默认商品图片的 base64 编码
-    this.DEFAULT_ITEM_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNmMGYwZjAiLz48dGV4dCB4PSI1MCIgeT0iNTAiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj7mmoLml6Dlm77niYc8L3RleHQ+PC9zdmc+';
   }
 
   /**
@@ -662,19 +660,50 @@ class UIService {
    * 初始化任务相关事件监听
    */
   initTaskEvents() {
-    Logger.info("UIService", "初始化任务相关事件监听");
-
+    Logger.info('UIService', 'initTaskEvents', '初始化任务事件');
     try {
-      // 移除旧的事件监听
-      document.removeEventListener("click", this.handleDocumentClick);
+        // 绑定任务相关事件
+        document.querySelectorAll('.task-card').forEach(taskCard => {
+            this.initializeTaskCard(taskCard);
+        });
 
-      // 绑定新的事件监听
-      document.addEventListener("click", this.handleDocumentClick.bind(this));
-
-      Logger.info("UIService", "任务事件监听初始化完成");
+        // 绑定全局任务事件
+        document.addEventListener('click', this.handleDocumentClick);
+        
+        Logger.info('UIService', 'initTaskEvents', '任务事件初始化完成');
     } catch (error) {
-      Logger.error("UIService", "初始化任务事件监听失败:", error);
-      throw error;
+        Logger.error('UIService', 'initTaskEvents', '任务事件初始化失败:', error);
+        throw error;
+    }
+  }
+
+  /**
+   * 移除任务事件
+   */
+  removeTaskEvents() {
+    Logger.info('UIService', 'removeTaskEvents', '移除任务事件');
+    try {
+        // 移除所有任务卡片的事件监听
+        document.querySelectorAll('.task-card').forEach(taskCard => {
+            const acceptBtn = taskCard.querySelector('.accept-task-btn');
+            const abandonBtn = taskCard.querySelector('.abandon-task');
+            
+            if (acceptBtn) {
+                acceptBtn.removeEventListener('click', this.handleTaskAccept);
+            }
+            if (abandonBtn) {
+                abandonBtn.removeEventListener('click', this.handleTaskAbandon);
+            }
+            taskCard.removeEventListener('click', this.handleTaskClick);
+        });
+
+        // 移除全局任务事件
+        document.removeEventListener('click', this.handleDocumentClick);
+        
+        Logger.info('UIService', 'removeTaskEvents', '任务事件移除完成');
+    } catch (error) {
+        Logger.error('UIService', 'removeTaskEvents', '任务事件移除失败:', error);
+        throw error;
     }
   }
 
@@ -1093,24 +1122,27 @@ class UIService {
    * 初始化商城相关事件
    */
   initShopEvents() {
-    Logger.debug("UIService", "初始化商城相关事件");
-    try {
-      // 初始化商城入口点击事件
-      const shopEntrance = document.querySelector('.shop-entrance');
-      if (shopEntrance) {
-        shopEntrance.addEventListener('click', () => {
-          Logger.info('UIService', 'initShopEvents', '点击商城入口，触发进入商城事件');
-          this.eventBus.emit(SHOP_EVENTS.ENTER);
-        });
-      }
-      Logger.info("UIService", "商城事件初始化完成");
-    } catch (error) {
-      Logger.error("UIService", "初始化商城事件失败:", error);
-      this.showNotification({
-        type: "ERROR",
-        message: "初始化商城功能失败"
-      });
+    Logger.info('UIService', 'initShopEvents', '初始化商城事件');
+    // 绑定商城入口点击事件
+    const shopEntrance = document.querySelector('.shop-entrance');
+    if (shopEntrance) {
+        shopEntrance.addEventListener('click', this.handleShopEntranceClick);
     }
+  }
+
+  // 移除商城事件监听器
+  removeShopEvents() {
+    Logger.info('UIService', 'removeShopEvents', '移除商城事件');
+    const shopEntrance = document.querySelector('.shop-entrance');
+    if (shopEntrance) {
+        shopEntrance.removeEventListener('click', this.handleShopEntranceClick);
+    }
+  }
+
+  // 处理商城入口点击
+  handleShopEntranceClick = () => {
+    Logger.info('UIService', 'handleShopEntranceClick', '点击商城入口');
+    this.eventBus.emit(SHOP_EVENTS.ENTER);
   }
 
   /**
@@ -1152,54 +1184,242 @@ class UIService {
    * 创建商品卡片DOM元素
    */
   createShopItemCard(item) {
-    const card = document.createElement('div');
-    card.className = 'shop-item-card';
+    Logger.debug('UIService', 'createShopItemCard', '创建商品卡片:', item);
     
-    // 使用默认图片作为备选
-    const imageUrl = item.image_url || this.DEFAULT_ITEM_IMAGE;
+    const itemElement = document.createElement('div');
+    itemElement.className = 'shop-item';
+    itemElement.setAttribute('data-item-id', item.id);
     
-    card.innerHTML = `
+    // 使用base64默认图片
+    const DEFAULT_ITEM_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiMxQTFBMUEiLz4KICA8cGF0aCBkPSJNMTAwIDY1QzkwLjUwODggNjUgODEuMzMyMyA2OC42ODc1IDc0LjQ4NTMgNzUuNDg1M0M2Ny42ODc1IDgyLjMzMjMgNjQgOTEuNTA4OCA2NCAxMDFDNjQgMTEwLjQ5MSA2Ny42ODc1IDExOS42NjggNzQuNDg1MyAxMjYuNTE1QzgxLjMzMjMgMTMzLjMxMiA5MC41MDg4IDEzNyAxMDAgMTM3QzEwOS40OTEgMTM3IDExOC42NjggMTMzLjMxMiAxMjUuNTE1IDEyNi41MTVDMTMyLjMxMiAxMTkuNjY4IDEzNiAxMTAuNDkxIDEzNiAxMDFDMTM2IDkxLjUwODggMTMyLjMxMiA4Mi4zMzIzIDEyNS41MTUgNzUuNDg1M0MxMTguNjY4IDY4LjY4NzUgMTA5LjQ5MSA2NSAxMDAgNjVaTTg2IDkzQzg2IDkwLjc5MzkgODYuODQyOCA4OC42NzcxIDg4LjM0MzEgODcuMTcxN0M4OS44NDM1IDg1LjY2NjMgOTEuOTU2NSA4NC44MjM1IDk0LjE1ODggODQuODIzNUM5Ni4zNjEyIDg0LjgyMzUgOTguNDc0MiA4NS42NjYzIDk5Ljk3NDUgODcuMTcxN0MxMDEuNDc1IDg4LjY3NzEgMTAyLjMxOCA5MC43OTM5IDEwMi4zMTggOTNDMTAyLjMxOCA5NS4yMDYxIDEwMS40NzUgOTcuMzIyOSA5OS45NzQ1IDk4LjgyODNDOTguNDc0MiAxMDAuMzM0IDk2LjM2MTIgMTAxLjE3NiA5NC4xNTg4IDEwMS4xNzZDOTEuOTU2NSAxMDEuMTc2IDg5Ljg0MzUgMTAwLjMzNCA4OC4zNDMxIDk4LjgyODNDODYuODQyOCA5Ny4zMjI5IDg2IDk1LjIwNjEgODYgOTNaTTExNS44NDEgOTNDMTE1Ljg0MSA5MC43OTM5IDExNi42ODQgODguNjc3MSAxMTguMTg0IDg3LjE3MTdDMTE5LjY4NSA4NS42NjYzIDEyMS43OTggODQuODIzNSAxMjQgODQuODIzNUMxMjYuMjAyIDg0LjgyMzUgMTI4LjMxNSA4NS42NjYzIDEyOS44MTYgODcuMTcxN0MxMzEuMzE2IDg4LjY3NzEgMTMyLjE1OSA5MC43OTM5IDEzMi4xNTkgOTNDMTMyLjE1OSA5NS4yMDYxIDEzMS4zMTYgOTcuMzIyOSAxMjkuODE2IDk4LjgyODNDMTI4LjMxNSAxMDAuMzM0IDEyNi4yMDIgMTAxLjE3NiAxMjQgMTAxLjE3NkMxMjEuNzk4IDEwMS4xNzYgMTE5LjY4NSAxMDAuMzM0IDExOC4xODQgOTguODI4M0MxMTYuNjg0IDk3LjMyMjkgMTE1Ljg0MSA5NS4yMDYxIDExNS44NDEgOTNaTTEwMCAxMjAuMjM1QzkzLjE1NzkgMTIwLjIzNSA4Ny4xNTc5IDExNy4xMTggODMuNzg5NSAxMTIuMjM1SDExNi4yMUMxMTIuODQyIDExNy4xMTggMTA2Ljg0MiAxMjAuMjM1IDEwMCAxMjAuMjM1WiIgZmlsbD0iIzhBQTJDMSIvPgo8L3N2Zz4=';
+
+    itemElement.innerHTML = `
         <div class="item-image">
-            <img src="${imageUrl}" alt="${item.name}" onerror="this.src='${this.DEFAULT_ITEM_IMAGE}'"/>
+            <img src="${item.image_url || DEFAULT_ITEM_IMAGE}" alt="${item.name}" 
+                 onerror="this.src='${DEFAULT_ITEM_IMAGE}'">
         </div>
         <div class="item-info">
-            <h3 class="item-name">${item.name}</h3>
-            <p class="item-desc">${item.description}</p>
+            <div class="item-name">${item.name}</div>
+            <div class="item-description">${item.description}</div>
             <div class="item-price">
-                <span class="price-icon">
-                    <i class="layui-icon layui-icon-diamond"></i>
-                </span>
-                <span class="price-number">${item.price}</span>
+                <img src="/static/img/points.png" alt="积分">
+                <span>${item.price}</span>
             </div>
             <div class="item-stock">库存: ${item.stock}</div>
-            <button class="layui-btn layui-btn-normal" onclick="window.shopService.purchaseItem(${JSON.stringify(item)})">购买</button>
         </div>
     `;
-    
-    return card;
+
+    // 点击商品卡片显示详情
+    itemElement.addEventListener('click', () => {
+        this.showItemDetail(item);
+    });
+
+    return itemElement;
   }
 
   /**
    * 显示商品购买确认对话框
+   * @param {Object} options 对话框配置
+   * @param {Object} options.item 商品数据
+   * @param {number} options.quantity 购买数量
+   * @param {Function} options.onConfirm 确认回调
+   * @param {Function} options.onCancel 取消回调
    */
-  showPurchaseConfirmDialog(itemData) {
-    Logger.debug("UIService", "显示购买确认对话框:", itemData);
+  showPurchaseConfirmDialog(options) {
+    const { item, quantity = 1 } = options;
+    const totalPrice = quantity * item.price;
+
+    // 构建确认框内容
+    const content = `
+      <div class="purchase-confirm-content">
+        <div class="item-info">
+          <img src="${item.image_url}" alt="${item.name}" class="item-image">
+          <div class="item-details">
+            <h3>${item.name}</h3>
+            <p class="item-description">${item.description}</p>
+          </div>
+        </div>
+        <div class="purchase-details">
+          <div class="detail-row">
+            <span>购买数量：</span>
+            <span class="value">${quantity}</span>
+          </div>
+          <div class="detail-row">
+            <span>单价：</span>
+            <span class="value">${item.price} 积分</span>
+          </div>
+          <div class="detail-row total">
+            <span>总价：</span>
+            <span class="value">${totalPrice} 积分</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    layer.confirm(content, {
+      title: '购买确认',
+      btn: ['确认购买', '取消'],
+      area: ['400px', '500px'],
+      skin: 'purchase-confirm-dialog',
+      success: (layero) => {
+        // 添加自定义样式
+        const style = document.createElement('style');
+        style.textContent = `
+          .purchase-confirm-dialog .layui-layer-content {
+            padding: 20px;
+          }
+          .purchase-confirm-content {
+            color: #b0b6c2;
+          }
+          .purchase-confirm-content .item-info {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+          }
+          .purchase-confirm-content .item-image {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+          }
+          .purchase-confirm-content .item-details h3 {
+            margin: 0 0 10px;
+            color: #57CAFF;
+            font-size: 16px;
+          }
+          .purchase-confirm-content .item-description {
+            font-size: 14px;
+            margin: 0;
+            color: rgba(176, 182, 194, 0.8);
+          }
+          .purchase-confirm-content .purchase-details {
+            background: rgba(27, 39, 53, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+          }
+          .purchase-confirm-content .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+          }
+          .purchase-confirm-content .detail-row:last-child {
+            margin-bottom: 0;
+          }
+          .purchase-confirm-content .detail-row.total {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(87, 202, 255, 0.2);
+          }
+          .purchase-confirm-content .detail-row .value {
+            color: #57CAFF;
+            font-weight: bold;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }, (index) => {
+      // 确认回调
+      if (options.onConfirm) {
+        options.onConfirm(index);
+      }
+    }, (index) => {
+      // 取消回调
+      if (options.onCancel) {
+        options.onCancel(index);
+      }
+      layer.close(index);
+    });
+  }
+
+  /**
+   * 显示商品详情
+   * @param {Object} item - 商品信息
+   */
+  showItemDetail(item) {
+    Logger.debug('UIService', 'showItemDetail', '显示商品详情:', item);
+    
     try {
-      layer.confirm(
-        `确定要购买 ${itemData.name} 吗？需要消耗 ${itemData.price} 积分`,
-        {
-          title: "购买确认",
-          btn: ["确定", "取消"]
-        },
-        () => {
-          this.eventBus.emit(SHOP_EVENTS.PURCHASE, itemData);
+      // 更新模态框内容
+      const modalImage = document.getElementById('modalItemImage');
+      const modalName = document.getElementById('modalItemName');
+      const modalDescription = document.getElementById('modalItemDescription');
+      const modalPrice = document.getElementById('modalItemPrice');
+      const modalStock = document.getElementById('modalItemStock');
+      const modalDate = document.getElementById('modalItemDate');
+      const quantityInput = document.getElementById('itemQuantity');
+      const purchaseBtn = document.getElementById('purchaseBtn');
+
+      if (modalImage) modalImage.src = item.image_url || DEFAULT_ITEM_IMAGE;
+      if (modalName) modalName.textContent = item.name;
+      if (modalDescription) modalDescription.textContent = item.description;
+      if (modalPrice) modalPrice.textContent = item.price;
+      if (modalStock) modalStock.textContent = item.stock;
+      if (modalDate) {
+        const onlineTime = new Date(item.online_time).toLocaleString();
+        const offlineTime = new Date(item.offline_time).toLocaleString();
+        modalDate.textContent = `上架时间: ${onlineTime}\n下架时间: ${offlineTime}`;
+      }
+      if (quantityInput) quantityInput.value = '1';
+
+      // 绑定数量控制按钮事件
+      const decreaseBtn = document.getElementById('decreaseQty');
+      const increaseBtn = document.getElementById('increaseQty');
+      
+      if (decreaseBtn) {
+        decreaseBtn.onclick = () => {
+          const currentValue = parseInt(quantityInput.value);
+          if (currentValue > 1) {
+            quantityInput.value = currentValue - 1;
+          }
+        };
+      }
+      
+      if (increaseBtn) {
+        increaseBtn.onclick = () => {
+          const currentValue = parseInt(quantityInput.value);
+          if (currentValue < item.stock) {
+            quantityInput.value = currentValue + 1;
+          }
+        };
+      }
+
+      // 绑定购买按钮事件
+      if (purchaseBtn) {
+        purchaseBtn.onclick = () => {
+          const quantity = parseInt(quantityInput.value);
+          this.showPurchaseConfirmDialog({
+            item: item,
+            quantity: quantity,
+            onConfirm: (index) => {
+              this.eventBus.emit(SHOP_EVENTS.PURCHASE_REQUESTED, {
+                item: item,
+                quantity: quantity
+              });
+              layer.close(index);
+            },
+            onCancel: (index) => {
+              layer.close(index);
+            }
+          });
+        };
+      }
+
+      // 显示模态框
+      layer.open({
+        type: 1,
+        title: false,
+        content: $('#itemDetailModal'),
+        area: ['800px', '500px'],
+        shadeClose: true,
+        success: () => {
+          Logger.debug('UIService', 'showItemDetail', '商品详情模态框打开成功');
         }
-      );
+      });
     } catch (error) {
-      Logger.error("UIService", "显示购买确认对话框失败:", error);
+      Logger.error('UIService', 'showItemDetail', '显示商品详情失败:', error);
       this.showNotification({
-        type: "ERROR",
-        message: "显示购买确认失败"
+        type: 'ERROR',
+        message: '显示商品详情失败'
       });
     }
   }

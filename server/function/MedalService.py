@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-02-12 20:04:48
-# LastEditTime: 2025-02-25 14:31:45
+# LastEditTime: 2025-02-27 13:20:49
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -249,6 +249,41 @@ class MedalService:
             if filename.endswith(('.png', '.svg', '.jpg', '.jpeg', '.gif')):
                 icons.append(filename)
         return icons
+
+    def get_wordcloud_medals(self) -> Dict:
+        """
+        获取用于词云显示的勋章数据
+        :return: 包含勋章名称列表的字典
+        """
+        try:
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            # 联合查询获取正在展示的勋章名称
+            cursor.execute('''
+                SELECT m.name, pm.level
+                FROM player_medal pm
+                JOIN medals m ON pm.medal_id = m.id
+                WHERE pm.show = 1
+            ''')
+            
+            # 获取所有勋章名称
+            medals = [(row['name'], row['level']) for row in cursor.fetchall()]
+            
+            return {
+                'code': 0,
+                'msg': '获取成功',
+                'data': medals
+            }
+        except Exception as e:
+            return {
+                'code': 500,
+                'msg': str(e),
+                'data': None
+            }
+        finally:
+            if conn:
+                conn.close()
 
 # 创建全局实例
 medal_service = MedalService()

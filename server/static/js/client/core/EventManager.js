@@ -60,12 +60,17 @@ class EventManager {
      * @private
      */
     handleError(context, error, userMessage) {
-        Logger.error('EventManager', 'handleError:57', `${context}:`, error);
-        this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-            type: 'ERROR',
-            message: userMessage || '操作失败'
-        });
-        this.eventBus.emit(AUDIO_EVENTS.PLAY, 'ERROR');
+        Logger.error('EventManager', 'handleError', `${context}:`, error);
+        
+        // 避免重复显示错误通知
+        if (!this._lastErrorTime || Date.now() - this._lastErrorTime > 2000) {
+            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+                type: 'ERROR',
+                message: userMessage || '操作失败，请重试'
+            });
+            this.eventBus.emit(AUDIO_EVENTS.PLAY, 'ERROR');
+            this._lastErrorTime = Date.now();
+        }
     }
 
     /**
@@ -98,15 +103,16 @@ class EventManager {
     }
 
     /**
-     * 初始化路由相关事件
+     * 初始化路由事件
      */
     initializeRouteEvents() {
-        // 路由变化事件监听
-        this.eventBus.on(ROUTE_EVENTS.CHANGED, async (event) => {
-            const { from, to } = event;
-            Logger.info('EventManager', 'handleRouteChange', `路由变化: ${from} -> ${to}`);
-            
+        Logger.info('EventManager', 'initializeRouteEvents', '初始化路由事件');
+        
+        // 路由变化事件
+        this.eventBus.on(ROUTE_EVENTS.CHANGED, async ({ from, to, isPopState }) => {
+            Logger.info('EventManager', 'routeChanged', `路由变化: ${from} -> ${to}, isPopState: ${isPopState}`);
             try {
+                // 根据路由路径处理不同页面
                 switch (to) {
                     case '/':
                         await this.handleHomeRoute();
@@ -114,33 +120,32 @@ class EventManager {
                     case '/shop':
                         await this.handleShopRoute();
                         break;
+                    default:
+                        Logger.warn('EventManager', 'routeChanged', '未知路由:', to);
                 }
             } catch (error) {
-                Logger.error('EventManager', 'handleRouteChange', '处理路由变化失败:', error);
-                this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-                    type: 'ERROR',
-                    message: '页面加载失败，请刷新重试'
-                });
+                this.handleError('路由处理', error, '页面加载失败，请刷新重试');
             }
         });
-        
-        Logger.info('EventManager', 'initializeRouteEvents', '路由事件监听器设置完成');
+
+        // 路由错误事件
+        this.eventBus.on(ROUTE_EVENTS.ERROR, (error) => {
+            this.handleError('路由错误', error, '页面加载失败，请刷新重试');
+        });
     }
 
     /**
      * 处理首页路由
      */
     async handleHomeRoute() {
+        Logger.info('EventManager', 'handleHomeRoute', '处理首页路由');
         try {
-            Logger.info('EventManager', 'handleHomeRoute', '处理首页路由');
-            await Promise.all([
-                this.taskService.loadTasks(),
-                this.playerService.loadPlayerInfo(),
-                this.mapService.initMap()
-            ]);
-            this.wordcloudService.updateWordCloud();
+            // 确保清理之前的状态
+            await this.handleHomeCleanup();
+            // 初始化首页
+            await this.handleHomeInit();
         } catch (error) {
-            Logger.error('EventManager', 'handleHomeRoute', '处理首页路由失败:', error);
+            this.handleError('首页初始化', error, '首页加载失败，请刷新重试');
             throw error;
         }
     }
@@ -149,20 +154,118 @@ class EventManager {
      * 处理商城路由
      */
     async handleShopRoute() {
+        Logger.info('EventManager', 'handleShopRoute', '处理商城路由');
         try {
-            Logger.info('EventManager', 'handleShopRoute', '处理商城路由');
-            
+            // 确保清理之前的状态
+            await this.handleShopCleanup();
             // 初始化商城
-            if (this.shopService) {
-                await this.shopService.initializeShop();
-                Logger.info('EventManager', 'handleShopRoute', '商城初始化完成');
-            } else {
-                throw new Error('商城服务未初始化');
-            }
+            await this.handleShopInit();
         } catch (error) {
-            Logger.error('EventManager', 'handleShopRoute', '处理商城路由失败:', error);
-            this.uiService.showErrorMessage('商城加载失败，请刷新重试');
+            this.handleError('商城初始化', error, '商城加载失败，请刷新重试');
             throw error;
+        }
+    }
+
+    /**
+     * 首页初始化处理
+     */
+    async handleHomeInit() {
+        try {
+            Logger.info('EventManager', 'handleHomeInit', '开始初始化首页');
+
+            // 1. 初始化地图服务
+            if (this.mapService) {
+                await this.mapService.initialize();
+                this.uiService.initializeMapUI();
+            }
+
+            // 2. 初始化任务服务
+            if (this.taskService) {
+                await this.taskService.loadTasks();
+                this.uiService.initTaskEvents();
+            }
+
+            // 3. 初始化词云服务
+            if (this.wordcloudService) {
+                await this.wordcloudService.initialize();
+            }
+
+            // 4. 初始化通知服务
+            if (this.notificationService) {
+                await this.notificationService.initialize();
+            }
+
+            // 5. 初始化Live2D
+            if (this.live2dService) {
+                await this.live2dService.initialize();
+            }
+
+            Logger.info('EventManager', 'handleHomeInit', '首页初始化完成');
+        } catch (error) {
+            Logger.error('EventManager', 'handleHomeInit', '首页初始化失败:', error);
+            this.handleError('首页初始化', error, '页面加载失败，请刷新重试');
+            throw error;
+        }
+    }
+
+    /**
+     * 首页清理
+     */
+    handleHomeCleanup() {
+        try {
+            Logger.info('EventManager', 'handleHomeCleanup', '开始清理首页');
+            
+            // 1. 清理任务相关
+            if (this.uiService) {
+                this.uiService.removeTaskEvents();
+            }
+            
+            // 2. 清理地图相关
+            if (this.mapService) {
+                this.mapService.cleanup();
+            }
+            
+            // 3. 清理词云相关
+            if (this.wordcloudService) {
+                this.wordcloudService.cleanup();
+            }
+            
+            Logger.info('EventManager', 'handleHomeCleanup', '首页清理完成');
+        } catch (error) {
+            Logger.error('EventManager', 'handleHomeCleanup', '首页清理失败:', error);
+            this.handleError('首页清理', error);
+        }
+    }
+
+    // 商城初始化处理
+    async handleShopInit() {
+        try {
+            await this.shopService.initializeShop();
+            this.uiService.initShopEvents();
+        } catch (error) {
+            this.handleError('商城初始化', error);
+        }
+    }
+
+    // 商城清理处理
+    handleShopCleanup() {
+        try {
+            Logger.info('EventManager', 'handleShopCleanup', '开始清理商城');
+            
+            // 1. 清理商城UI事件
+            if (this.uiService) {
+                this.uiService.removeShopEvents();
+            }
+            
+            // 2. 清理商城服务
+            if (this.shopService) {
+                this.shopService.leaveShop();
+            }
+            
+            Logger.info('EventManager', 'handleShopCleanup', '商城清理完成');
+        } catch (error) {
+            Logger.error('EventManager', 'handleShopCleanup', '商城清理失败:', error);
+            this.handleError('商城清理', error);
         }
     }
 

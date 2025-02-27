@@ -20,7 +20,21 @@ export const ROUTE_EVENTS = {
     // 路由变化时
     CHANGED: 'route:changed',
     // 路由变化后
-    AFTER_CHANGE: 'route:after:change'
+    AFTER_CHANGE: 'route:after:change',
+    // 路由加载开始
+    LOADING_START: 'route:loading:start',
+    // 路由加载结束
+    LOADING_END: 'route:loading:end',
+    // 路由错误
+    ERROR: 'route:error',
+    // 首页初始化
+    HOME_INIT: 'route:home:init',
+    // 首页清理
+    HOME_CLEANUP: 'route:home:cleanup',
+    // 商城初始化
+    SHOP_INIT: 'route:shop:init',
+    // 商城清理
+    SHOP_CLEANUP: 'route:shop:cleanup'
 }; 
 // 任务相关事件
 export const TASK_EVENTS = {
