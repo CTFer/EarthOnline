@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-13 19:10:14
- * @LastEditTime: 2025-02-25 22:39:00
+ * @LastEditTime: 2025-02-28 16:47:59
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -78,7 +78,7 @@ class Logger {
         let messageArgs = args;
         let callerStr = '';
         
-        if (locationInfo) {
+        if (locationInfo && LOG_CONFIG.openCallerStack) {
             // 如果第一个参数是位置信息，使用它并移除
             callerStr = ` [${locationInfo.function}:${locationInfo.line}]`;
             messageArgs = args.slice(1);

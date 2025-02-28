@@ -180,9 +180,12 @@ class EventManager {
       if (this.uiService) {
         await this.uiService.initPlayerInfoUI();
       }
-      // 7.初始化Live2D
+
+      // 7. 初始化Live2D
       if (this.live2dService) {
         await this.live2dService.initialize();
+      }else{
+        Logger.error("EventManager", "handleHomeInit", "Live2D服务未初始化");
       }
 
       Logger.info("EventManager", "handleHomeInit", "首页初始化完成");
@@ -615,7 +618,20 @@ class EventManager {
       Logger.info("EventManager", "initializeLive2DEvents:329", "Live2D模型加载完成");
     });
   }
-
+  /**
+   * 处理模型加载成功
+   */
+  handleModelLoaded() {
+    Logger.info('Live2DService', '模型加载成功');
+    // 其他处理逻辑...
+  }
+  /**
+   * 处理模型销毁
+   */
+  handleModelDestroyed() {
+    Logger.info('Live2DService', '模型销毁');
+    // 其他处理逻辑...
+  }
   /**
    * 处理新通知
    */

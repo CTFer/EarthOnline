@@ -17,25 +17,11 @@ class TaskService {
         this.loading = false;
         this.templateService = templateService;
         this.processingTasks = new Set(); // 添加任务处理状态集合
-        Logger.info('TaskService', '初始化任务服务');
-        
-        // 初始化事件监听
-        // this.initEvents();
-    }
+        this.componentId = "taskService";
 
-    /**
-     * 初始化事件监听
-     * @private
-     */
-    initEvents() {
-        Logger.debug('TaskService', '初始化事件监听');
-        
-        // 任务相关事件监听
-        // this.eventBus.on(TASK_EVENTS.COMPLETED, this.handleTaskComplete.bind(this));
-        // this.eventBus.on(TASK_EVENTS.STATUS_UPDATED, this.handleTaskStatusUpdate.bind(this));
-        // this.eventBus.on(TASK_EVENTS.ABANDONED, this.handleTaskAbandoned.bind(this));
-        
-        Logger.info('TaskService', '事件监听初始化完成');
+        this.state = this.store.getComponentState(this.componentId); // 从store中获取状态
+        Logger.info('TaskService', '初始化任务服务');
+        this.saveState(); // 保存状态
     }
 
     async loadTasks() {
@@ -50,6 +36,7 @@ class TaskService {
             if (result.code === 0) {
                 this.store.setState({ taskList: result.data });
                 Logger.debug('TaskService', '任务列表加载完成:', result.data);
+                this.saveState(); // 保存状态
                 return result.data;
             } else {
                 throw new Error(result.msg);
@@ -75,6 +62,7 @@ class TaskService {
                 Logger.debug('TaskService', '当前任务加载完成:', currentTasks);
                 this.store.setState({ currentTasks });
                 this.eventBus.emit('currentTasks:loaded', currentTasks);
+                this.saveState(); // 保存状态
                 return currentTasks;
             }
         } catch (error) {
@@ -248,87 +236,30 @@ class TaskService {
         }
     }
 
-    initTaskSwipers() {
-        Logger.info('TaskService', 'Initializing task swipers');
-        this.initActiveTasksSwiper();
-        
-        const taskListContainer = document.querySelector('.task-list-swiper');
-        if (!taskListContainer) {
-            Logger.error('TaskService', 'Task list container not found');
-            return;
-        }
-        
-        const taskCards = taskListContainer.querySelectorAll('.swiper-slide');
-        Logger.debug('TaskService', 'Found', taskCards.length, 'task cards');
-        
-        this.initTaskListSwiper();
-    }
 
-    initActiveTasksSwiper() {
-        const container = document.querySelector('.active-tasks-swiper');
-        if (!container) return;
-
-        this.activeTasksSwiper = new Swiper('.active-tasks-swiper', {
-            slidesPerView: 'auto',
-            spaceBetween: 20,
-            pagination: {
-                el: '.swiper-pagination',
-                clickable: true
-            }
-        });
-        Logger.info('TaskService', 'Active tasks swiper initialized');
-    }
-
-    initTaskListSwiper() {
-        const container = document.querySelector('.task-list-swiper');
-        if (!container) return;
-
-        this.taskListSwiper = new Swiper('.task-list-swiper', {
-            direction: 'vertical',
-            slidesPerView: 'auto',
-            freeMode: true,
-            scrollbar: {
-                el: '.swiper-scrollbar',
-            },
-            mousewheel: true,
-        });
-        Logger.info('TaskService', 'Task list swiper initialized');
-    }
-
-    destroySwipers() {
-        Logger.info('TaskService', 'Destroying swipers');
-        if (this.activeTasksSwiper) {
-            this.activeTasksSwiper.destroy(true, true);
-            this.activeTasksSwiper = null;
-        }
-        if (this.taskListSwiper) {
-            this.taskListSwiper.destroy(true, true);
-            this.taskListSwiper = null;
-        }
-    }
 
     // 创建活动任务卡片DOM
-    createActiveTaskCard(task) {
-        Logger.debug('TaskService', '创建活动任务卡片:', task);
-        const taskTypeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
-        const currentTime = Math.floor(Date.now()/1000);
-        const progressPercent = Math.max(0, Math.min(100, 
-            ((task.endtime - currentTime) / (task.endtime - task.starttime)) * 100
-        ));
+    // createActiveTaskCard(task) {
+    //     Logger.debug('TaskService', '创建活动任务卡片:', task);
+    //     const taskTypeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
+    //     const currentTime = Math.floor(Date.now()/1000);
+    //     const progressPercent = Math.max(0, Math.min(100, 
+    //         ((task.endtime - currentTime) / (task.endtime - task.starttime)) * 100
+    //     ));
 
-        const slide = document.createElement('div');
-        slide.className = 'swiper-slide';
-        slide.innerHTML = this.templateService.getActiveTaskTemplate(task, taskTypeInfo, progressPercent);
-        return slide;
-    }
+    //     const slide = document.createElement('div');
+    //     slide.className = 'swiper-slide';
+    //     slide.innerHTML = this.templateService.getActiveTaskTemplate(task, taskTypeInfo, progressPercent);
+    //     return slide;
+    // }
 
     // 创建可用任务卡片DOM
-    createAvailableTaskCard(task) {
-        Logger.debug('TaskService', '创建可用任务卡片:', task);
-        const taskTypeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
-        const rewards = this.templateService.parseTaskRewards(task.task_rewards);
-        return this.templateService.getAvailableTaskTemplate(task, taskTypeInfo, rewards);
-    }
+    // createAvailableTaskCard(task) {
+    //     Logger.debug('TaskService', '创建可用任务卡片:', task);
+    //     const taskTypeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
+    //     const rewards = this.templateService.parseTaskRewards(task.task_rewards);
+    //     return this.templateService.getAvailableTaskTemplate(task, taskTypeInfo, rewards);
+    // }
 
     /**
      * 更新玩家ID并清理任务缓存
@@ -381,6 +312,7 @@ class TaskService {
             }
             
             Logger.debug('TaskService', '任务状态更新完成');
+            this.saveState(); // 保存状态
         } catch (error) {
             Logger.error('TaskService', '更新任务状态失败:', error);
             throw error;
@@ -516,6 +448,11 @@ class TaskService {
             message: userMessage
         });
         this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
+    }
+
+    // 保存状态
+    saveState() {
+        this.store.setComponentState(this.componentId, this.state);
     }
 }
 

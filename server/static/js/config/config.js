@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:31
- * @LastEditTime: 2025-02-27 21:00:45
+ * @LastEditTime: 2025-02-28 09:52:09
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -10,7 +10,8 @@
 
 // 声明配置变量
 export const SERVER = "http://192.168.1.4/";
-
+export const WEBNAME = "团团圆圆的生活家";
+export const ICP = "蜀ICP备2025125672号-1";
 export const Live2D_MODE = true;
 // 角色图片配置，使用player_id作为key
 export const Character_image = {
@@ -32,6 +33,7 @@ export const LOG_CONFIG = {
   alwaysError: true, // 是否总是输出error级别的日志
   timeFormat: true, // 是否在日志中显示时间
   styleOutput: true, // 是否启用样式输出
+  openCallerStack:false,//开启调用堆栈显示 功能异常不开启
   styles: {
     debug: "color: #9E9E9E", // 灰色
     info: "color: #2196F3", // 蓝色

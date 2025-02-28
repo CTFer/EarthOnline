@@ -129,4 +129,11 @@ export const gameUtils = {
 
     return `${year}-${month}-${day} ${hour}:${minute}`;
   },
+  // 设置ICP备案号
+  setICP(icp) {
+    const icpElement = document.getElementById("icp");
+    if (icpElement) {
+      icpElement.textContent = icp;
+    }
+  },
 };

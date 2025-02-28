@@ -1,16 +1,16 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-08 11:24:25
- * @LastEditTime: 2025-02-22 20:42:16
+ * @LastEditTime: 2025-02-28 11:00:13
  * @LastEditors: 一根鱼骨棒
  * @Description: Live2D服务
  */
 import Logger from "../../utils/logger.js";
 import { Live2D_MODE, Character_image } from "../../config/config.js";
-import { UI_EVENTS } from "../config/events.js";
+import { UI_EVENTS, LIVE2D_EVENTS } from "../config/events.js";
 
 class Live2DService {
-  constructor(eventBus) {
+  constructor(eventBus, store) {
     // 基础属性初始化
     this.app = null;
     this.model = null;
@@ -25,57 +25,54 @@ class Live2DService {
       // throw new Error('EventBus is required for Live2DService');
     }
     this.eventBus = eventBus;
-
+    this.store = store; // 引入store
+    this.componentId = "live2dService"; // 设置组件ID
+    this.state = this.loadState(); // 从store中获取状态
     Logger.info("Live2DService", "初始化Live2D服务");
+    this.saveState(); // 保存状态
   }
 
   /**
    * 初始化Live2D服务
    */
   async initialize() {
-      Logger.info("Live2DService", "开始初始化Live2D模型");
-      try {
-        // 获取容器
-        const container = document.getElementById("live2dContainer");
-        if (!container) {
-          Logger.error("Live2DService", "找不到Live2D容器");
-          return;
-        }
-        this.live2dContainer = container;
-
-        // 清理旧的内容
-        this.cleanupOldCanvas();
-
-        // 根据模式选择初始化方法
-        if (Live2D_MODE) {
-          // Live2D模式
-          await this.loadLive2DResources();
-          await this.checkLibrariesLoaded();
-          await this.initializeLive2D();
-        } else {
-          // 图片模式
-          await this.initializeImage();
-        }
-
-        this.initialized = true;
-        Logger.info("Live2DService", `${Live2D_MODE ? "Live2D模型" : "图片模式"}初始化完成`);
-        // 发送初始化成功事件
-        if (this.eventBus) {
-          this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-            type: "SUCCESS",
-            message: `${Live2D_MODE ? "Live2D模型" : "图片"}加载成功`,
-          });
-        }
-      } catch (error) {
-        Logger.error("Live2DService", "初始化失败:", error);
-        if (this.eventBus) {
-          this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-            type: "ERROR",
-            message: `${Live2D_MODE ? "Live2D模型" : "图片"}加载失败: $
-                        {error.message}`,
-          });
-        }
+    Logger.info("Live2DService", "开始初始化Live2D模型");
+    try {
+      // 获取容器
+      const container = document.getElementById("live2dContainer");
+      if (!container) {
+        Logger.error("Live2DService", "找不到Live2D容器");
+        return;
       }
+      this.live2dContainer = container;
+
+      // 清理旧的内容
+      this.cleanupOldCanvas();
+
+      // 根据模式选择初始化方法
+      if (Live2D_MODE) {
+        await this.loadLive2DResources();
+        await this.checkLibrariesLoaded();
+        await this.initializeLive2D();
+      } else {
+        await this.initializeImage();
+      }
+
+      this.initialized = true;
+      Logger.info("Live2DService", `${Live2D_MODE ? "Live2D模型" : "图片模式"}初始化完成`);
+      this.saveState(); // 保存状态
+
+      // 发送模型加载成功事件
+      this.eventBus.emit(LIVE2D_EVENTS.MODEL_LOADED);
+    } catch (error) {
+      Logger.error("Live2DService", "初始化失败:", error);
+      if (this.eventBus) {
+        this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+          type: "ERROR",
+          message: `${Live2D_MODE ? "Live2D模型" : "图片"}加载失败: ${error.message}`,
+        });
+      }
+    }
   }
 
   /**
@@ -156,6 +153,9 @@ class Live2DService {
       this.setupResizeHandler();
 
       Logger.info("Live2DService", "Live2D模型初始化完成");
+
+      // 发送模型加载成功事件
+      this.eventBus.emit(LIVE2D_EVENTS.MODEL_LOADED);
     } catch (error) {
       Logger.error("Live2DService", "Live2D模型加载失败:", error);
     //   throw error;
@@ -285,6 +285,9 @@ class Live2DService {
       if (hitAreas.includes("body")) {
         this.model.motion("tap_body");
       }
+
+      // 在用户交互时触发事件
+      this.eventBus.emit(LIVE2D_EVENTS.INTERACTION, { /* 交互数据 */ });
     });
   }
 
@@ -352,6 +355,16 @@ class Live2DService {
     Logger.info("Live2DService", "销毁Live2D服务");
     this.cleanup();
     this.initialized = false;
+  }
+
+  // 保存状态
+  saveState() {
+    this.store.setComponentState(this.componentId, this.state);
+  }
+
+  // 加载状态
+  loadState() {
+    return this.store.getComponentState(this.componentId);
   }
 }
 

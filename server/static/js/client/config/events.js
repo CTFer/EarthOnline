@@ -154,8 +154,8 @@ export const AUDIO_EVENTS = {
 
 // Live2D相关事件
 export const LIVE2D_EVENTS = {
-    // 模型加载完成
-    MODEL_LOADED: 'live2d:model:loaded',
+    MODEL_LOADED: 'live2d:modelLoaded',
+    INTERACTION: 'live2d:interaction',
     // 动作播放
     MOTION_PLAY: 'live2d:motion:play',
     // 表情改变

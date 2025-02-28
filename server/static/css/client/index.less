@@ -25,7 +25,7 @@
 @import "./components/tooltip.less";
 @import "./components/layui.less";
 @import "./components/wordcloud.less";
-@import "./components/websocket.less";
+@import "./components/footer.less";
 @import "./components/notification.less";
 @import "./components/shop.less";
 
@@ -124,33 +124,6 @@ body {
   }
 }
 
-// 主内容区域
-.main-content {
-  flex: 1;
-  min-width: 800px;
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 40px);
-
-  &-top {
-    flex: 3;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  &-bottom {
-    flex: 2;
-    padding: 20px;
-    background: @background-color;
-    border-top: 1px solid @secondary-color;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
-  }
-}
 
 
 
@@ -222,5 +195,4 @@ body {
     font-size: 12px;
   }
 }
-
 

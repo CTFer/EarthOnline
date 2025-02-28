@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-02-27 23:30:16
+ * @LastEditTime: 2025-02-28 16:45:54
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -11,16 +11,16 @@ import { WS_STATE, WS_CONFIG } from "../config/wsConfig.js";
 import { gameUtils } from "../../utils/utils.js";
 import NotificationService from "./notificationService.js";
 class UIService {
-  constructor(eventBus, store, templateService, taskService, playerService, notificationService) {
+  constructor(eventBus, store, templateService, taskService, playerService,swiperService, notificationService) {
     this.eventBus = eventBus;
     this.store = store;
     this.templateService = templateService;
     this.taskService = taskService;
     this.playerService = playerService;
+    this.swiperService = swiperService;
     this.notificationService = new NotificationService();
     this.observers = new Map();
     this.componentId = "uiService";
-
     // 初始化默认状态
     this.defaultState = {
       initialized: false,
@@ -86,25 +86,27 @@ class UIService {
     });
   }
 
-  // 设置状态监听器
+  // 设置状态监听器 这个函数在页面刷新时不应该运行的
   setupStateListeners() {
-    this.store.subscribe("component", this.componentId, (newState, oldState) => {
-      Logger.debug("UIService", "状态更新:", { old: oldState, new: newState });
+    this.store.subscribe("component", this.componentId, async (newState, oldState) => {
+        Logger.debug("UIService", "状态更新:", { old: oldState, new: newState });
 
-      // 处理通知状态变化
-      if (newState.notifications !== oldState.notifications) {
-        this.handleNotificationsStateChange(newState.notifications);
-      }
+        // 处理任务卡片状态变化
+        // if (newState.taskCards !== oldState.taskCards) {
+        //     // 加载任务数据
+        //     const tasks = await this.taskService.loadTasks();
+        //     const currentTasks = await this.taskService.loadCurrentTasks();
 
-      // 处理任务卡片状态变化
-      if (newState.taskCards !== oldState.taskCards) {
-        this.handleTaskCardsStateChange(newState.taskCards);
-      }
+        //     // 渲染任务列表
+        //     this.renderTaskList(tasks);
+        //     this.renderCurrentTasks(currentTasks);
+        //     this.swiperService.initSwipers();
+        // }
 
-      // 处理UI组件状态变化
-      if (newState.uiComponents !== oldState.uiComponents) {
-        this.handleUIComponentsStateChange(newState.uiComponents);
-      }
+        // 处理UI组件状态变化
+        // if (newState.uiComponents !== oldState.uiComponents) {
+        //     this.handleUIComponentsStateChange(newState.uiComponents);
+        // }
     });
   }
 
@@ -128,7 +130,7 @@ class UIService {
   handleTaskCardsStateChange(taskCards) {
     try {
       // 更新任务卡片UI
-      this.renderTaskCards(taskCards);
+      // this.renderTaskCards(taskCards);
     } catch (error) {
       Logger.error("UIService", "处理任务卡片状态变化失败:", error);
     }
@@ -1705,7 +1707,7 @@ class UIService {
       Logger.error("UIService", "UI服务清理失败:", error);
     }
   }
-  // store用来渲染通知列表的
+  // 这个函数是store用来渲染通知列表的
   renderNotifications(notifications) {
     Logger.info("UIService", "开始渲染通知列表");
     const container = document.querySelector(".notification-list");
@@ -1729,32 +1731,6 @@ class UIService {
     } catch (error) {
       Logger.error("UIService", "渲染通知列表失败:", error);
       container.innerHTML = '<div class="error-notification">加载通知失败</div>';
-    }
-  }
-  // TODO 这个函数应该是store用来恢复任务列表的 目前工作不正常
-  renderTaskCards(taskCards) {
-    Logger.info("UIService", "开始渲染任务卡片列表");
-    const container = document.querySelector(".task-card-list");
-
-    if (!container) {
-      Logger.error("UIService", "找不到任务卡片列表容器");
-      return;
-    }
-
-    try {
-      if (!taskCards || !taskCards.length) {
-        container.innerHTML = '<div class="no-task-cards">无任务卡片</div>';
-      } else {
-        const taskCardItems = taskCards
-          .map((taskCard) => {
-            return `<div class="task-card-item">${taskCard.title}</div>`;
-          })
-          .join("");
-        container.innerHTML = taskCardItems;
-      }
-    } catch (error) {
-      Logger.error("UIService", "渲染任务卡片列表失败:", error);
-      container.innerHTML = '<div class="error-task-card">加载任务卡片失败</div>';
     }
   }
 }

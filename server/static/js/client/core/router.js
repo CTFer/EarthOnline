@@ -7,6 +7,7 @@
 
 import Logger from '../../utils/logger.js';
 import { ROUTE_EVENTS } from '../config/events.js';
+import { WEBNAME } from '../../config/config.js';
 
 class Router {
     constructor(eventBus) {
@@ -21,14 +22,14 @@ class Router {
             '/': {
                 container: '.game-container',
                 template: '/api/templates/home',
-                title: '团总的地球Online',
+                title: `${WEBNAME} - 地球Online`,
                 init: () => this.eventBus.emit(ROUTE_EVENTS.HOME_INIT),
                 cleanup: () => this.eventBus.emit(ROUTE_EVENTS.HOME_CLEANUP)
             },
             '/shop': {
                 container: '.game-container',
                 template: '/api/templates/shop',
-                title: '商城 - 团总的地球Online',
+                title: `${WEBNAME} - 商城`,
                 init: () => this.eventBus.emit(ROUTE_EVENTS.SHOP_INIT),
                 cleanup: () => this.eventBus.emit(ROUTE_EVENTS.SHOP_CLEANUP)
             }
@@ -75,6 +76,7 @@ class Router {
      */
     async processNavigation() {
         if (this.isNavigating || !this.pendingNavigation) {
+            Logger.info('Router', 'processNavigation', '导航请求已处理或不存在');
             return;
         }
 
@@ -88,7 +90,7 @@ class Router {
             if (path === this.currentRoute) {
                 return;
             }
-
+            Logger.debug('Router', 'processNavigation', '触发路由变化前事件');
             // 触发路由变化前事件
             this.eventBus.emit(ROUTE_EVENTS.BEFORE_CHANGE, { 
                 from: this.currentRoute,
@@ -96,6 +98,7 @@ class Router {
             });
 
             if (!isPopState) {
+                Logger.debug('Router', 'processNavigation', '更新历史记录');
                 // 更新历史记录
                 window.history.pushState({ path }, '', path);
                 if (!this.history.includes(path)) {
@@ -131,9 +134,11 @@ class Router {
 
         try {
             Logger.info('Router', 'handleRoute', '开始处理路由:', path);
-            
-            // 触发路由加载开始事件
-            this.eventBus.emit(ROUTE_EVENTS.LOADING_START, { path });
+
+            // 仅在实际的路由跳转时触发路由加载开始事件
+            if (isPopState && path === '/') {
+                this.eventBus.emit(ROUTE_EVENTS.LOADING_START, { path });
+            }
 
             // 执行当前路由的清理函数
             const currentRoute = this.routes[this.currentRoute];

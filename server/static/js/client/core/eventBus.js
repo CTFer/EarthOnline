@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:54
- * @LastEditTime: 2025-02-21 20:28:48
+ * @LastEditTime: 2025-02-28 16:49:28
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -49,10 +49,6 @@ class EventBus {
             caller
         });
         
-        // 获取并记录事件传播路径
-        const trace = this.getEventTrace(event);
-        Logger.debug('EventBus', `事件传播路径: ${trace.map((cb, index) => `Callback ${index}: ${cb.name || '匿名函数'}`).join(', ')}`);
-        
         if (this.events[event]) {
             this.eventTrace[event] = []; // 重置事件的传播路径记录
             this.events[event].forEach((callback, index) => {
@@ -77,13 +73,7 @@ class EventBus {
         return this.events[event] ? this.events[event].length : 0;
     }
 
-    // 获取特定事件的传播路径
-    getEventTrace(event) {
-        Logger.debug('EventBus', `获取事件传播路径: ${event}`, {
-            trace: this.eventTrace[event] || []
-        });
-        return this.eventTrace[event] || [];
-    }
+
 }
 
 export default EventBus; 
