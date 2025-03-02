@@ -534,13 +534,6 @@ def get_task(task_id):
         if conn:
             conn.close()
 
-# 添加任务状态常量
-TASK_STATUS = {
-    'LOCKED': '未解锁',
-    'AVAIL': '可接受',
-    'ACCEPT': '已接受',
-    'COMPLETED': '已完成'
-}
 
 @admin_bp.route('/api/tasks', methods=['POST'])
 @admin_required
@@ -706,7 +699,7 @@ def update_task(task_id):
                     }
                     for reward in data['task_rewards']['real_rewards']
                 ]
-
+        print(f'task_rewards: {task_rewards}')
         cursor.execute('''
             UPDATE task 
             SET name = ?, 

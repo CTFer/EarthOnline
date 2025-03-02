@@ -317,111 +317,164 @@
   background-color: #ccc !important;
 }
 // 任务详情弹窗样式
+// 任务详情弹窗样式
 .task-detail-popup {
-    color: @text-color;
-  
-    .task-detail-header {
+  color: @text-color;
+  background: rgba(0, 0, 0, 0.8); // 背景颜色
+  border-radius: 12px; // 圆角
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); // 阴影效果
+  padding: 20px; // 内边距
+
+  .task-header {
       padding: 20px;
       display: flex;
       align-items: center;
       gap: 20px;
-  
+
       .task-icon {
-        width: 64px;
-        height: 64px;
-        background: rgba(0, 0, 0, 0.2);
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-  
-        i {
-          font-size: 32px;
-          color: #fff;
-        }
-      }
-  
-      .task-info {
-        h2 {
-          margin: 0 0 8px;
-          color: #fff;
-          font-size: 24px;
-        }
-  
-        .task-type {
-          background: rgba(0, 0, 0, 0.2);
-          padding: 4px 12px;
-          border-radius: 20px;
-          font-size: 14px;
-          color: #fff;
-        }
-      }
-    }
-  
-    .task-detail-content {
-      padding: 20px;
-  
-      .detail-section {
-        margin-bottom: 24px;
-  
-        h3 {
-          color: @primary-color;
-          font-size: 16px;
-          margin-bottom: 12px;
+          width: 64px;
+          height: 64px;
+          background: rgba(255, 255, 255, 0.1); // 背景
+          border-radius: 12px;
           display: flex;
           align-items: center;
-          gap: 8px;
-        }
-  
-        ul {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-  
-          li {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 8px;
-            color: @text-color-secondary;
-  
-            i {
-              color: @primary-color;
-              font-size: 12px;
-            }
-          }
-        }
-      }
-  
-      .rewards-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 15px;
-  
-        .reward-detail {
-          background: rgba(255, 255, 255, 0.05);
-          padding: 12px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-  
+          justify-content: center;
+
           i {
-            color: @primary-color;
-            font-size: 20px;
+              font-size: 32px;
+              color: #fff; // 图标颜色
           }
-  
-          span {
-            color: @text-color;
+      }
+
+      .task-info {
+        flex: 1;
+        text-align: right;
+        padding-right: 16px;
+          h2 {
+              margin: 0 0 8px;
+              color: #fff; // 任务名称颜色
+              font-size: 24px;
           }
-        }
+
+          .task-type {
+              background: rgba(0, 0, 0, 0.2);
+              padding: 4px 12px;
+              border-radius: 20px;
+              font-size: 14px;
+              color: #fff; // 任务类型颜色
+          }
+      }
+  }
+
+  .task-content {
+      padding: 20px;
+
+      .description{
+          margin-bottom: 24px;
+
+          h3 {
+              color: @primary-color; // 主色调
+              font-size: 16px;
+              margin-bottom: 12px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+          }
+
+          ul {
+              list-style: none;
+              padding: 0;
+              margin: 0;
+
+              li {
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  margin-bottom: 8px;
+                  color: @text-color-secondary;
+
+                  i {
+                      color: @primary-color;
+                      font-size: 12px;
+                  }
+              }
+          }
+      }
+
+      .task-rewards {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 15px;
+
+          .reward-detail {
+              background: rgba(255, 255, 255, 0.05);
+              padding: 12px;
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+
+              i {
+                  color: @primary-color;
+                  font-size: 20px;
+              }
+
+              span {
+                  color: @text-color;
+              }
+          }
+      }
+  }
+
+  .task-actions{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+
+    .submit-btn,
+    .accept-btn,
+    .abandon-btn {
+      padding: 8px 24px;
+      border-radius: 20px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: all @transition-duration ease;
+
+      i {
+        font-size: 12px;
       }
     }
-  
-    .task-detail-footer {
-      padding: 20px;
-      border-top: 1px solid @border-color;
-      display: flex;
-      justify-content: flex-end;
+    .submit-btn {
+      background: rgba(76, 175, 80, 0.1);
+      color: #4caf50;
+      border: 1px solid rgba(76, 175, 80, 0.3);
+
+      &:hover {
+        background: rgba(76, 175, 80, 0.2);
+      }
+    }
+    .accept-btn {
+      background: rgba(76, 175, 80, 0.1);
+      color: #4caf50;
+      border: 1px solid rgba(76, 175, 80, 0.3);
+
+      &:hover {
+        background: rgba(76, 175, 80, 0.2);
+      }
+    }
+
+    .abandon-btn {
+      background: rgba(255, 77, 79, 0.1);
+      color: #ff4d4f;
+      border: 1px solid rgba(255, 77, 79, 0.3);
+
+      &:hover {
+        background: rgba(255, 77, 79, 0.2);
+      }
     }
   }
+}

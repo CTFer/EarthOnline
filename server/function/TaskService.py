@@ -29,7 +29,71 @@ class TaskService:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
-
+    def get_task_by_id(self, task_id):
+        """获取任务详情"""
+        conn = self.get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM task WHERE id = ?', (task_id,))
+        task = cursor.fetchone()
+        return json.dumps({
+            'code': 0,
+            'msg': '获取任务详情成功',
+            'data': task
+        })
+    def get_current_task_by_id(self, task_id):
+        """获取当前任务详情"""
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 联表查询player_task和task表的数据
+            cursor.execute('''
+                SELECT 
+                    pt.id,
+                    pt.player_id,
+                    pt.status,
+                    pt.starttime,
+                    pt.endtime,
+                    pt.complete_time,
+                    t.name,
+                    t.description,
+                    t.task_type,
+                    t.stamina_cost,
+                    t.task_rewards,
+                    t.icon,
+                    t.limit_time
+                FROM player_task pt
+                JOIN task t ON pt.task_id = t.id
+                WHERE pt.id = ?
+            ''', (task_id,))
+            
+            task = cursor.fetchone()
+            
+            if task:
+                # 将查询结果转换为字典
+                task_data = dict(task)
+                
+                return json.dumps({
+                    'code': 0,
+                    'msg': '获取当前任务详情成功',
+                    'data': task_data
+                })
+            else:
+                return json.dumps({
+                    'code': 1,
+                    'msg': '任务不存在',
+                    'data': None
+                }), 404
+                
+        except sqlite3.Error as e:
+            return json.dumps({
+                'code': 1,
+                'msg': f'获取当前任务详情失败: {str(e)}',
+                'data': None
+            }), 500
+        finally:
+            conn.close()
+            
     def get_available_tasks(self, player_id):
         """获取可用任务列表"""
         try:
@@ -163,7 +227,8 @@ class TaskService:
                     pt.status,
                     t.task_type,
                     pt.endtime,
-                    t.icon
+                    t.icon,
+                    t.task_rewards
                 FROM player_task pt
                 JOIN task t ON pt.task_id = t.id
                 WHERE pt.player_id = ? 
@@ -183,7 +248,8 @@ class TaskService:
                     'status': row[5],
                     'task_type': row[6],
                     'endtime': row[7],
-                    'icon': row[8]
+                    'icon': row[8],
+                    'task_rewards':row[9]
                 })
 
             return json.dumps({

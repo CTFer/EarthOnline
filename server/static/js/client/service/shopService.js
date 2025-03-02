@@ -38,15 +38,9 @@ class ShopService {
      */
     async loadUserPoints() {
         try {
-            const currentPlayerId = this.playerService.getPlayerId();
-            const response = await this.api.request(`/api/player/${currentPlayerId}`);
-            
-            if (response.code === 0) {
-                this.eventBus.emit(SHOP_EVENTS.ITEMS_UPDATED, {
-                    points: response.data.points
-                });
-                return response.data.points;
-            }
+            const points = await this.playerService.loadUserPoints();
+            this.eventBus.emit(SHOP_EVENTS.ITEMS_UPDATED, { points });
+            return points;
         } catch (error) {
             Logger.error('ShopService', 'loadUserPoints', '加载积分失败:', error);
             throw error;
@@ -206,8 +200,11 @@ class ShopService {
      */
     async initializeShop() {
         try {
-            // 加载用户积分
-            await this.loadUserPoints();
+
+            
+            // 加载玩家信息
+            await this.playerService.loadPlayerInfo();
+            this.playerService.updatePlayerUI(this.playerService.getPlayerData());
             
             // 加载商品列表
             await this.loadItems();

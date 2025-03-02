@@ -2,63 +2,132 @@ import Logger from '../../utils/logger.js';
 import { gameUtils } from '../../utils/utils.js';
 
 class TemplateService {
-    constructor() {
+    constructor(apiClient, eventBus, store) {
+        this.api = apiClient;
+        this.eventBus = eventBus;
+        this.store = store;
         Logger.info('TemplateService', '初始化模板服务');
     }
 
-    // 获取活动任务卡片模板
-    getActiveTaskTemplate(task, taskTypeInfo, progressPercent) {
-        Logger.debug('TemplateService', '生成活动任务卡片模板:', task);
-        return `
-            <div class="task-card active-task" data-endtime="${task.endtime}">
-                <div class="task-header" style="background-color: ${taskTypeInfo.color}">
-                    <div class="task-icon">
-                        <i class="layui-icon ${taskTypeInfo.icon}"></i>
-                    </div>
-                    <div class="task-info">
-                        <h3 class="task-name">${task.name}</h3>
-                        <span class="task-type">${taskTypeInfo.text}</span>
-                    </div>
-                </div>
-                <div class="task-content">
-                    <div class="task-details">
-                        <p class="task-description">${task.description}</p>
-                        <div class="task-time">
-                            <i class="layui-icon layui-icon-time"></i>
-                            计算中...
-                        </div>
-                    </div>
-                    <div class="task-footer">
-                        <div class="task-rewards">
-                            ${this.renderRewardItems(task)}
-                        </div>
-                        <button class="abandon-task" data-task-id="${task.id}">
-                            <i class="layui-icon layui-icon-close"></i>
-                            放弃
-                        </button>
-                    </div>
-                </div>
-                <div class="task-progress-bar" style="width: ${progressPercent}%"></div>
-            </div>
-        `;
-    }
+    // 获取活动任务卡片模板 似乎没有作用
+    // getActiveTaskTemplate(task, taskTypeInfo, progressPercent) {
+    //     Logger.debug('TemplateService', '生成活动任务卡片模板:', task);
+    //     return `
+    //         <div class="task-card active-task" data-endtime="${task.endtime}">
+    //             <div class="task-header" style="background-color: ${taskTypeInfo.color}">
+    //                 <div class="task-icon">
+    //                     <i class="layui-icon ${taskTypeInfo.icon}"></i>
+    //                 </div>
+    //                 <div class="task-info">
+    //                     <h3 class="task-name">${task.name}</h3>
+    //                     <span class="task-type">${taskTypeInfo.text}</span>
+    //                 </div>
+    //             </div>
+    //             <div class="task-content">
+    //                 <div class="task-details">
+    //                     <p class="task-description">${task.description}</p>
+    //                     <div class="task-time">
+    //                         <i class="layui-icon layui-icon-time"></i>
+    //                         计算中...
+    //                     </div>
+    //                 </div>
+    //                 <div class="task-footer">
+    //                     <div class="task-rewards">
+    //                         ${this.renderRewardItems(task)}
+    //                     </div>
+    //                     <button class="abandon-task" data-task-id="${task.id}">
+    //                         <i class="layui-icon layui-icon-close"></i>
+    //                         放弃
+    //                     </button>
+    //                 </div>
+    //             </div>
+    //             <div class="task-progress-bar" style="width: ${progressPercent}%"></div>
+    //         </div>
+    //     `;
+    // }
 
-    // 获取可用任务卡片模板
-    getAvailableTaskTemplate(task, taskTypeInfo, rewards) {
-        Logger.debug('TemplateService', '生成可用任务卡片模板:', task);
-        return `
-            <div class="swiper-slide">
-                <div class="task-card" onclick="GameManager.uiService.showTaskDetails(${JSON.stringify({
-                    ...task,
-                    typeInfo: taskTypeInfo,
-                    rewards: rewards
-                }).replace(/"/g, '&quot;')})">
-                    ${this.getTaskCardContent(task, taskTypeInfo, rewards)}
-                </div>
-            </div>
-        `;
-    }
+    // 获取可用任务卡片模板 似乎没有作用
+    // getAvailableTaskTemplate(task, taskTypeInfo, rewards) {
+    //     Logger.debug('TemplateService', '生成可用任务卡片模板:', task);
+    //     return `
+    //         <div class="swiper-slide">
+    //             <div class="task-card" onclick="GameManager.uiService.showTaskDetails(${JSON.stringify({
+    //                 ...task,
+    //                 typeInfo: taskTypeInfo,
+    //                 rewards: rewards
+    //             }).replace(/"/g, '&quot;')})">
+    //                 ${this.getTaskCardContent(task, taskTypeInfo, rewards)}
+    //             </div>
+    //         </div>
+    //     `;
+    // }
+    /**
+     * 获取任务奖励的详细信息
+     * @param {Object} task 任务数据
+     * @returns {Promise<Object>} 包含完整奖励信息的对象
+     */
+    async getTaskRewardDetails(task) {
+        try {
+            const rewards = this.parseTaskRewards(task.task_rewards);
+            
+            // 获取道具卡详细信息
+            const cardPromises = rewards.card_rewards?.map(async card => {
+                try {
+                    if(!card || card.id === 0){
+                        return null;
+                    }
+                    const response = await this.api.request(`/api/game_cards/${card.id}`);
+                    if (response.code === 0 && response.data) {
+                        return {
+                            ...card,
+                            name: response.data.name,
+                            icon: response.data.icon || 'layui-icon-gift'
+                        };
+                    }
+                    return card;
+                } catch (error) {
+                    Logger.error('TemplateService', `获取道具卡信息失败: ${error}`);
+                    return null;
+                }
+            }) || [];
 
+            // 获取勋章详细信息
+            const medalPromises = rewards.medal_rewards?.map(async medal => {
+                try {
+                    if (!medal || medal.id === 0) {
+                        return null;
+                    }
+                    const response = await this.api.request(`/api/medals/${medal.id}`);
+                    if (response.code === 0 && response.data) {
+                        return {
+                            ...medal,
+                            name: response.data.name,
+                            icon: response.data.icon || 'layui-icon-medal'
+                        };
+                    }
+                    return medal;
+                } catch (error) {
+                    Logger.error('TemplateService', `获取勋章信息失败: ${error}`);
+                    return null;
+                }
+            }) || [];
+            
+            // 等待所有请求完成
+            const [enrichedCards, enrichedMedals] = await Promise.all([
+                Promise.all(cardPromises),
+                Promise.all(medalPromises)
+            ]);
+
+            return {
+                ...rewards,
+                enrichedCards: enrichedCards.filter(Boolean),
+                enrichedMedals: enrichedMedals.filter(Boolean)
+            };
+        } catch (error) {
+            Logger.error('TemplateService', '获取任务奖励详情失败:', error);
+            throw error;
+        }
+    }
     // 获取任务卡片内容模板（复用）
     getTaskCardContent(task, taskTypeInfo, rewards) {
         return `
@@ -186,7 +255,13 @@ class TemplateService {
 
     // 解析任务奖励
     parseTaskRewards(taskRewards) {
-        let rewards = { points: 0, exp: 0, cards: [], medals: [] };
+        let rewards = { 
+            points: 0, 
+            exp: 0, 
+            card_rewards: [], 
+            medal_rewards: [],
+            real_rewards: []
+        };
         
         try {
             if (taskRewards) {
@@ -197,8 +272,9 @@ class TemplateService {
                     rewards.exp = rewardsData.points_rewards[0]?.number || 0;
                     rewards.points = rewardsData.points_rewards[1]?.number || 0;
                 }
-                rewards.cards = rewardsData.card_rewards || [];
-                rewards.medals = rewardsData.medal_rewards || [];
+                rewards.card_rewards = rewardsData.card_rewards || [];
+                rewards.medal_rewards = rewardsData.medal_rewards || [];
+                rewards.real_rewards = rewardsData.real_rewards || [];
             }
         } catch (error) {
             Logger.error('TemplateService', '解析任务奖励失败:', error);
@@ -208,8 +284,9 @@ class TemplateService {
     }
 
     // 渲染奖励项
-    renderRewardItems(task) {
-        const rewards = this.parseTaskRewards(task.task_rewards);
+    async renderRewardItems(task) {
+        const rewards = await this.getTaskRewardDetails(task);
+        
         return `
             ${rewards.exp > 0 ? `
                 <div class="reward-item">
@@ -223,13 +300,32 @@ class TemplateService {
                     <span>+${rewards.points}</span>
                 </div>
             ` : ''}
-            <div class="reward-item">
-                <i class="layui-icon layui-icon-fire"></i>
-                <span>-${task.stamina_cost}</span>
-            </div>
+            ${rewards.enrichedCards.map(card => `
+                <div class="reward-item" title="${card?.name || '道具卡'}">
+                    <i class="layui-icon ${card?.icon || 'layui-icon-gift'}"></i>
+                    <span>${card?.name || '道具卡'} ${card?.number > 1 ? `x${card.number}` : ''}</span>
+                </div>
+            `).join('')}
+            ${rewards.enrichedMedals.map(medal => `
+                <div class="reward-item" title="${medal?.name || '勋章'}">
+                    <i class="layui-icon ${medal?.icon || 'layui-icon-medal'}"></i>
+                    <span>${medal?.name || '勋章'}</span>
+                </div>
+            `).join('')}
+            ${rewards.real_rewards?.map(reward => `
+                <div class="reward-item" title="${reward?.name || '实物'}">
+                    <i class="layui-icon layui-icon-gift"></i>
+                    <span>${reward?.name || '实物'} ${reward?.number > 1 ? `x${reward.number}` : ''}</span>
+                </div>
+            `).join('') || ''}
+            ${task.stamina_cost ? `
+                <div class="reward-item">
+                    <i class="layui-icon layui-icon-fire"></i>
+                    <span>-${task.stamina_cost}</span>
+                </div>
+            ` : ''}
         `;
     }
-
     /**
      * 创建可用任务卡片
      * @param {Object} task 任务数据
@@ -253,7 +349,7 @@ class TemplateService {
                                 <span class="task-type">${typeInfo.text}</span>
                             </div>
                         </div>
-                        <div class="task-content">
+                   <!-- <div class="task-content">
                             <div class="task-footer">
                                 <div class="task-rewards">
                                     ${this.renderRewardItems(task)}
@@ -263,7 +359,7 @@ class TemplateService {
                                     接受
                                 </button>
                             </div>
-                        </div>
+                        </div>-->
                     </div>
                 </div>`;
         } catch (error) {
@@ -282,8 +378,12 @@ class TemplateService {
         
         try {
             const typeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
-            const rewards = this.parseTaskRewards(task.task_rewards);
-            
+            // const rewards = this.parseTaskRewards(task.task_rewards);
+            const rewardsHtml= this.renderRewardItems(task);
+            console.log(typeof rewardsHtml);
+            console.log(
+                rewardsHtml
+            );
             return `
                 <div class="task-card active-task" data-task-id="${task.id}" data-endtime="${task.endtime}">
                     <div class="task-header" style="background-color: ${typeInfo.color}">
@@ -305,7 +405,7 @@ class TemplateService {
                         </div>
                         <div class="task-footer">
                             <div class="task-rewards">
-                                ${this.renderRewardItems(task)}
+                                ${rewardsHtml}
                             </div>
                             <button class="abandon-task" data-task-id="${task.id}">
                                 <i class="layui-icon layui-icon-close"></i>
@@ -326,12 +426,11 @@ class TemplateService {
      * @param {Object} taskData 任务数据
      * @returns {string} 任务详情HTML
      */
-    createTaskDetailTemplate(taskData) {
-        // Logger.debug("TemplateService", "创建任务详情模板:", taskData);
-        
+    async createTaskDetailTemplate(taskData) {
         try {
             const typeInfo = gameUtils.getTaskTypeInfo(taskData.task_type, taskData.icon);
-            const rewards = this.parseTaskRewards(taskData.task_rewards);
+            const rewardsHtml =await this.renderRewardItems(taskData);
+            
             
             return `
                 <div class="task-detail-popup">
@@ -349,7 +448,7 @@ class TemplateService {
                         <div class="rewards-section">
                             <h4>任务奖励</h4>
                             <div class="rewards-list">
-                                ${this.renderRewardItems(taskData)}
+                                ${rewardsHtml}
                             </div>
                         </div>
                         ${taskData.endTime ? `
@@ -359,7 +458,7 @@ class TemplateService {
                             </div>
                         ` : ''}
                         <div class="task-actions">
-                            <button class="accept-task layui-btn" data-task-id="${taskData.id}">
+                            <button class="accept-btn accept-task layui-btn" data-task-id="${taskData.id}">
                                 <i class="layui-icon layui-icon-ok"></i>
                                 接受任务
                             </button>
@@ -433,6 +532,65 @@ class TemplateService {
             minute: '2-digit'
         });
     }
+
+    /**
+     * 创建当前任务详情模板
+     * @param {Object} taskData 任务数据
+     * @returns {string} 当前任务详情HTML
+     */
+    createCurrentTaskDetailTemplate(taskData) {
+        try {
+            const typeInfo = gameUtils.getTaskTypeInfo(taskData.task_type, taskData.icon);
+            const rewards = this.parseTaskRewards(taskData.task_rewards);
+            
+            return `
+                <div class="task-detail-popup">
+                    <div class="task-header" style="background-color: ${typeInfo?.color || '#4CAF50'}">
+                        <div class="task-icon">
+                            <i class="layui-icon ${typeInfo?.icon || 'layui-icon-flag'}"></i>
+                        </div>
+                        <div class="task-info">
+                            <h3 class="task-name">${taskData.name}</h3>
+                            <span class="task-type">${typeInfo?.text || '未知类型'}</span>
+                        </div>
+                    </div>
+                    <div class="task-content">
+                        <div class="description">${taskData.description}</div>
+                        <div class="rewards-section">
+                            <h4>任务奖励</h4>
+                            <div class="rewards-list">
+                                ${this.renderRewardItems(taskData)}
+                            </div>
+                        </div>
+                        <div class="task-time-info">
+                            <div class="task-starttime">
+                                <i class="layui-icon layui-icon-time"></i>
+                                <span>开始时间: ${this.formatTime(taskData.starttime)}</span>
+                            </div>
+                            ${taskData.endtime ? `
+                                <div class="task-deadline">
+                                    <i class="layui-icon layui-icon-time"></i>
+                                    <span>截止时间: ${this.formatTime(taskData.endtime)}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="task-actions">
+                            <button class="submit-btn" data-task-id="${taskData.id}">
+                                <i class="layui-icon layui-icon-ok"></i>
+                                提交任务
+                            </button>
+                            <button class="abandon-btn" data-task-id="${taskData.id}">
+                                <i class="layui-icon layui-icon-close"></i>
+                                放弃任务
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+        } catch (error) {
+            Logger.error("TemplateService", "创建当前任务详情模板失败:", error);
+            return '';
+        }
+    }
 }
 
-export default TemplateService; 
+export default TemplateService;

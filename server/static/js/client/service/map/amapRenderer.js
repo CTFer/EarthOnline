@@ -319,7 +319,7 @@ class AMapRenderer {
   }
 
   async createMarker(gpsData, index) {
-    Logger.debug('AMapRenderer', 'createMarker:321', '创建标记点:', { gpsData, index });
+    // Logger.debug('AMapRenderer', 'createMarker:321', '创建标记点:', { gpsData, index });
 
     // 创建标记点
     const marker = new AMap.Marker({

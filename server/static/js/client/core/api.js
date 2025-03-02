@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:01
- * @LastEditTime: 2025-02-27 11:01:58
+ * @LastEditTime: 2025-03-02 19:52:32
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -120,7 +120,10 @@ class APIClient {
         Logger.info('API', '获取任务列表');
         return this.request(`/api/tasks/available/${playerId}`);
     }
-
+    async getTaskById(taskId) {
+        Logger.info('API', '获取任务详情:', taskId);
+        return this.request(`/api/tasks/${taskId}`);
+    }
     // NFC相关
     async getNFCStatus() {
         Logger.info('API', '获取NFC状态');
@@ -154,6 +157,10 @@ class APIClient {
         return this.request(`/api/tasks/available/${playerId}`);
     }
 
+    async getCurrentTaskById(taskId) {
+        Logger.info('API', '获取当前任务详情:', taskId);
+        return this.request(`/api/tasks/current_detail/${taskId}`);
+    }
     async loadTaskHistory(playerId) {
         Logger.info('API', '加载任务历史:', playerId);
         return this.request(`/api/tasks/history/${playerId}`);
@@ -276,6 +283,7 @@ class APIClient {
         Logger.info('API', '获取高德地图安全密钥');
         return this.request('/api/amap/security-config');
     }
+
 }
 
 // 修改导出方式

@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-02-28 16:41:54
+ * @LastEditTime: 2025-03-02 19:02:57
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -22,13 +22,13 @@ import NFCService from "./service/nfcService.js";
 import MapService from "./service/mapService.js";
 import UIService from "./service/uiService.js";
 import AudioService from "./service/audioService.js";
-import Live2DService from "./service/Live2DService.js";
+import Live2DService from "./service/live2dService.js";
 import WebSocketService from "./service/websocketService.js";
 import { gameUtils } from "../utils/utils.js";
 import { TASK_EVENTS, PLAYER_EVENTS, MAP_EVENTS, UI_EVENTS, WS_EVENTS, AUDIO_EVENTS, LIVE2D_EVENTS, SHOP_EVENTS, ROUTE_EVENTS } from "./config/events.js";
-import EventManager from "./core/EventManager.js";
+import EventManager from "./core/eventManager.js";
 import Router from "./core/router.js";
-import ShopService from "./service/ShopService.js";
+import ShopService from "./service/shopService.js";
 
 // 在文件开头声明全局变量
 let taskManager;
@@ -102,16 +102,13 @@ class GameManager {
 
     try {
       // 1. 初始化基础服务（无依赖）
-      this.templateService = new TemplateService();
+      this.templateService = new TemplateService(this.api, this.eventBus, this.store);
 
       // 2. 初始化路由（优先处理，加载必要的DOM）
       this.router = new Router(this.eventBus);
       await this.router.initialize();
 
-      // 3. 等待路由加载完成DOM
-      await this.router.handleRoute(window.location.pathname);
-
-      // 4. 等待DOM完全加载
+      // 3. 等待DOM完全加载
       await new Promise((resolve) => {
         const checkDom = () => {
           const container = document.querySelector(".game-container");
@@ -123,6 +120,9 @@ class GameManager {
         };
         checkDom();
       });
+
+      // 4. 处理路由，确保在DOM加载完成后再处理
+      // await this.router.handleRoute(window.location.pathname);
 
       Logger.info("GameManager", "[initializeServices:120]", "DOM加载完成");
 
@@ -223,10 +223,10 @@ class GameManager {
           });
         }
 
-        // 1. 加载玩家信息
-        Logger.info("GameManager", "[initializeApplication:196]", "开始加载玩家信息");
-        await this.playerService.loadPlayerInfo();
-        Logger.info("GameManager", "[initializeApplication:198]", "玩家信息加载完成");
+        // 1. 加载玩家信息 这一步应该是多余的
+        // Logger.info("GameManager", "[initializeApplication:196]", "开始加载玩家信息");
+        // await this.playerService.loadPlayerInfo();
+        // Logger.info("GameManager", "[initializeApplication:198]", "玩家信息加载完成");
 
         // 2. 设置WebSocket订阅
         const playerId = this.playerService.getPlayerId();
@@ -375,18 +375,13 @@ class GameManager {
         shopService: this.shopService,
         wordcloudService: this.wordcloudService,
         live2dService: this.live2dService,
+        swiperService: this.swiperService,
         router: this.router
       });
     } catch (error) {
       Logger.error("GameManager", "初始化事件管理器失败:", error);
       throw error;
     }
-  }
-
-  // 删除原有的 showTaskDetails 方法，改为调用 UIService
-  handleTaskClick(taskData) {
-    Logger.debug("GameManager", "处理任务点击:", taskData);
-    this.uiService.showTaskDetails(taskData);
   }
 
   // 修改销毁方法，添加观察器清理

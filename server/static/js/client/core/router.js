@@ -29,7 +29,7 @@ class Router {
             '/shop': {
                 container: '.game-container',
                 template: '/api/templates/shop',
-                title: `${WEBNAME} - 商城`,
+                title: `兑换商店 - ${WEBNAME}`,
                 init: () => this.eventBus.emit(ROUTE_EVENTS.SHOP_INIT),
                 cleanup: () => this.eventBus.emit(ROUTE_EVENTS.SHOP_CLEANUP)
             }

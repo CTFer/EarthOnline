@@ -7,7 +7,7 @@
 # Copyright 2025 迷舍
 
 # 服务器配置
-SERVER_IP = '192.168.1.4'
+SERVER_IP = '192.168.5.18'
 PORT = 80
 # 环境配置 本地开发环境 local 生产环境 prod 生产环境中NFC读写卡功能关闭
 ENV = 'local'

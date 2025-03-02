@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-02-28 16:45:54
+ * @LastEditTime: 2025-03-02 23:39:53
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -90,23 +90,6 @@ class UIService {
   setupStateListeners() {
     this.store.subscribe("component", this.componentId, async (newState, oldState) => {
         Logger.debug("UIService", "状态更新:", { old: oldState, new: newState });
-
-        // 处理任务卡片状态变化
-        // if (newState.taskCards !== oldState.taskCards) {
-        //     // 加载任务数据
-        //     const tasks = await this.taskService.loadTasks();
-        //     const currentTasks = await this.taskService.loadCurrentTasks();
-
-        //     // 渲染任务列表
-        //     this.renderTaskList(tasks);
-        //     this.renderCurrentTasks(currentTasks);
-        //     this.swiperService.initSwipers();
-        // }
-
-        // 处理UI组件状态变化
-        // if (newState.uiComponents !== oldState.uiComponents) {
-        //     this.handleUIComponentsStateChange(newState.uiComponents);
-        // }
     });
   }
 
@@ -357,13 +340,12 @@ class UIService {
 
   /**
    * 显示任务详情
-   * @param {Object} taskData 任务数据
+   * @param {Object} taskId 任务ID
    */
-  showTaskDetails(taskData) {
-    Logger.info("UIService", "显示任务详情:", taskData);
+  showTaskDetails(taskId) {
+    Logger.info("UIService", "显示任务详情:", taskId);
 
     try {
-      const taskId = taskData.id;
       const taskCard = document.querySelector(`[data-task-id="${taskId}"]`);
       if (!taskCard) {
         Logger.error("UIService", "未找到任务卡片:", taskId);
@@ -372,7 +354,9 @@ class UIService {
 
       // 从store中获取完整的任务数据
       const tasks = this.store.state.taskList || [];
-      const task = tasks.find((t) => t.id.toString() === taskId.toString()) || taskData;
+      // 获取任务数据
+      // 如果任务数据中没有找到，则从taskService中获取
+      const task = tasks.find((t) => t.id.toString() === taskId.toString()) || this.taskService.getTaskById(taskId);
 
       if (!task) {
         Logger.error("UIService", "未找到任务数据:", taskId);
@@ -421,7 +405,51 @@ class UIService {
       });
     }
   }
+  /**
+   * 显示当前任务详情
+   * @param {Object} taskId 任务ID
+   */
+  showCurrentTaskDetails(taskId) {
+    Logger.info("UIService", "显示当前任务详情:", taskId);
 
+    try {
+      // 从store中获取当前任务数据
+      const currentTasks = this.store.state.currentTasks || [];
+      Logger.info('UIService',"currentTasks:", currentTasks);
+      const task = currentTasks.find(t => t.id.toString() === taskId.toString());
+
+      if (!task) {
+        // 如果任务不在当前任务列表中，则从API获取
+        this.api.getCurrentTaskById(taskId).then(response => {
+          if (response.code === 0) {
+            const taskDetails = response.data;
+            layer.open({
+              type: 1,
+              title: false,
+              content: this.templateService.createCurrentTaskDetailTemplate(taskDetails),
+              area: ["500px", "400px"],
+              shadeClose: true,
+            });
+          } else {
+            Logger.error("UIService", "未找到任务数据:", taskId);
+          }
+        }).catch(error => {
+          Logger.error("UIService", "获取当前任务详情失败:", error);
+        });
+      } else {
+        // 如果任务在当前任务列表中，直接显示
+        layer.open({
+          type: 1,
+          title: false,
+          content: this.templateService.createCurrentTaskDetailTemplate(task),
+          area: ["500px", "400px"],
+          shadeClose: true,
+        });
+      }
+    } catch (error) {
+      Logger.error("UIService", "显示当前任务详情失败:", error);
+    }
+  }
   /**
    * 显示通知消息
    * @param {Object} data 通知数据
@@ -469,51 +497,6 @@ class UIService {
     return iconMap[type] || 6;
   }
 
-  /**
-   * 渲染奖励详情
-   * @private
-   */
-  _renderRewardsDetail(rewards) {
-    let html = "";
-
-    if (rewards.exp > 0) {
-      html += `
-                <div class="reward-item">
-                    <i class="layui-icon layui-icon-star"></i>
-                    <span>经验值 +${rewards.exp}</span>
-                </div>`;
-    }
-
-    if (rewards.points > 0) {
-      html += `
-                <div class="reward-item">
-                    <i class="layui-icon layui-icon-diamond"></i>
-                    <span>积分 +${rewards.points}</span>
-                </div>`;
-    }
-
-    if (rewards.cards.length > 0) {
-      rewards.cards.forEach((card) => {
-        html += `
-                    <div class="reward-item">
-                        <i class="layui-icon layui-icon-template"></i>
-                        <span>${card.name} x${card.number}</span>
-                    </div>`;
-      });
-    }
-
-    if (rewards.medals.length > 0) {
-      rewards.medals.forEach((medal) => {
-        html += `
-                    <div class="reward-item">
-                        <i class="layui-icon layui-icon-medal"></i>
-                        <span>${medal.name}</span>
-                    </div>`;
-      });
-    }
-
-    return html || '<div class="no-rewards">无奖励</div>';
-  }
 
   /**
    * 显示确认对话框
@@ -545,16 +528,6 @@ class UIService {
     );
   }
 
-  /**
-   * 显示成功消息
-   * @param {string} message 消息内容
-   */
-  showSuccessMessage(message) {
-    layui.layer.msg(message, {
-      icon: 1,
-      time: 2000,
-    });
-  }
 
   /**
    * 显示错误消息
@@ -808,9 +781,8 @@ class UIService {
       document.querySelectorAll(".task-card").forEach((taskCard) => {
         this.initializeTaskCard(taskCard);
       });
-
       // 绑定全局任务事件
-      document.addEventListener("click", this.handleDocumentClick);
+      document.addEventListener("click", (e) => this.handleDocumentClick(e));
 
       Logger.info("UIService", "initTaskEvents", "任务事件初始化完成");
     } catch (error) {
@@ -1084,14 +1056,22 @@ class UIService {
     Logger.debug("UIService", "处理文档点击事件");
     e.stopPropagation(); // 阻止事件冒泡
 
-    // 处理任务卡片点击
+    // 处理任务卡片点击 需要判断是进行中的任务还是可用任务
     const taskCard = e.target.closest(".task-card");
     if (taskCard && !e.target.closest("button")) {
-      Logger.debug("UIService", "处理任务卡片点击");
-      const taskId = taskCard.dataset.taskId;
-      if (taskId) {
-        this.showTaskDetails(taskId);
-      }
+        const taskId = taskCard.dataset.taskId;
+        if (taskId) {
+            // 判断任务类型
+            const isActiveTask = taskCard.closest(".active-tasks-container") !== null;
+            const isAvailableTask = taskCard.closest(".task-list-swiper") !== null;
+            
+            Logger.debug("UIService", `处理任务卡片点击 - ${isActiveTask ? '进行中任务' : isAvailableTask ? '可用任务' : '未知类型任务'} ID: ${taskId}`);
+            if(isActiveTask){
+              this.showCurrentTaskDetails(taskId);
+            }else{
+              this.showTaskDetails(taskId);
+            }
+        }
     }
 
     // 处理接受任务按钮点击
@@ -1349,8 +1329,7 @@ class UIService {
     itemElement.setAttribute("data-item-id", item.id);
 
     // 使用base64默认图片
-    const DEFAULT_ITEM_IMAGE =
-      "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiMxQTFBMUEiLz4KICA8cGF0aCBkPSJNMTAwIDY1QzkwLjUwODggNjUgODEuMzMyMyA2OC42ODc1IDc0LjQ4NTMgNzUuNDg1M0M2Ny42ODc1IDgyLjMzMjMgNjQgOTEuNTA4OCA2NCAxMDFDNjQgMTEwLjQ5MSA2Ny42ODc1IDExOS42NjggNzQuNDg1MyAxMjYuNTE1QzgxLjMzMjMgMTMzLjMxMiA5MC41MDg4IDEzNyAxMDAgMTM3QzEwOS40OTEgMTM3IDExOC42NjggMTMzLjMxMiAxMjUuNTE1IDEyNi41MTVDMTMyLjMxMiAxMTkuNjY4IDEzNiAxMTAuNDkxIDEzNiAxMDFDMTM2IDkxLjUwODggMTMyLjMxMiA4Mi4zMzIzIDEyNS41MTUgNzUuNDg1M0MxMTguNjY4IDY4LjY4NzUgMTA5LjQ5MSA2NSAxMDAgNjVaTTg2IDkzQzg2IDkwLjc5MzkgODYuODQyOCA4OC42NzcxIDg4LjM0MzEgODcuMTcxN0M4OS44NDM1IDg1LjY2NjMgOTEuOTU2NSA4NC44MjM1IDk0LjE1ODggODQuODIzNUM5Ni4zNjEyIDg0LjgyMzUgOTguNDc0MiA4NS42NjYzIDk5Ljk3NDUgODcuMTcxN0MxMDEuNDc1IDg4LjY3NzEgMTAyLjMxOCA5MC43OTM5IDEwMi4zMTggOTNDMTAyLjMxOCA5NS4yMDYxIDEwMS40NzUgOTcuMzIyOSA5OS45NzQ1IDk4LjgyODNDOTguNDc0MiAxMDAuMzM0IDk2LjM2MTIgMTAxLjE3NiA5NC4xNTg4IDEwMS4xNzZDOTEuOTU2NSAxMDEuMTc2IDg5Ljg0MzUgMTAwLjMzNCA4OC4zNDMxIDk4LjgyODNDODYuODQyOCA5Ny4zMjI5IDg2IDk1LjIwNjEgODYgOTNaTTExNS44NDEgOTNDMTE1Ljg0MSA5MC43OTM5IDExNi42ODQgODguNjc3MSAxMTguMTg0IDg3LjE3MTdDMTE5LjY4NSA4NS42NjYzIDEyMS43OTggODQuODIzNSAxMjQgODQuODIzNUMxMjYuMjAyIDg0LjgyMzUgMTI4LjMxNSA4NS42NjYzIDEyOS44MTYgODcuMTcxN0MxMzEuMzE2IDg4LjY3NzEgMTMyLjE1OSA5MC43OTM5IDEzMi4xNTkgOTNDMTMyLjE1OSA5NS4yMDYxIDEzMS4zMTYgOTcuMzIyOSAxMjkuODE2IDk4LjgyODNDMTI4LjMxNSAxMDAuMzM0IDEyNi4yMDIgMTAxLjE3NiAxMjQgMTAxLjE3NkMxMjEuNzk4IDEwMS4xNzYgMTE5LjY4NSAxMDAuMzM0IDExOC4xODQgOTguODI4M0MxMTYuNjg0IDk3LjMyMjkgMTE1Ljg0MSA5NS4yMDYxIDExNS44NDEgOTNaTTEwMCAxMjAuMjM1QzkzLjE1NzkgMTIwLjIzNSA4Ny4xNTc5IDExNy4xMTggODMuNzg5NSAxMTIuMjM1SDExNi4yMUMxMTIuODQyIDExNy4xMTggMTA2Ljg0MiAxMjAuMjM1IDEwMCAxMjAuMjM1WiIgZmlsbD0iIzhBQTJDMSIvPgo8L3N2Zz4=";
+    const DEFAULT_ITEM_IMAGE ='/static/img/shop/default_item.svg';
 
     itemElement.innerHTML = `
         <div class="item-image">
@@ -1733,6 +1712,8 @@ class UIService {
       container.innerHTML = '<div class="error-notification">加载通知失败</div>';
     }
   }
+
+
 }
 
 export default UIService;

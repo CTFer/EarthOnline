@@ -106,7 +106,11 @@ class TaskService {
             throw error;
         }
     }
-
+    async getTaskById(taskId) {
+        const result = await this.api.getTaskById(taskId);
+        Logger.debug('TaskService', '获取任务详情:', result);
+        return result.data;
+    }
     async acceptTask(taskId) {
         const playerId = this.playerService.getPlayerId();
         Logger.info("TaskService", `接受任务: ${taskId} 玩家ID: ${playerId}`);
@@ -235,6 +239,7 @@ class TaskService {
             this.eventBus.emit(AUDIO_EVENTS.PLAY, 'ERROR');
         }
     }
+
 
 
 

@@ -9,7 +9,7 @@ import { TASK_EVENTS, PLAYER_EVENTS, MAP_EVENTS, UI_EVENTS, AUDIO_EVENTS, WS_EVE
 import { WS_EVENT_TYPES, WS_STATE } from "../config/wsConfig.js";
 
 class EventManager {
-  constructor({ eventBus, taskService, playerService, uiService, mapService, audioService, websocketService, wordcloudService, live2dService, notificationService, shopService, router }) {
+  constructor({ eventBus, taskService, playerService, uiService, mapService, audioService, websocketService, wordcloudService, live2dService, notificationService, shopService, swiperService, router }) {
     // 事件总线
     this.eventBus = eventBus;
 
@@ -24,6 +24,7 @@ class EventManager {
     this.live2dService = live2dService;
     this.notificationService = notificationService;
     this.shopService = shopService;
+    this.swiperService = swiperService;
     this.router = router;
 
     Logger.info("EventManager", "constructor:47", "初始化事件管理器");
@@ -162,10 +163,21 @@ class EventManager {
 
       // 3. 初始化任务服务
       if (this.taskService) {
-        await this.taskService.loadTasks();
-        this.uiService.initTaskEvents();
-      }
+        // this.uiService.initTaskEvents();
 
+        if (this.taskService && this.uiService) {
+          await Promise.all([
+            this.taskService.loadTasks().then((tasks) => {
+              this.uiService.renderTaskList(tasks);
+            }),
+            this.taskService.loadCurrentTasks().then((currentTasks) => {
+              this.uiService.renderCurrentTasks(currentTasks);
+            }),
+          ]);
+          Logger.info("EventManager", "[handleHomeInit]", "任务数据加载完成");
+        }
+      }
+      this.swiperService.initSwipers();
       // 4. 初始化词云服务
       if (this.wordcloudService) {
         await this.wordcloudService.initialize();
@@ -184,7 +196,7 @@ class EventManager {
       // 7. 初始化Live2D
       if (this.live2dService) {
         await this.live2dService.initialize();
-      }else{
+      } else {
         Logger.error("EventManager", "handleHomeInit", "Live2D服务未初始化");
       }
 
@@ -622,14 +634,14 @@ class EventManager {
    * 处理模型加载成功
    */
   handleModelLoaded() {
-    Logger.info('Live2DService', '模型加载成功');
+    Logger.info("Live2DService", "模型加载成功");
     // 其他处理逻辑...
   }
   /**
    * 处理模型销毁
    */
   handleModelDestroyed() {
-    Logger.info('Live2DService', '模型销毁');
+    Logger.info("Live2DService", "模型销毁");
     // 其他处理逻辑...
   }
   /**

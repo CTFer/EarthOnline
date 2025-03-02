@@ -472,13 +472,66 @@
               repeat_time: taskData.repeat_time,
               is_enabled: taskData.is_enabled,
               repeatable: taskData.repeatable,
-              "points_rewards[0].number": taskData.task_rewards?.points_rewards?.[0]?.number || 0,
-              "points_rewards[1].number": taskData.task_rewards?.points_rewards?.[1]?.number || 0,
-              "card_rewards[0].id": taskData.task_rewards?.card_rewards?.[0]?.id || 0,
-              "card_rewards[0].number": taskData.task_rewards?.card_rewards?.[0]?.number || 0,
-              "medal_rewards[0].id": taskData.task_rewards?.medal_rewards?.[0]?.id || 0,
-              "medal_rewards[0].number": taskData.task_rewards?.medal_rewards?.[0]?.number || 0,
             });
+
+            // 解析 task_rewards
+            const taskRewards = typeof taskData.task_rewards === 'string' 
+                ? JSON.parse(taskData.task_rewards) 
+                : taskData.task_rewards;
+
+            // 填充数值奖励
+            if (taskRewards.points_rewards) {
+              taskRewards.points_rewards.forEach((reward, index) => {
+                if (index === 0) {
+                  document.querySelector(`select[name="points_rewards[0].type"]`).value = reward.type;
+                  document.querySelector(`input[name="points_rewards[0].number"]`).value = reward.number;
+                } else {
+                  addRewardItem('points'); // 添加新的奖励项
+                  document.querySelector(`select[name="points_rewards[${index}].type"]`).value = reward.type;
+                  document.querySelector(`input[name="points_rewards[${index}].number"]`).value = reward.number;
+                }
+              });
+            }
+
+            // 填充卡片奖励
+            if (taskRewards.card_rewards) {
+              taskRewards.card_rewards.forEach((reward, index) => {
+                if (index === 0) {
+                  document.querySelector(`input[name="card_rewards[0].id"]`).value = reward.id;
+                  document.querySelector(`input[name="card_rewards[0].number"]`).value = reward.number;
+                } else {
+                  addRewardItem('card'); // 添加新的奖励项
+                  document.querySelector(`input[name="card_rewards[${index}].id"]`).value = reward.id;
+                  document.querySelector(`input[name="card_rewards[${index}].number"]`).value = reward.number;
+                }
+              });
+            }
+
+            // 填充成就奖励
+            if (taskRewards.medal_rewards) {
+              taskRewards.medal_rewards.forEach((reward, index) => {
+                if (index === 0) {
+                  document.querySelector(`input[name="medal_rewards[0].id"]`).value = reward.id;
+                } else {
+                  addRewardItem('medal'); // 添加新的奖励项
+                  document.querySelector(`input[name="medal_rewards[${index}].id"]`).value = reward.id;
+                }
+              });
+            }
+
+            // 填充实物奖励
+            if (taskRewards.real_rewards) {
+              taskRewards.real_rewards.forEach((reward, index) => {
+                if (index === 0) {
+                  document.querySelector(`input[name="real_rewards[0].name"]`).value = reward.name;
+                  document.querySelector(`input[name="real_rewards[0].number"]`).value = reward.number;
+                } else {
+                  addRewardItem('real'); // 添加新的奖励项
+                  document.querySelector(`input[name="real_rewards[${index}].name"]`).value = reward.name;
+                  document.querySelector(`input[name="real_rewards[${index}].number"]`).value = reward.number;
+                }
+              });
+            }
           }
 
           form.render(null, "taskForm");

@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:31
- * @LastEditTime: 2025-02-28 09:52:09
+ * @LastEditTime: 2025-03-02 10:26:11
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -9,7 +9,7 @@
  */
 
 // 声明配置变量
-export const SERVER = "http://192.168.1.4/";
+export const SERVER = "http://192.168.5.18/";
 export const WEBNAME = "团团圆圆的生活家";
 export const ICP = "蜀ICP备2025125672号-1";
 export const Live2D_MODE = true;

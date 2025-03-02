@@ -34,6 +34,7 @@ from config.private import AMAP_SECURITY_JS_CODE
 import requests
 from function.NotificationService import notification_service
 from function.MedalService import medal_service
+from function.GameCardService import game_card_service
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -305,8 +306,16 @@ def get_available_tasks(player_id):
     """获取可用任务列表"""
     return task_service.get_available_tasks(player_id)
 
-# 添加获取玩家当前任务的API
+@app.route('/api/tasks/<int:task_id>', methods=['GET'])
+def get_task_by_id(task_id):
+    """获取任务详情"""
+    return task_service.get_task_by_id(task_id)
 
+# 添加获取玩家当前任务的API
+@app.route('/api/tasks/current_detail/<int:task_id>', methods=['GET'])
+def get_current_task_by_id(task_id):
+    """获取当前任务详情"""
+    return task_service.get_current_task_by_id(task_id)
 
 @app.route('/api/tasks/current/<int:player_id>', methods=['GET'])
 def get_current_tasks(player_id):
@@ -922,6 +931,45 @@ def get_amap_security_config():
 def get_wordcloud():
     """获取词云数据 - 展示中的勋章"""
     return medal_service.get_wordcloud_medals()
+# 获取勋章列表
+@app.route('/api/medals', methods=['GET'])
+def get_medals():
+    """获取勋章列表"""
+    return medal_service.get_medals()
+# 获取勋章详情
+@app.route('/api/medals/<int:medal_id>', methods=['GET'])
+def get_medal(medal_id):
+    """获取勋章详情"""
+    return medal_service.get_medal(medal_id)
+    
+# GameCard相关接口
+@app.route('/api/game_cards', methods=['GET'])
+def get_game_cards():
+    """获取道具卡列表"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 20, type=int)
+        result = game_card_service.get_game_card(page=page, limit=limit)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        })
+
+@app.route('/api/game_cards/<int:game_card_id>', methods=['GET'])
+def get_game_card(game_card_id):
+    """获取单个道具卡信息"""
+    try:
+        result = game_card_service.get_game_card(game_card_id)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': str(e),
+            'data': None
+        })
 
 if __name__ == '__main__':
     logger = setup_logging()
@@ -971,9 +1019,3 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Failed to start server: {str(e)}", exc_info=True)
         raise
-
-
-
-
-
-

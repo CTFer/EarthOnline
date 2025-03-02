@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 22:49:55
- * @LastEditTime: 2025-02-27 22:29:13
+ * @LastEditTime: 2025-03-02 11:28:22
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -76,19 +76,20 @@ class PlayerService {
     Logger.info("PlayerService", "加载玩家信息:", this.state.playerId);
 
     try {
-      const result = await this.api.getPlayerInfo(this.state.playerId);
-      if (result.code === 0) {
+      const playerId = this.getPlayerId();
+      const response = await this.api.getPlayerInfo(playerId);
+      if (response.code === 0) {
+        const playerData = response.data;
+        // 更新状态
+        this.store.setState({ player: playerData });
         this.setState({
-          playerData: result.data,
+          playerData: playerData,
           initialized: true,
           lastUpdate: Date.now(),
           loading: false,
         });
 
-        // 更新全局状态
-        this.store.setState({ player: result.data });
-
-        this.eventBus.emit(PLAYER_EVENTS.INFO_UPDATED, result.data);
+        this.eventBus.emit(PLAYER_EVENTS.INFO_UPDATED, playerData);
         Logger.info("PlayerService", "玩家信息加载成功");
       }
     } catch (error) {
