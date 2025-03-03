@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-03-02 23:39:53
+ * @LastEditTime: 2025-03-03 11:44:46
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -342,7 +342,7 @@ class UIService {
    * 显示任务详情
    * @param {Object} taskId 任务ID
    */
-  showTaskDetails(taskId) {
+  async showTaskDetails(taskId) {
     Logger.info("UIService", "显示任务详情:", taskId);
 
     try {
@@ -366,28 +366,37 @@ class UIService {
       layer.open({
         type: 1,
         title: false,
-        content: this.templateService.createTaskDetailTemplate(task),
+        content: await this.templateService.createTaskDetailTemplate(task),
         area: ["500px", "400px"],
         shadeClose: true,
         success: (layero) => {
+          // 确保layero是jQuery对象
+          const $layero = $(layero);
+
           // 绑定接受任务按钮事件
-          const acceptBtn = layero.find(".accept-task");
+          const acceptBtn = $layero.find(".accept-task");
           if (acceptBtn.length) {
             acceptBtn.on("click", () => {
-              this.eventBus.emit(TASK_EVENTS.ACCEPTED, { taskId, playerId: this.playerId });
-              layer.closeAll();
+              this.showConfirmDialog({
+                title: "确认接受",
+                  content: "确定要接受这个任务吗？",
+                  onConfirm: () => {
+                    this.eventBus.emit(TASK_EVENTS.ACCEPT, { taskId, playerId: this.playerService.getPlayerId() });
+                    layer.closeAll();
+                  },
+              });
             });
           }
 
           // 绑定放弃任务按钮事件
-          const abandonBtn = layero.find(".abandon-task");
+          const abandonBtn = $layero.find(".abandon-task");
           if (abandonBtn.length) {
             abandonBtn.on("click", () => {
               this.showConfirmDialog({
                 title: "确认放弃",
                 content: "确定要放弃这个任务吗？",
                 onConfirm: () => {
-                  this.eventBus.emit(TASK_EVENTS.ABANDONED, { taskId, playerId: this.playerId });
+                  this.eventBus.emit(TASK_EVENTS.ABANDONED, { taskId, playerId: this.playerService.getPlayerId() });
                   layer.closeAll();
                 },
               });
@@ -409,7 +418,7 @@ class UIService {
    * 显示当前任务详情
    * @param {Object} taskId 任务ID
    */
-  showCurrentTaskDetails(taskId) {
+  async showCurrentTaskDetails(taskId) {
     Logger.info("UIService", "显示当前任务详情:", taskId);
 
     try {
@@ -420,28 +429,25 @@ class UIService {
 
       if (!task) {
         // 如果任务不在当前任务列表中，则从API获取
-        this.api.getCurrentTaskById(taskId).then(response => {
-          if (response.code === 0) {
-            const taskDetails = response.data;
-            layer.open({
-              type: 1,
-              title: false,
-              content: this.templateService.createCurrentTaskDetailTemplate(taskDetails),
-              area: ["500px", "400px"],
-              shadeClose: true,
-            });
-          } else {
-            Logger.error("UIService", "未找到任务数据:", taskId);
-          }
-        }).catch(error => {
-          Logger.error("UIService", "获取当前任务详情失败:", error);
-        });
+        const response = await this.api.getCurrentTaskById(taskId);
+        if (response.code === 0) {
+          const taskDetails = response.data;
+          layer.open({
+            type: 1,
+            title: false,
+            content: await this.templateService.createCurrentTaskDetailTemplate(taskDetails),
+            area: ["500px", "400px"],
+            shadeClose: true,
+          });
+        } else {
+          Logger.error("UIService", "未找到任务数据:", taskId);
+        }
       } else {
         // 如果任务在当前任务列表中，直接显示
         layer.open({
           type: 1,
           title: false,
-          content: this.templateService.createCurrentTaskDetailTemplate(task),
+          content: await this.templateService.createCurrentTaskDetailTemplate(task),
           area: ["500px", "400px"],
           shadeClose: true,
         });
@@ -450,6 +456,7 @@ class UIService {
       Logger.error("UIService", "显示当前任务详情失败:", error);
     }
   }
+
   /**
    * 显示通知消息
    * @param {Object} data 通知数据
@@ -844,8 +851,8 @@ class UIService {
               layer.close(index);
 
               // 调用任务服务接受任务
-              const result = await this.taskService.acceptTask(taskId);
-
+              const result = await this.taskService.handleTaskAccept(taskId);
+              Logger.info("UIService", "接受任务结果:", result);
               // 根据返回结果显示不同的提示
               if (result.code === 1) {
                 // 已接受的情况
@@ -859,7 +866,11 @@ class UIService {
                   type: "SUCCESS",
                   message: "任务接受成功",
                 });
-
+                // 任务接受完成，更新任务状态
+                this.eventBus.emit(TASK_EVENTS.ACCEPTED, {
+                  taskId: taskId,
+                  playerId: this.playerService.getPlayerId(),
+                });
                 // 发送音频播放事件
                 this.eventBus.emit(AUDIO_EVENTS.PLAY, "ACCEPT");
               }
@@ -912,7 +923,7 @@ class UIService {
             // 用户点击确定后触发任务放弃事件
             this.eventBus.emit(TASK_EVENTS.ABANDONED, {
               taskId: taskId,
-              playerId: this.playerId,
+              playerId: this.playerService.getPlayerId(),
             });
             layer.closeAll();
           } catch (error) {
@@ -1053,12 +1064,11 @@ class UIService {
 
   // 处理文档点击事件的函数
   handleDocumentClick(e) {
-    Logger.debug("UIService", "处理文档点击事件");
-    e.stopPropagation(); // 阻止事件冒泡
+    const target = e.target;
 
-    // 处理任务卡片点击 需要判断是进行中的任务还是可用任务
-    const taskCard = e.target.closest(".task-card");
-    if (taskCard && !e.target.closest("button")) {
+    // 处理任务卡片点击 需要判断是进行中的任务还是可用任务    
+    const taskCard = target.closest(".task-card");
+    if (taskCard && !target.closest("button")) {
         const taskId = taskCard.dataset.taskId;
         if (taskId) {
             // 判断任务类型
@@ -1075,8 +1085,8 @@ class UIService {
     }
 
     // 处理接受任务按钮点击
-    if (e.target.closest(".accept-btn")) {
-      const taskId = e.target.closest(".task-card").dataset.taskId;
+    if (target.classList.contains(".accept-task")) {
+      const taskId =target.dataset.taskId;
       Logger.debug("UIService", "处理接受任务按钮点击::, taskId ", taskId);
       if (taskId) {
         this.handleTaskAccept(taskId);
@@ -1084,8 +1094,8 @@ class UIService {
     }
 
     // 处理放弃任务按钮点击
-    if (e.target.closest(".abandon-task")) {
-      const taskId = e.target.closest(".task-card").dataset.taskId;
+    if (target.classList.contains('abandon-task')) {
+      const taskId = target.dataset.taskId;
       Logger.debug("UIService", "处理放弃任务按钮点击::, taskId ", taskId);
       if (taskId) {
         this.handleTaskAbandon(taskId);

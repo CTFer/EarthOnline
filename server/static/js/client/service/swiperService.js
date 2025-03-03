@@ -93,6 +93,15 @@ class SwiperService {
             this.taskListSwiper = null;
         }
     }
+
+    reinitializeSwipers() {
+        if (this.activeTasksSwiper) {
+            this.activeTasksSwiper.update();
+        }
+        if (this.taskListSwiper) {
+            this.taskListSwiper.update();
+        }
+    }
 }
 
 export default SwiperService; 

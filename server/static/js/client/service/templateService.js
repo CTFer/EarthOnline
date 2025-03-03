@@ -152,7 +152,7 @@ class TemplateService {
                     <div class="task-rewards">
                         ${this.renderRewardItems(rewards, task)}
                     </div>
-                    <button class="accept-btn" onclick="event.stopPropagation(); GameManager.acceptTask(${task.id})">
+                    <button class="accept-btn accept-task" data-task-id="${task.id}">
                         <i class="layui-icon layui-icon-ok"></i>
                         接受
                     </button>
@@ -285,46 +285,51 @@ class TemplateService {
 
     // 渲染奖励项
     async renderRewardItems(task) {
-        const rewards = await this.getTaskRewardDetails(task);
-        
-        return `
-            ${rewards.exp > 0 ? `
-                <div class="reward-item">
-                    <i class="layui-icon layui-icon-star"></i>
-                    <span>+${rewards.exp}</span>
-                </div>
-            ` : ''}
-            ${rewards.points > 0 ? `
-                <div class="reward-item">
-                    <i class="layui-icon layui-icon-diamond"></i>
-                    <span>+${rewards.points}</span>
-                </div>
-            ` : ''}
-            ${rewards.enrichedCards.map(card => `
-                <div class="reward-item" title="${card?.name || '道具卡'}">
-                    <i class="layui-icon ${card?.icon || 'layui-icon-gift'}"></i>
-                    <span>${card?.name || '道具卡'} ${card?.number > 1 ? `x${card.number}` : ''}</span>
-                </div>
-            `).join('')}
-            ${rewards.enrichedMedals.map(medal => `
-                <div class="reward-item" title="${medal?.name || '勋章'}">
-                    <i class="layui-icon ${medal?.icon || 'layui-icon-medal'}"></i>
-                    <span>${medal?.name || '勋章'}</span>
-                </div>
-            `).join('')}
-            ${rewards.real_rewards?.map(reward => `
-                <div class="reward-item" title="${reward?.name || '实物'}">
-                    <i class="layui-icon layui-icon-gift"></i>
-                    <span>${reward?.name || '实物'} ${reward?.number > 1 ? `x${reward.number}` : ''}</span>
-                </div>
-            `).join('') || ''}
-            ${task.stamina_cost ? `
-                <div class="reward-item">
-                    <i class="layui-icon layui-icon-fire"></i>
-                    <span>-${task.stamina_cost}</span>
-                </div>
-            ` : ''}
-        `;
+        try {
+            const rewards = await this.getTaskRewardDetails(task);
+            
+            return `
+                ${rewards.exp > 0 ? `
+                    <div class="reward-item">
+                        <i class="layui-icon layui-icon-star"></i>
+                        <span>+${rewards.exp}</span>
+                    </div>
+                ` : ''}
+                ${rewards.points > 0 ? `
+                    <div class="reward-item">
+                        <i class="layui-icon layui-icon-diamond"></i>
+                        <span>+${rewards.points}</span>
+                    </div>
+                ` : ''}
+                ${rewards.enrichedCards.map(card => `
+                    <div class="reward-item" title="${card?.name || '道具卡'}">
+                        <i class="layui-icon ${card?.icon || 'layui-icon-gift'}"></i>
+                        <span>${card?.name || '道具卡'} ${card?.number > 1 ? `x${card.number}` : ''}</span>
+                    </div>
+                `).join('')}
+                ${rewards.enrichedMedals.map(medal => `
+                    <div class="reward-item" title="${medal?.name || '勋章'}">
+                        <i class="layui-icon ${medal?.icon || 'layui-icon-medal'}"></i>
+                        <span>${medal?.name || '勋章'}</span>
+                    </div>
+                `).join('')}
+                ${rewards.real_rewards?.map(reward => `
+                    <div class="reward-item" title="${reward?.name || '实物'}">
+                        <i class="layui-icon layui-icon-gift"></i>
+                        <span>${reward?.name || '实物'} ${reward?.number > 1 ? `x${reward.number}` : ''}</span>
+                    </div>
+                `).join('') || ''}
+                ${task.stamina_cost ? `
+                    <div class="reward-item">
+                        <i class="layui-icon layui-icon-fire"></i>
+                        <span>-${task.stamina_cost}</span>
+                    </div>
+                ` : ''}
+            `;
+        } catch (error) {
+            Logger.error('TemplateService', '渲染任务奖励失败:', error);
+            return '<div class="reward-item">奖励加载失败</div>'; // 返回一个错误提示
+        }
     }
     /**
      * 创建可用任务卡片
@@ -336,7 +341,7 @@ class TemplateService {
         
         try {
             const typeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
-            
+            const rewardsHtml = this.renderRewardItems(task);
             return `
                 <div class="swiper-slide" role="group">
                     <div class="task-card" data-task-id="${task.id}"> 
@@ -352,9 +357,9 @@ class TemplateService {
                    <!-- <div class="task-content">
                             <div class="task-footer">
                                 <div class="task-rewards">
-                                    ${this.renderRewardItems(task)}
+                                    ${rewardsHtml}
                                 </div>
-                                <button class="accept-btn" data-task-id="${task.id}">
+                                <button class="accept-btn accept-task" data-task-id="${task.id}">
                                     <i class="layui-icon layui-icon-ok"></i>
                                     接受
                                 </button>
@@ -379,11 +384,7 @@ class TemplateService {
         try {
             const typeInfo = gameUtils.getTaskTypeInfo(task.task_type, task.icon);
             // const rewards = this.parseTaskRewards(task.task_rewards);
-            const rewardsHtml= this.renderRewardItems(task);
-            console.log(typeof rewardsHtml);
-            console.log(
-                rewardsHtml
-            );
+            const rewardsHtml = this.renderRewardItems(task);
             return `
                 <div class="task-card active-task" data-task-id="${task.id}" data-endtime="${task.endtime}">
                     <div class="task-header" style="background-color: ${typeInfo.color}">
@@ -403,7 +404,7 @@ class TemplateService {
                                 计算中...
                             </div>
                         </div>
-                        <div class="task-footer">
+                        <!--<div class="task-footer">
                             <div class="task-rewards">
                                 ${rewardsHtml}
                             </div>
@@ -411,7 +412,7 @@ class TemplateService {
                                 <i class="layui-icon layui-icon-close"></i>
                                 放弃
                             </button>
-                        </div>
+                        </div>-->
                     </div>
                     ${task.progress !== undefined ? `<div class="task-progress-bar" style="width: ${task.progress}%"></div>` : ''}
                 </div>`;
@@ -429,8 +430,7 @@ class TemplateService {
     async createTaskDetailTemplate(taskData) {
         try {
             const typeInfo = gameUtils.getTaskTypeInfo(taskData.task_type, taskData.icon);
-            const rewardsHtml =await this.renderRewardItems(taskData);
-            
+            const rewardsHtml = await this.renderRewardItems(taskData);
             
             return `
                 <div class="task-detail-popup">
@@ -538,10 +538,10 @@ class TemplateService {
      * @param {Object} taskData 任务数据
      * @returns {string} 当前任务详情HTML
      */
-    createCurrentTaskDetailTemplate(taskData) {
+    async createCurrentTaskDetailTemplate(taskData) {
         try {
             const typeInfo = gameUtils.getTaskTypeInfo(taskData.task_type, taskData.icon);
-            const rewards = this.parseTaskRewards(taskData.task_rewards);
+            const rewardsHtml = await this.renderRewardItems(taskData);
             
             return `
                 <div class="task-detail-popup">
@@ -559,7 +559,7 @@ class TemplateService {
                         <div class="rewards-section">
                             <h4>任务奖励</h4>
                             <div class="rewards-list">
-                                ${this.renderRewardItems(taskData)}
+                                ${rewardsHtml}
                             </div>
                         </div>
                         <div class="task-time-info">
@@ -579,7 +579,7 @@ class TemplateService {
                                 <i class="layui-icon layui-icon-ok"></i>
                                 提交任务
                             </button>
-                            <button class="abandon-btn" data-task-id="${taskData.id}">
+                            <button class="abandon-btn abandon-task" data-task-id="${taskData.id}">
                                 <i class="layui-icon layui-icon-close"></i>
                                 放弃任务
                             </button>

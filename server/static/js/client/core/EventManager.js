@@ -299,7 +299,21 @@ class EventManager {
       this.handleError("任务放弃", error, "放弃任务失败");
     }
   }
+  async handleTaskAccept(data) {
+    try {
+      await this.taskService.handleTaskAccept(data);
+    } catch (error) {
+      this.handleError("任务接受", error, "接受任务失败");
+    }
+  }
 
+  async handleTaskAccepted(data) {
+    try {
+      await this.taskService.handleTaskAccepted(data);
+    } catch (error) {
+      this.handleError("任务接受", error, "接受任务失败");
+    }
+  }
   async handleTaskCompleted(data) {
     try {
       await this.wordcloudService.updateWordCloud();
@@ -312,7 +326,8 @@ class EventManager {
     this.eventBus.on(TASK_EVENTS.COMPLETED, this.handleTaskCompleted.bind(this));
     this.eventBus.on(TASK_EVENTS.STATUS_UPDATED, this.handleTaskStatusUpdate.bind(this));
     this.eventBus.on(TASK_EVENTS.ABANDONED, this.handleTaskAbandon.bind(this));
-
+    this.eventBus.on(TASK_EVENTS.ACCEPT, this.handleTaskAccept.bind(this));
+    this.eventBus.on(TASK_EVENTS.ACCEPTED, this.handleTaskAccepted.bind(this));
     Logger.info("EventManager", "initializeTaskEvents:136", "任务事件监听器设置完成");
   }
 
