@@ -163,8 +163,6 @@ class EventManager {
 
       // 3. 初始化任务服务
       if (this.taskService) {
-        // this.uiService.initTaskEvents();
-
         if (this.taskService && this.uiService) {
           await Promise.all([
             this.taskService.loadTasks().then((tasks) => {
@@ -283,10 +281,13 @@ class EventManager {
       this.handleError("处理任务完成", error, "处理任务完成失败");
     }
   }
-
+  /**
+   * 处理任务状态更新
+   */
   async handleTaskStatusUpdate(data) {
+    Logger.info("EventManager", "handleTaskStatusUpdate", "处理任务状态更新:", data);
     try {
-      await this.taskService.handleTaskStatusUpdate(data);
+      this.uiService.updateTaskStatus(data);
     } catch (error) {
       this.handleError("任务状态更新", error, "更新任务状态失败");
     }

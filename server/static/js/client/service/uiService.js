@@ -640,8 +640,11 @@ class UIService {
    */
   updateTaskStatus(data) {
     Logger.info("UIService", "更新任务状态UI:", data);
-
     try {
+      // 同时更新任务列表和当前任务列表
+      this.renderTaskList(this.store.state.taskList);
+      this.renderCurrentTasks(this.store.state.currentTasks);
+      return;
       // 获取任务容器
       const container = document.querySelector(".active-tasks-swiper .swiper-wrapper");
       if (!container) {
@@ -705,9 +708,6 @@ class UIService {
             taskCard.innerHTML = newCard.innerHTML;
           }
       }
-
-      // 触发任务状态更新事件
-      this.eventBus.emit("ui:task:status:updated", data);
 
       Logger.info("UIService", "任务状态UI更新完成");
     } catch (error) {

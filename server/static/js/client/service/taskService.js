@@ -94,7 +94,7 @@ class TaskService {
   async handleTaskAccept(data) {
     const playerId = this.playerService.getPlayerId();
     Logger.info("TaskService", `接受任务: ${data.taskId} 玩家ID: ${playerId}`);
-    
+
     try {
       const response = await this.api.acceptTask(data.taskId, playerId);
       Logger.debug("TaskService", "接受任务响应:", response);
@@ -108,8 +108,6 @@ class TaskService {
       await this.updateTaskStatus(taskStatus);
       await this.loadCurrentTasks();
 
-      // 触发任务状态更新事件
-      this.eventBus.emit(TASK_EVENTS.STATUS_UPDATED, taskStatus);
       return response;
     } catch (error) {
       Logger.error("TaskService", "接受任务失败:", error);
@@ -165,7 +163,7 @@ class TaskService {
       // 只在特定状态下重新加载任务
       if (["COMPLETED", "ABANDONED", "ACCEPTED"].includes(data.status)) {
         Logger.info("TaskService", "重新加载任务列表和当前任务");
-        await Promise.all([this.loadTasks(), this.loadCurrentTasks()]);
+        this.refreshTasks();
       }
     } catch (error) {
       Logger.error("TaskService", "处理任务状态更新失败:", error);
@@ -201,12 +199,6 @@ class TaskService {
         // 更新任务状态
         await this.updateTaskStatus({
           id: data.taskId,
-          status: "ABANDONED",
-        });
-
-        // 发送状态更新事件
-        this.eventBus.emit(TASK_EVENTS.STATUS_UPDATED, {
-          taskId: data.taskId,
           status: "ABANDONED",
         });
 
@@ -288,24 +280,54 @@ class TaskService {
     Logger.debug("TaskService", "更新任务状态:", taskData);
 
     try {
-      // 更新本地任务状态
       const currentTasks = this.store.state.currentTasks || [];
-      const taskIndex = currentTasks.findIndex((t) => t.id === taskData.id);
+      const taskList = this.store.state.taskList || [];
 
-      if (taskIndex !== -1) {
-        currentTasks[taskIndex] = {
-          ...currentTasks[taskIndex],
-          ...taskData,
-        };
+      // 确保ID类型一致
+      const taskId = Number(taskData.id);
 
-        // 更新 store
-        this.store.setState({
-          currentTasks: currentTasks,
-        });
-
-        // 发送任务更新事件
-        this.eventBus.emit("task:updated", taskData);
+      // 根据任务状态更新任务列表
+      switch (taskData.status) {
+        case "ACCEPTED":
+          // 接受任务：添加到当前任务列表，移除可用任务列表
+          const acceptedTaskIndex = taskList.findIndex(t => t.id === taskId);
+          if (acceptedTaskIndex !== -1) {
+            const acceptedTask = taskList[acceptedTaskIndex];
+            currentTasks.push(acceptedTask);
+            taskList.splice(acceptedTaskIndex, 1);
+          }
+          break;
+        case "ABANDONED":
+          // 放弃任务：从当前任务列表中移除，添加到可用任务列表
+          Logger.debug("TaskService", "当前任务列表:", currentTasks);
+          const abandonedTaskIndex = currentTasks.findIndex(t => t.id === taskId);
+          Logger.debug("TaskService", "查找放弃任务的索引:", abandonedTaskIndex);
+          if (abandonedTaskIndex !== -1) {
+            const abandonedTask = currentTasks[abandonedTaskIndex];
+            taskList.push(abandonedTask);
+            currentTasks.splice(abandonedTaskIndex, 1);
+          }
+          break;
+        default:
+          // 更新当前任务状态
+          const currentTaskIndex = currentTasks.findIndex(t => t.id === taskId);
+          if (currentTaskIndex !== -1) {
+            currentTasks[currentTaskIndex] = {
+              ...currentTasks[currentTaskIndex],
+              ...taskData,
+            };
+          }
+          break;
       }
+
+      // 更新 store
+      this.store.setState({
+        currentTasks: currentTasks,
+        taskList: taskList,
+      });
+
+      // 发送任务更新事件
+      this.eventBus.emit(TASK_EVENTS.STATUS_UPDATED, taskData);
 
       Logger.debug("TaskService", "任务状态更新完成");
       this.saveState(); // 保存状态
@@ -423,7 +445,6 @@ class TaskService {
             this.eventBus.emit(TASK_EVENTS.CURRENT_UPDATED, currentTasks);
           }),
         ]);
-
         Logger.info("TaskService", "任务列表刷新完成");
       }, 300); // 300ms 的防抖时间
     } catch (error) {
