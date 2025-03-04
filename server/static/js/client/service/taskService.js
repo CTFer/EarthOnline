@@ -98,16 +98,16 @@ class TaskService {
     try {
       const response = await this.api.acceptTask(data.taskId, playerId);
       Logger.debug("TaskService", "接受任务响应:", response);
+      if (response.code === 0) {
+        // 更新任务状态
+        const taskStatus = {
+          id: data.taskId,
+          status: "ACCEPTED",
+        };
 
-      // 更新任务状态
-      const taskStatus = {
-        id: data.taskId,
-        status: "ACCEPTED",
-      };
-
-      await this.updateTaskStatus(taskStatus);
-      await this.loadCurrentTasks();
-
+        await this.updateTaskStatus(taskStatus);
+        await this.loadCurrentTasks();
+      }
       return response;
     } catch (error) {
       Logger.error("TaskService", "接受任务失败:", error);
@@ -290,7 +290,7 @@ class TaskService {
       switch (taskData.status) {
         case "ACCEPTED":
           // 接受任务：添加到当前任务列表，移除可用任务列表
-          const acceptedTaskIndex = taskList.findIndex(t => t.id === taskId);
+          const acceptedTaskIndex = taskList.findIndex((t) => t.id === taskId);
           if (acceptedTaskIndex !== -1) {
             const acceptedTask = taskList[acceptedTaskIndex];
             currentTasks.push(acceptedTask);
@@ -300,7 +300,7 @@ class TaskService {
         case "ABANDONED":
           // 放弃任务：从当前任务列表中移除，添加到可用任务列表
           Logger.debug("TaskService", "当前任务列表:", currentTasks);
-          const abandonedTaskIndex = currentTasks.findIndex(t => t.id === taskId);
+          const abandonedTaskIndex = currentTasks.findIndex((t) => t.id === taskId);
           Logger.debug("TaskService", "查找放弃任务的索引:", abandonedTaskIndex);
           if (abandonedTaskIndex !== -1) {
             const abandonedTask = currentTasks[abandonedTaskIndex];
@@ -310,7 +310,7 @@ class TaskService {
           break;
         default:
           // 更新当前任务状态
-          const currentTaskIndex = currentTasks.findIndex(t => t.id === taskId);
+          const currentTaskIndex = currentTasks.findIndex((t) => t.id === taskId);
           if (currentTaskIndex !== -1) {
             currentTasks[currentTaskIndex] = {
               ...currentTasks[currentTaskIndex],

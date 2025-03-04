@@ -11,7 +11,7 @@ layui.use(["jquery", "layer", "form", "laytpl"], function () {
     light: {
       "layui-bg-blue": "#1e9fff", // 经典蓝
       "layui-bg-green": "#16b777", // 清新绿
-      "layui-bg-cyan": "#16baaa", // 蓝绿色
+      "layui-bg-cyan": "#3f51b5", // 深蓝色
       "layui-bg-orange": "#ffb800", // 警示色
       "layui-bg-red": "#ff5722", // 错误色
       "layui-bg-purple": "#a233c6", // 紫色
@@ -20,7 +20,7 @@ layui.use(["jquery", "layer", "form", "laytpl"], function () {
     dark: {
       "layui-bg-blue": "#0d47a1", // 深蓝
       "layui-bg-green": "#1b5e20", // 深绿
-      "layui-bg-cyan": "#006064", // 深青
+      "layui-bg-cyan": "#283593", // 深蓝色（暗色版）
       "layui-bg-orange": "#e65100", // 深橙
       "layui-bg-red": "#b71c1c", // 深红
       "layui-bg-purple": "#4a148c", // 深紫

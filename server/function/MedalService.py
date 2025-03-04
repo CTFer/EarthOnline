@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-02-12 20:04:48
-# LastEditTime: 2025-02-27 13:20:49
+# LastEditTime: 2025-03-04 21:34:59
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -12,6 +12,7 @@ import os
 import time
 import sqlite3
 from typing import Dict, List, Optional, Union
+from utils.response_handler import ResponseHandler, StatusCode
 
 class MedalService:
     '''
@@ -56,19 +57,18 @@ class MedalService:
             
             medals = [dict(row) for row in cursor.fetchall()]
             
-            return {
-                'code': 0,
-                'msg': '',
-                'count': total,
-                'data': medals
-            }
+            return ResponseHandler.success(
+                data={
+                    'items': medals,
+                    'total': total
+                },
+                msg='获取勋章列表成功'
+            )
         except Exception as e:
-            return {
-                'code': 500,
-                'msg': str(e),
-                'count': 0,
-                'data': []
-            }
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'获取勋章列表失败: {str(e)}'
+            )
         finally:
             if conn:
                 conn.close()
@@ -91,23 +91,20 @@ class MedalService:
             
             row = cursor.fetchone()
             if not row:
-                return {
-                    'code': 404,
-                    'msg': '勋章不存在',
-                    'data': None
-                }
+                return ResponseHandler.error(
+                    code=StatusCode.NOT_FOUND,
+                    msg='勋章不存在'
+                )
             
-            return {
-                'code': 0,
-                'msg': '',
-                'data': dict(row)
-            }
+            return ResponseHandler.success(
+                data=dict(row),
+                msg='获取勋章信息成功'
+            )
         except Exception as e:
-            return {
-                'code': 500,
-                'msg': str(e),
-                'data': None
-            }
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'获取勋章信息失败: {str(e)}'
+            )
         finally:
             if conn:
                 conn.close()
@@ -137,17 +134,15 @@ class MedalService:
             medal_id = cursor.lastrowid
             conn.commit()
             
-            return {
-                'code': 0,
-                'msg': '创建成功',
-                'data': {'id': medal_id}
-            }
+            return ResponseHandler.success(
+                data={'id': medal_id},
+                msg='创建勋章成功'
+            )
         except Exception as e:
-            return {
-                'code': 500,
-                'msg': str(e),
-                'data': None
-            }
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'创建勋章失败: {str(e)}'
+            )
         finally:
             if conn:
                 conn.close()
@@ -186,11 +181,10 @@ class MedalService:
             ))
             
             if cursor.rowcount == 0:
-                return {
-                    'code': 404,
-                    'msg': '未找到要更新的勋章',
-                    'data': None
-                }
+                return ResponseHandler.error(
+                    code=StatusCode.NOT_FOUND,
+                    msg='未找到要更新的勋章'
+                )
             
             conn.commit()
             
@@ -198,17 +192,15 @@ class MedalService:
             cursor.execute('SELECT * FROM medals WHERE id = ?', (medal_id,))
             updated_medal = cursor.fetchone()
             
-            return {
-                'code': 0,
-                'msg': '更新成功',
-                'data': dict(updated_medal) if updated_medal else None
-            }
+            return ResponseHandler.success(
+                data=dict(updated_medal) if updated_medal else None,
+                msg='更新勋章成功'
+            )
         except Exception as e:
-            return {
-                'code': 500,
-                'msg': str(e),
-                'data': None
-            }
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'更新勋章失败: {str(e)}'
+            )
         finally:
             if conn:
                 conn.close()
@@ -224,31 +216,44 @@ class MedalService:
             cursor = conn.cursor()
             
             cursor.execute('DELETE FROM medals WHERE id = ?', (medal_id,))
+            
+            if cursor.rowcount == 0:
+                return ResponseHandler.error(
+                    code=StatusCode.NOT_FOUND,
+                    msg='未找到要删除的勋章'
+                )
+            
             conn.commit()
             
-            return {
-                'code': 0,
-                'msg': '删除成功',
-                'data': None
-            }
+            return ResponseHandler.success(
+                msg='删除勋章成功'
+            )
         except Exception as e:
-            return {
-                'code': 500,
-                'msg': str(e),
-                'data': None
-            }
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'删除勋章失败: {str(e)}'
+            )
         finally:
             if conn:
                 conn.close()
     
-    def get_icon_list(self) -> List[str]:
+    def get_icon_list(self) -> Dict:
         """获取图标列表"""
-        icons = []
-        icon_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'img', 'medal')
-        for filename in os.listdir(icon_dir):
-            if filename.endswith(('.png', '.svg', '.jpg', '.jpeg', '.gif')):
-                icons.append(filename)
-        return icons
+        try:
+            icons = []
+            icon_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'img', 'medal')
+            for filename in os.listdir(icon_dir):
+                if filename.endswith(('.png', '.svg', '.jpg', '.jpeg', '.gif')):
+                    icons.append(filename)
+            return ResponseHandler.success(
+                data=icons,
+                msg='获取图标列表成功'
+            )
+        except Exception as e:
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'获取图标列表失败: {str(e)}'
+            )
 
     def get_wordcloud_medals(self) -> Dict:
         """
@@ -270,17 +275,15 @@ class MedalService:
             # 获取所有勋章名称
             medals = [(row['name'], row['level']) for row in cursor.fetchall()]
             
-            return {
-                'code': 0,
-                'msg': '获取成功',
-                'data': medals
-            }
+            return ResponseHandler.success(
+                data=medals,
+                msg='获取词云勋章数据成功'
+            )
         except Exception as e:
-            return {
-                'code': 500,
-                'msg': str(e),
-                'data': None
-            }
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'获取词云勋章数据失败: {str(e)}'
+            )
         finally:
             if conn:
                 conn.close()

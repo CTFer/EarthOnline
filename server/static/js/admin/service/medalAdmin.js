@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-25 11:17:32
- * @LastEditTime: 2025-02-27 11:50:03
+ * @LastEditTime: 2025-03-04 21:54:09
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -24,9 +24,9 @@ class MedalAdmin {
         throw new Error(result.msg);
       }
 
-      const medals = result.data || [];
+      const medals = result.data.items || [];
       const tbody = document.querySelector("#medalTable tbody");
-
+      console.log("勋章", medals);
       tbody.innerHTML = medals
         .map(
           (medal) => `
@@ -237,7 +237,6 @@ class MedalAdmin {
 
   // 选择图标
   selectIcon() {
-    // 使用 layer.zIndex 来管理层级
     const layerIndex = this.layer.open({
       type: 1,
       title: "选择图标",
@@ -258,10 +257,11 @@ class MedalAdmin {
             return response.json();
           })
           .then((result) => {
-            if (result.code !== 0) {
-              throw new Error(result.msg || "获取图标列表失败");
+            console.log("图标", result);
+            if (result.code !== 0 || result.data.code !== 0) {
+              throw new Error(result.msg || result.data.msg || "获取图标列表失败");
             }
-            const icons = result.data;
+            const icons = result.data.data;  // 修改这里以匹配新的数据结构
             const iconList = document.getElementById("iconList");
             iconList.innerHTML = ""; // 清空列表
 
@@ -271,11 +271,13 @@ class MedalAdmin {
               iconItem.style.textAlign = "center";
               iconItem.style.padding = "10px";
               iconItem.innerHTML = `
-                            <div class="icon-item" style="border: 1px solid #e6e6e6; padding: 10px; margin-bottom: 10px; cursor: pointer;">
-                                <img src="/static/img/medal/${icon}" alt="${icon}" style="width: 100%; max-width: 64px; height: auto;">
-                                <p style="margin-top: 5px; font-size: 12px; color: #666;">${icon}</p>
-                            </div>
-                        `;
+                <div class="icon-item" style="border: 1px solid #e6e6e6; padding: 10px; margin-bottom: 10px; cursor: pointer;">
+                  <img src="/static/img/medal/${icon}" alt="${icon}" 
+                       style="width: 100%; max-width: 64px; height: auto;"
+                       onerror="this.src='/static/img/medal/default.svg'">
+                  <p style="margin-top: 5px; font-size: 12px; color: #666;">${icon}</p>
+                </div>
+              `;
 
               // 使用一次性事件监听器
               const iconItemElement = iconItem.querySelector(".icon-item");

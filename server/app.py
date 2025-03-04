@@ -35,6 +35,7 @@ import requests
 from function.NotificationService import notification_service
 from function.MedalService import medal_service
 from function.GameCardService import game_card_service
+from utils.response_handler import ResponseHandler, StatusCode, api_response
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -290,23 +291,26 @@ def broadcast_task_update(player_id, task_data):
     socketio.emit('task_update', task_data, room=f'user_{player_id}')
 
 @app.route('/api/player/<int:player_id>', methods=['GET'])
+@api_response
 def get_player_api(player_id):
     """获取角色信息"""
-    print(player_id)    
     return player_service.get_player(player_id)
 
 
 @app.route('/api/get_players', methods=['GET'])
+@api_response
 def get_players():
     """获取所有玩家"""
     return player_service.get_players()
 
 @app.route('/api/tasks/available/<int:player_id>', methods=['GET'])
+@api_response
 def get_available_tasks(player_id):
     """获取可用任务列表"""
     return task_service.get_available_tasks(player_id)
 
 @app.route('/api/tasks/<int:task_id>', methods=['GET'])
+@api_response
 def get_task_by_id(task_id):
     """获取任务详情"""
     return task_service.get_task_by_id(task_id)
@@ -318,12 +322,14 @@ def get_current_task_by_id(task_id):
     return task_service.get_current_task_by_id(task_id)
 
 @app.route('/api/tasks/current/<int:player_id>', methods=['GET'])
+@api_response
 def get_current_tasks(player_id):
     """获取用户当前未过期的任务列表"""
     return task_service.get_current_tasks(player_id)
 
 
 @app.route('/api/tasks/accept', methods=['POST'])
+@api_response
 def accept_task():
     """接受任务接口"""
     try:
@@ -332,21 +338,19 @@ def accept_task():
         
         # 验证请求数据
         if not data:
-            logger.error("[TaskAPI] 请求数据为空")
-            return jsonify({
-                'code': 1,
-                'msg': '无效的请求数据'
-            })
+            return ResponseHandler.error(
+                code=StatusCode.PARAM_ERROR,
+                msg='无效的请求数据'
+            )
             
         # 检查必要字段
         required_fields = ['player_id', 'task_id']
         for field in required_fields:
             if field not in data:
-                logger.error(f"[TaskAPI] 缺少必要字段: {field}")
-                return jsonify({
-                    'code': 1,
-                    'msg': f'缺少必要参数: {field}'
-                })
+                return ResponseHandler.error(
+                    code=StatusCode.PARAM_ERROR,
+                    msg=f'缺少必要参数: {field}'
+                )
         
         # 调用任务服务
         logger.debug(f"[TaskAPI] 开始处理任务接受请求 - 玩家ID: {data['player_id']}, 任务ID: {data['task_id']}")
@@ -357,12 +361,13 @@ def accept_task():
         
     except Exception as e:
         logger.error(f"[TaskAPI] 处理任务接受请求时发生错误: {str(e)}", exc_info=True)
-        return jsonify({
-            'code': 1,
-            'msg': f'处理任务请求失败: {str(e)}'
-        })
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=f'处理任务请求失败: {str(e)}'
+        )
 
 @app.route('/api/tasks/abandon', methods=['POST'])
+@api_response
 def abandon_task():
     """放弃任务接口"""
     try:
@@ -371,21 +376,19 @@ def abandon_task():
         
         # 验证请求数据
         if not data:
-            logger.error("[TaskAPI] 请求数据为空")
-            return jsonify({
-                'code': 1,
-                'msg': '无效的请求数据'
-            })
+            return ResponseHandler.error(
+                code=StatusCode.PARAM_ERROR,
+                msg='无效的请求数据'
+            )
             
         # 检查必要字段
         required_fields = ['player_id', 'task_id']
         for field in required_fields:
             if field not in data:
-                logger.error(f"[TaskAPI] 缺少必要字段: {field}")
-                return jsonify({
-                    'code': 1,
-                    'msg': f'缺少必要参数: {field}'
-                })
+                return ResponseHandler.error(
+                    code=StatusCode.PARAM_ERROR,
+                    msg=f'缺少必要参数: {field}'
+                )
         
         # 调用任务服务
         logger.debug(f"[TaskAPI] 开始处理任务放弃请求 - 玩家ID: {data['player_id']}, 任务ID: {data['task_id']}")
@@ -396,12 +399,13 @@ def abandon_task():
         
     except Exception as e:
         logger.error(f"[TaskAPI] 处理任务放弃请求时发生错误: {str(e)}", exc_info=True)
-        return jsonify({
-            'code': 1,
-            'msg': f'处理任务请求失败: {str(e)}'
-        })
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=f'处理任务请求失败: {str(e)}'
+        )
 
 @app.route('/api/tasks/complete', methods=['POST'])
+@api_response
 def complete_task_api():
     data = request.get_json()
     return task_service.complete_task_api(data['player_id'], data['task_id'])
@@ -580,6 +584,7 @@ def handle_nfc_card():
         }), 500
 
 @app.route('/api/gps', methods=['POST'])
+@api_response
 def add_gps():
     """添加GPS记录"""
     try:
@@ -592,11 +597,10 @@ def add_gps():
         try:
             latitude, longitude = map(float, location.split(','))
         except (ValueError, AttributeError):
-            return json.dumps({
-                'code': 400,
-                'msg': '无效的位置数据格式',
-                'data': None
-            }), 400
+            return ResponseHandler.error(
+                code=StatusCode.GPS_DATA_INVALID,
+                msg='无效的位置数据格式'
+            )
 
         # 处理时间戳
         try:
@@ -659,11 +663,10 @@ def add_gps():
 
     except Exception as e:
         logger.error(f"处理GPS数据失败: {str(e)}")
-        return json.dumps({
-            'code': 500,
-            'msg': f'处理GPS数据失败: {str(e)}',
-            'data': None
-        }), 500
+        return ResponseHandler.error(
+            code=StatusCode.GPS_DATA_INVALID,
+            msg=f'处理GPS数据失败: {str(e)}'
+        )
 
 @app.route('/api/gps/<int:gps_id>', methods=['GET'])
 def get_gps(gps_id):
@@ -933,43 +936,41 @@ def get_wordcloud():
     return medal_service.get_wordcloud_medals()
 # 获取勋章列表
 @app.route('/api/medals', methods=['GET'])
+@api_response
 def get_medals():
     """获取勋章列表"""
     return medal_service.get_medals()
 # 获取勋章详情
 @app.route('/api/medals/<int:medal_id>', methods=['GET'])
+@api_response
 def get_medal(medal_id):
     """获取勋章详情"""
     return medal_service.get_medal(medal_id)
     
 # GameCard相关接口
 @app.route('/api/game_cards', methods=['GET'])
+@api_response
 def get_game_cards():
     """获取道具卡列表"""
-    try:
-        page = request.args.get('page', 1, type=int)
-        limit = request.args.get('limit', 20, type=int)
-        result = game_card_service.get_game_card(page=page, limit=limit)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({
-            'code': 500,
-            'msg': str(e),
-            'data': None
-        })
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 20, type=int)
+    return game_card_service.get_game_cards(page=page, limit=limit)
 
 @app.route('/api/game_cards/<int:game_card_id>', methods=['GET'])
+@api_response
 def get_game_card(game_card_id):
     """获取单个道具卡信息"""
-    try:
-        result = game_card_service.get_game_card(game_card_id)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({
-            'code': 500,
-            'msg': str(e),
-            'data': None
-        })
+    return game_card_service.get_game_card(game_card_id)
+
+# 全局错误处理
+@app.errorhandler(Exception)
+def handle_error(e):
+    """全局错误处理器"""
+    logger.exception("未捕获的异常")
+    return jsonify(ResponseHandler.error(
+        code=StatusCode.SERVER_ERROR,
+        msg=f"服务器错误: {str(e)}"
+    ))
 
 if __name__ == '__main__':
     logger = setup_logging()

@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-02-04 23:29:47
-# LastEditTime: 2025-02-05 11:30:49
+# LastEditTime: 2025-03-04 21:06:52
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -12,6 +12,10 @@ import sqlite3
 import os
 import logging
 import json
+import time
+from typing import Dict, List, Optional
+from utils.response_handler import ResponseHandler, StatusCode
+
 logger = logging.getLogger(__name__)
 
 class PlayerService:
@@ -33,55 +37,47 @@ class PlayerService:
             
     def get_db(self):
         """获取数据库连接"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        return sqlite3.connect(self.db_path)
 
-    def get_player(self, player_id):
-        """获取角色信息"""
+    def get_player(self, player_id: int) -> Dict:
+        """获取玩家信息"""
         logger.debug(f"获取角色信息: player_id={player_id}")
         try:
             conn = self.get_db()
             cursor = conn.cursor()
-            cursor.execute(
-                'SELECT * FROM player_data where player_id=?', (player_id,))
-            columns = [description[0] for description in cursor.description]
-            character = cursor.fetchone()
 
-            if character:
-                player_data = dict(zip(columns, character))
-                return json.dumps({
-                    'code': 0,
-                    'msg': '获取角色信息成功',
-                    'data': {
-                        'player_id': player_data['player_id'],
-                        'stamina': player_data['stamina'],
-                        'sex': player_data['sex'],
-                        'player_name': player_data['player_name'],
-                        'points': player_data['points'],
-                        'create_time': player_data['create_time'],
-                        'level': player_data['level'],
-                        'experience': player_data['experience']
-                    }
-                })
-            else:
-                return json.dumps({
-                    'code': 1,
-                    'msg': '角色不存在',
-                    'data': None
-                }), 404
+            cursor.execute('''
+                SELECT *
+                FROM player_data 
+                WHERE player_id = ?
+            ''', (player_id,))
 
-        except sqlite3.Error as e:
-            print("Database error:", str(e))
-            return json.dumps({
-                'code': 2,
-                'msg': f'数据库错误: {str(e)}',
-                'data': None
-            }), 500
+            player = cursor.fetchone()
+            if not player:
+                return ResponseHandler.error(
+                    code=StatusCode.USER_NOT_FOUND,
+                    msg="玩家不存在"
+                )
+
+            # 将查询结果转换为字典
+            columns = [col[0] for col in cursor.description]
+            player_dict = dict(zip(columns, player))
+
+            return ResponseHandler.success(
+                data=player_dict,
+                msg="获取玩家信息成功"
+            )
+
+        except Exception as e:
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取玩家信息失败: {str(e)}"
+            )
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
-    def get_players(self):
+    def get_players(self) -> Dict:
         """获取所有玩家"""
         try:
             conn = self.get_db()
@@ -93,46 +89,59 @@ class PlayerService:
                 ORDER BY player_id ASC
             ''')
 
-            players = [dict(row) for row in cursor.fetchall()]
+            # 将查询结果转换为字典列表
+            columns = [col[0] for col in cursor.description]
+            players = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-            return json.dumps({
-                "code": 0,
-                "msg": "获取玩家列表成功",
-                "data": players
-            })
+            return ResponseHandler.success(
+                data=players,
+                msg="获取玩家列表成功"
+            )
 
         except Exception as e:
-            print(f"获取玩家列表出错: {str(e)}")
-            return json.dumps({
-                "code": 1,
-                "msg": f"获取玩家列表失败: {str(e)}",
-                "data": None
-            }), 500
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取玩家列表失败: {str(e)}"
+            )
         finally:
             if conn:
                 conn.close()
-    def update_player(self, player_id,data):
+
+    def update_player(self, player_id: int, data: Dict) -> Dict:
         """更新玩家信息"""
         try:
             conn = self.get_db()
             cursor = conn.cursor()
 
-            print(data)
+            # 检查玩家是否存在
+            cursor.execute('SELECT 1 FROM player_data WHERE player_id = ?', (player_id,))
+            if not cursor.fetchone():
+                return ResponseHandler.error(
+                    code=StatusCode.USER_NOT_FOUND,
+                    msg="玩家不存在"
+                )
+
             cursor.execute('''
                 UPDATE player_data 
                 SET player_name = ?,
-                points = ?,
-                level = ?
+                    points = ?,
+                    level = ?
                 WHERE player_id = ?
-            ''', (data['player_name'], data['points'], data['level'], player_id,))
+            ''', (data['player_name'], data['points'], data['level'], player_id))
 
             conn.commit()
-            return json.dumps({"success": True})
+
+            return ResponseHandler.success(
+                msg="更新玩家信息成功"
+            )
         except Exception as e:
-            print(f"Error in update_player: {str(e)}")
-            return json.dumps({'error': str(e)}), 500
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"更新玩家信息失败: {str(e)}"
+            )
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     def delete_player(self, player_id):
         """删除玩家"""
@@ -147,10 +156,14 @@ class PlayerService:
             cursor.execute('DELETE FROM player_data WHERE player_id = ?', (player_id,))
 
             conn.commit()
-            return json.dumps({"code": 0, "msg": "删除玩家成功"})
+            return ResponseHandler.success(
+                msg="删除玩家成功"
+            )
         except Exception as e:
-            print(f"Error in delete_player: {str(e)}")
-            return json.dumps({'code': 1, 'msg': str(e)}), 500
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"删除玩家失败: {str(e)}"
+            )
         finally:
             conn.close()
 
@@ -168,14 +181,15 @@ class PlayerService:
             player_id = cursor.lastrowid
             conn.commit()
 
-            return json.dumps({
-                "code": 0,
-                "msg": "添加玩家成功",
-                "data": {"id": player_id}
-            }), 201
+            return ResponseHandler.success(
+                data={"id": player_id},
+                msg="添加玩家成功"
+            )
         except Exception as e:
-            print(f"Error in add_player: {str(e)}")
-            return json.dumps({'code': 1, 'msg': str(e)}), 500
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"添加玩家失败: {str(e)}"
+            )
         finally:
             conn.close()
 

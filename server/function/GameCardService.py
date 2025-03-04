@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-02-12 20:04:48
-# LastEditTime: 2025-03-02 22:16:39
+# LastEditTime: 2025-03-04 21:44:23
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -12,6 +12,7 @@ import os
 import time
 import sqlite3
 from typing import Dict, List, Optional, Union
+from utils.response_handler import ResponseHandler, StatusCode
 
 class GameCardService:
     '''
@@ -28,7 +29,7 @@ class GameCardService:
         conn.row_factory = sqlite3.Row
         return conn
     
-    def get_game_card(self, page: int = 1, limit: int = 20) -> Dict:
+    def get_game_cards(self, page: int = 1, limit: int = 20) -> Dict:
         """
         获取道具卡列表
         :param page: 页码
@@ -54,21 +55,17 @@ class GameCardService:
                 LIMIT ? OFFSET ?
             ''', (limit, offset))
             
-            game_card = [dict(row) for row in cursor.fetchall()]
+            game_cards = [dict(row) for row in cursor.fetchall()]
             
-            return {
-                'code': 0,
-                'msg': '',
-                'count': total,
-                'data': game_card
-            }
+            return ResponseHandler.success(data={
+                'items': game_cards,
+                'total': total
+            }, msg='获取道具卡列表成功')
         except Exception as e:
-            return {
-                'code': 500,
-                'msg': str(e),
-                'count': 0,
-                'data': []
-            }
+            return ResponseHandler.error(
+                code=StatusCode.INTERNAL_ERROR.value,
+                msg=f'获取道具卡列表失败: {str(e)}'
+            )
         finally:
             if conn:
                 conn.close()
@@ -91,23 +88,20 @@ class GameCardService:
             
             row = cursor.fetchone()
             if not row:
-                return {
-                    'code': 404,
-                    'msg': '道具卡不存在',
-                    'data': None
-                }
+                return ResponseHandler.error(
+                    code=StatusCode.NOT_FOUND.value,
+                    msg='道具卡不存在'
+                )
             
-            return {
-                'code': 0,
-                'msg': '',
-                'data': dict(row)
-            }
+            return ResponseHandler.success(
+                data=dict(row),
+                msg='获取道具卡信息成功'
+            )
         except Exception as e:
-            return {
-                'code': 500,
-                'msg': str(e),
-                'data': None
-            }
+            return ResponseHandler.error(
+                code=StatusCode.INTERNAL_ERROR.value,
+                msg=f'获取道具卡信息失败: {str(e)}'
+            )
         finally:
             if conn:
                 conn.close()
@@ -138,17 +132,15 @@ class GameCardService:
             game_card_id = cursor.lastrowid
             conn.commit()
             
-            return {
-                'code': 0,
-                'msg': '创建成功',
-                'data': {'id': game_card_id}
-            }
+            return ResponseHandler.success(
+                data={'id': game_card_id},
+                msg='创建道具卡成功'
+            )
         except Exception as e:
-            return {
-                'code': 500,
-                'msg': str(e),
-                'data': None
-            }
+            return ResponseHandler.error(
+                code=StatusCode.INTERNAL_ERROR.value,
+                msg=f'创建道具卡失败: {str(e)}'
+            )
         finally:
             if conn:
                 conn.close()
@@ -190,11 +182,10 @@ class GameCardService:
             ))
             
             if cursor.rowcount == 0:
-                return {
-                    'code': 404,
-                    'msg': '未找到要更新的道具卡',
-                    'data': None
-                }
+                return ResponseHandler.error(
+                    code=StatusCode.NOT_FOUND.value,
+                    msg='未找到要更新的道具卡'
+                )
             
             conn.commit()
             
@@ -202,17 +193,15 @@ class GameCardService:
             cursor.execute('SELECT * FROM game_card WHERE id = ?', (game_card_id,))
             updated_game_card = cursor.fetchone()
             
-            return {
-                'code': 0,
-                'msg': '更新成功',
-                'data': dict(updated_game_card) if updated_game_card else None
-            }
+            return ResponseHandler.success(
+                data=dict(updated_game_card),
+                msg='更新道具卡成功'
+            )
         except Exception as e:
-            return {
-                'code': 500,
-                'msg': str(e),
-                'data': None
-            }
+            return ResponseHandler.error(
+                code=StatusCode.INTERNAL_ERROR.value,
+                msg=f'更新道具卡失败: {str(e)}'
+            )
         finally:
             if conn:
                 conn.close()
@@ -230,29 +219,33 @@ class GameCardService:
             cursor.execute('DELETE FROM game_card WHERE id = ?', (game_card_id,))
             conn.commit()
             
-            return {
-                'code': 0,
-                'msg': '删除成功',
-                'data': None
-            }
+            return ResponseHandler.success(msg='删除道具卡成功')
         except Exception as e:
-            return {
-                'code': 500,
-                'msg': str(e),
-                'data': None
-            }
+            return ResponseHandler.error(
+                code=StatusCode.INTERNAL_ERROR.value,
+                msg=f'删除道具卡失败: {str(e)}'
+            )
         finally:
             if conn:
                 conn.close()
     
-    def get_icon_list(self) -> List[str]:
+    def get_icon_list(self) -> Dict:
         """获取图标列表"""
-        icons = []
-        icon_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'img', 'game_card')
-        for filename in os.listdir(icon_dir):
-            if filename.endswith(('.png', '.svg', '.jpg', '.jpeg', '.gif')):
-                icons.append(filename)
-        return icons
+        try:
+            icons = []
+            icon_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'img', 'game_card')
+            for filename in os.listdir(icon_dir):
+                if filename.endswith(('.png', '.svg', '.jpg', '.jpeg', '.gif')):
+                    icons.append(filename)
+            return ResponseHandler.success(
+                data=icons,
+                msg='获取图标列表成功'
+            )
+        except Exception as e:
+            return ResponseHandler.error(
+                code=StatusCode.INTERNAL_ERROR.value,
+                msg=f'获取图标列表失败: {str(e)}'
+            )
 
 # 创建全局实例
 game_card_service = GameCardService()

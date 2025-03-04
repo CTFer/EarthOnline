@@ -7,12 +7,13 @@
 import Logger from '../../utils/logger.js';
 
 class NotificationService {
-    constructor(eventBus, wsManager) {
+    constructor(eventBus, wsManager, api) {
         Logger.info('NotificationService', '初始化通知服务');
         this.eventBus = eventBus;
         this.wsManager = wsManager;
         this.notifications = [];
         this.container = document.querySelector('.notification-list');
+        this.api = api;
         
         // 绑定WebSocket事件
         // if (this.wsManager) {
@@ -29,7 +30,7 @@ class NotificationService {
     async loadNotifications() {
         Logger.info('NotificationService', '加载通知列表');
         try {
-            const response = await fetch('/api/notifications');
+            const response = await this.api.getNotifications();
             const data = await response.json();
             
             if (data.code === 0) {

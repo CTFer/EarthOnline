@@ -1,9 +1,15 @@
+"""
+任务服务模块
+处理任务相关的业务逻辑
+"""
 import sqlite3
 import os
 import logging
 import time
 from datetime import datetime
 import json
+from typing import Dict, List, Optional
+from utils.response_handler import ResponseHandler, StatusCode
 
 logger = logging.getLogger(__name__)
 
@@ -29,17 +35,39 @@ class TaskService:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
-    def get_task_by_id(self, task_id):
+
+    def get_task_by_id(self, task_id: int) -> Dict:
         """获取任务详情"""
-        conn = self.get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM task WHERE id = ?', (task_id,))
-        task = cursor.fetchone()
-        return json.dumps({
-            'code': 0,
-            'msg': '获取任务详情成功',
-            'data': task
-        })
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM task WHERE id = ?', (task_id,))
+            task = cursor.fetchone()
+
+            if not task:
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在"
+                )
+
+            # 转换查询结果为字典
+            columns = [col[0] for col in cursor.description]
+            task_dict = dict(zip(columns, task))
+
+            return ResponseHandler.success(
+                data=task_dict,
+                msg="获取任务详情成功"
+            )
+
+        except Exception as e:
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取任务详情失败: {str(e)}"
+            )
+        finally:
+            if conn:
+                conn.close()
+
     def get_current_task_by_id(self, task_id):
         """获取当前任务详情"""
         try:
@@ -73,28 +101,25 @@ class TaskService:
                 # 将查询结果转换为字典
                 task_data = dict(task)
                 
-                return json.dumps({
-                    'code': 0,
-                    'msg': '获取当前任务详情成功',
-                    'data': task_data
-                })
+                return ResponseHandler.success(
+                    data=task_data,
+                    msg="获取当前任务详情成功"
+                )
             else:
-                return json.dumps({
-                    'code': 1,
-                    'msg': '任务不存在',
-                    'data': None
-                }), 404
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在"
+                )
                 
         except sqlite3.Error as e:
-            return json.dumps({
-                'code': 1,
-                'msg': f'获取当前任务详情失败: {str(e)}',
-                'data': None
-            }), 500
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取当前任务详情失败: {str(e)}"
+            )
         finally:
             conn.close()
             
-    def get_available_tasks(self, player_id):
+    def get_available_tasks(self, player_id: int) -> Dict:
         """获取可用任务列表"""
         try:
             conn = self.get_db()
@@ -195,22 +220,21 @@ class TaskService:
                         # 不可重复任务，今天还未接受过
                         available_tasks.append(task_dict)
 
-            return json.dumps({
-                'code': 0,
-                'msg': '获取可用任务成功',
-                'data': available_tasks
-            })
+            return ResponseHandler.success(
+                data=available_tasks,
+                msg="获取可用任务成功"
+            )
 
         except sqlite3.Error as e:
             logger.error(f"获取任务失败: {str(e)}")
-            return json.dumps({
-                'code': 1,
-                'msg': f'获取任务失败: {str(e)}',
-                'data': None
-            }), 500
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取任务失败: {str(e)}"
+            )
         finally:
             conn.close()
-    def get_current_tasks(self, player_id):
+
+    def get_current_tasks(self, player_id: int) -> Dict:
         """获取用户当前未过期的任务列表"""
         try:
             conn = self.get_db()
@@ -252,22 +276,20 @@ class TaskService:
                     'task_rewards':row[9]
                 })
 
-            return json.dumps({
-                'code': 0,
-                'msg': '获取当前任务成功',
-                'data': tasks
-            })
+            return ResponseHandler.success(
+                data=tasks,
+                msg="获取当前任务列表成功"
+            )
 
         except sqlite3.Error as e:
-            return json.dumps({
-                'code': 1,
-                'msg': f'获取当前任务失败: {str(e)}',
-                'data': None
-            }), 500
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取当前任务列表失败: {str(e)}"
+            )
         finally:
             conn.close()
 
-    def accept_task(self, player_id, task_id):
+    def accept_task(self, player_id: int, task_id: int) -> Dict:
         """接受任务"""
         try:
             conn = self.get_db()
@@ -281,11 +303,10 @@ class TaskService:
             task = cursor.fetchone()
             
             if not task:
-                return json.dumps({
-                    'code': 1,
-                    'msg': '任务不存在或未启用',
-                    'data': None
-                })
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在或未启用"
+                )
 
             # 检查是否已接受该任务,状态为进行中
             cursor.execute('''
@@ -294,11 +315,10 @@ class TaskService:
             ''', (player_id, task_id))
             
             if cursor.fetchone():
-                return json.dumps({
-                    'code': 1,
-                    'msg': '已接受该任务',
-                    'data': None
-                })
+                return ResponseHandler.error(
+                    code=StatusCode.FAIL,
+                    msg="已接受该任务"
+                )
 
             # 检查前置任务是否完成
             if task['parent_task_id']:
@@ -308,11 +328,10 @@ class TaskService:
                 ''', (player_id, task['parent_task_id']))
                 
                 if not cursor.fetchone():
-                    return json.dumps({
-                        'code': 2,
-                        'msg': '需要先完成前置任务',
-                        'data': None
-                    })
+                    return ResponseHandler.error(
+                        code=StatusCode.FAIL,
+                        msg="需要先完成前置任务"
+                    )
 
             # 检查是否有进行中的主线任务
             if task['task_type'] == 'MAIN':
@@ -324,11 +343,10 @@ class TaskService:
                 ''', (player_id,))
                 
                 if cursor.fetchone():
-                    return json.dumps({
-                        'code': 3,
-                        'msg': '请先完成当前主线任务',
-                        'data': None
-                    })
+                    return ResponseHandler.error(
+                        code=StatusCode.FAIL,
+                        msg="请先完成当前主线任务"
+                    )
 
             # 添加任务记录
             current_time = int(time.time())
@@ -341,27 +359,25 @@ class TaskService:
             ''', (player_id, task_id, current_time, endtime))
             
             conn.commit()
-            return json.dumps({
-                'code': 0,
-                'msg': '任务接受成功',
-                'data': {
+            return ResponseHandler.success(
+                data={
                     'task_id': task_id,
                     'player_id': player_id,
                     'task_name': task['name']
-                }
-            })
+                },
+                msg="接受任务成功"
+            )
 
         except sqlite3.Error as e:
             logger.error(f"接受任务失败: {str(e)}")
-            return json.dumps({
-                'code': 1,
-                'msg': f'接受任务失败: {str(e)}',
-                'data': None
-            }), 500
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"接受任务失败: {str(e)}"
+            )
         finally:
             conn.close()
 
-    def abandon_task(self, player_id, task_id):
+    def abandon_task(self, player_id: int, task_id: int) -> Dict:
         """放弃任务"""
         try:
             conn = self.get_db()
@@ -377,27 +393,24 @@ class TaskService:
             
             task = cursor.fetchone()
             if not task:
-                return json.dumps({
-                    'code': 1,
-                    'msg': '任务不存在或不属于该玩家',
-                    'data': None
-                })
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在或不属于该玩家"
+                )
             
             # 检查是否为主线任务
             if task['task_type'] == 'MAIN':
-                return json.dumps({
-                    'code': 1,
-                    'msg': '主线任务不能放弃',
-                    'data': None
-                })
+                return ResponseHandler.error(
+                    code=StatusCode.FAIL,
+                    msg="主线任务不能放弃"
+                )
             
             # 检查任务状态是否为进行中
             if task['status'] != 'IN_PROGRESS':
-                return json.dumps({
-                    'code': 1,
-                    'msg': '只能放弃进行中的任务',
-                    'data': None
-                })
+                return ResponseHandler.error(
+                    code=StatusCode.FAIL,
+                    msg="只能放弃进行中的任务"
+                )
             
             # 更新任务状态
             cursor.execute('''
@@ -411,28 +424,24 @@ class TaskService:
             
             if cursor.rowcount == 0:
                 conn.rollback()
-                return json.dumps({
-                    'code': 1,
-                    'msg': '放弃任务失败，请重试',
-                    'data': None
-                })
+                return ResponseHandler.error(
+                    code=StatusCode.FAIL,
+                    msg="放弃任务失败，请重试"
+                )
                 
             conn.commit()
-            return json.dumps({
-                'code': 0,
-                'msg': '任务已放弃',
-                'data': None
-            })
+            return ResponseHandler.success(
+                msg="任务已放弃"
+            )
 
         except sqlite3.Error as e:
             if conn:
                 conn.rollback()
             logger.error(f"放弃任务失败: {str(e)}")
-            return json.dumps({
-                'code': 1,
-                'msg': f'放弃任务失败: {str(e)}',
-                'data': None
-            }), 500
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"放弃任务失败: {str(e)}"
+            )
         finally:
             if conn:
                 conn.close()
@@ -537,8 +546,8 @@ class TaskService:
         finally:
             conn.close()
 
-    def complete_task_api(self, player_id, task_id):
-        """完成任务的API，包含主线任务的处理逻辑"""
+    def complete_task_api(self, player_id: int, task_id: int) -> Dict:
+        """完成任务"""
         try:
             conn = self.get_db()
             cursor = conn.cursor()
@@ -553,13 +562,19 @@ class TaskService:
             ''', (player_id, task_id))
             
             if cursor.rowcount == 0:
-                return False, "任务状态无效或已完成"
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务状态无效或已完成"
+                )
                 
             # 2. 发放任务奖励
             success, message, rewards = self._grant_task_rewards(conn, player_id, task_id)
             if not success:
                 conn.rollback()
-                return False, f"发放奖励失败: {message}"
+                return ResponseHandler.error(
+                    code=StatusCode.FAIL,
+                    msg=f"发放奖励失败: {message}"
+                )
                 
             # 3. 检查父主线任务
             parent_main_quests = self.get_parent_main_quests(task_id)
@@ -598,12 +613,18 @@ class TaskService:
                 'main_quests_completed': completed_main_quests
             }
             
-            return True, "任务完成", result
+            return ResponseHandler.success(
+                data=result,
+                msg="任务完成"
+            )
             
         except Exception as e:
             conn.rollback()
             logger.error(f"完成任务失败: {str(e)}")
-            return False, f"完成任务失败: {str(e)}", None
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"完成任务失败: {str(e)}"
+            )
         finally:
             conn.close()
 

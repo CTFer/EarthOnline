@@ -1,5 +1,8 @@
+"""
+GPS服务模块
+处理GPS相关的业务逻辑
+"""
 import sqlite3
-
 import os
 import logging
 import time
@@ -8,6 +11,9 @@ from datetime import datetime, timedelta
 import numpy as np
 from flask import request
 import json
+from typing import Dict, List, Optional
+from utils.response_handler import ResponseHandler, StatusCode
+
 logger = logging.getLogger(__name__)
 
 
@@ -20,13 +26,12 @@ class GPSService:
         return cls._instance
 
     def __init__(self):
-        if not hasattr(self, 'initialized'):
-            self.db_path = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                'database',
-                'game.db'
-            )
-            self.initialized = True
+        """初始化GPS服务"""
+        self.db_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            'database',
+            'game.db'
+        )
 
     def get_db(self):
         """获取数据库连接"""
@@ -34,8 +39,8 @@ class GPSService:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def add_gps(self, data):
-        """添加GPS记录，如果位置变化不大则只更新时间"""
+    def add_gps(self, gps_data: Dict) -> Dict:
+        """添加GPS记录"""
         try:
             conn = self.get_db()
             cursor = conn.cursor()
@@ -93,23 +98,21 @@ class GPSService:
             gps_id = cursor.lastrowid
             conn.commit()
 
-            return json.dumps({
-                'code': 0,
-                'msg': '添加GPS记录成功',
-                'data': {'id': gps_id}
-            })
+            return ResponseHandler.success(
+                data={'id': gps_id},
+                msg='添加GPS记录成功'
+            )
 
-        except sqlite3.Error as e:
-            logger.error(f"添加GPS记录失败: {str(e)}")
-            return json.dumps({
-                'code': 1,
-                'msg': f'添加GPS记录失败: {str(e)}',
-                'data': None
-            }), 500
+        except Exception as e:
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'添加GPS记录失败: {str(e)}'
+            )
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
-    def get_gps(self, gps_id):
+    def get_gps(self, gps_id: int) -> Dict:
         """获取单个GPS记录"""
         try:
             conn = self.get_db()
@@ -119,31 +122,31 @@ class GPSService:
             gps = cursor.fetchone()
 
             if not gps:
-                return json.dumps({
-                    'code': 1,
-                    'msg': 'GPS记录不存在',
-                    'data': None
-                }), 404
+                return ResponseHandler.error(
+                    code=StatusCode.GPS_RECORD_NOT_FOUND,
+                    msg='GPS记录不存在'
+                )
 
-            return json.dumps({
-                'code': 0,
-                'msg': '获取GPS记录成功',
-                'data': dict(gps)
-            })
+            # 转换查询结果为字典
+            columns = [col[0] for col in cursor.description]
+            gps_dict = dict(zip(columns, gps))
 
-        except sqlite3.Error as e:
-            return json.dumps({
-                'code': 1,
-                'msg': f'获取GPS记录失败: {str(e)}',
-                'data': None
-            }), 500
+            return ResponseHandler.success(
+                data=gps_dict,
+                msg='获取GPS记录成功'
+            )
+
+        except Exception as e:
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'获取GPS记录失败: {str(e)}'
+            )
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
-    def get_player_gps(self, player_id):
-        """
-        获取玩家GPS记录
-        """
+    def get_player_gps(self, player_id: int) -> Dict:
+        """获取玩家GPS记录"""
         try:
             # 获取时间筛选参数
             start_time = request.args.get('start_time', type=int)
@@ -163,37 +166,29 @@ class GPSService:
             
             # 添加数据验证
             if start_time and end_time and start_time > end_time:
-                return json.dumps({
-                    'code': 400,
-                    'msg': '开始时间不能大于结束时间',
-                    'data': None
-                })
+                return ResponseHandler.error(
+                    code=StatusCode.PARAM_ERROR,
+                    msg='开始时间不能大于结束时间'
+                )
 
-            result = gps_service.get_gps_records(
+            # 直接返回 get_gps_records 的结果，因为它已经使用了 ResponseHandler
+            return self.get_gps_records(
                 player_id=player_id,
                 start_time=start_time,
                 end_time=end_time,
                 page=page,
                 per_page=per_page
             )
-            
-            # 添加调试日志
-            # print(f"[GPS] 返回数据: {result.get_json() if hasattr(result, 'get_json') else result}")
-            return result
 
         except Exception as e:
-            error_msg = f"获取玩家GPS记录失败: {str(e)}"
-            print(f"[GPS] 错误: {error_msg}")
-            return json.dumps({
-                'code': 500,
-                'msg': error_msg,
-                'data': None
-            })
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'获取玩家GPS记录失败: {str(e)}'
+            )
 
     def analyze_gps_data(self, data):
-        """分析GPS数据的特征"""
-        if not data:
-            return
+        """分析GPS数据的特征 私有方法 不对外提供API接口"""
+
 
         # 计算时间间隔
         time_diffs = []
@@ -240,7 +235,7 @@ class GPSService:
         }
 
     def get_master_GPS_data(self, player_id, start_time=None, end_time=None, optimization_level=1):
-        """获取优化后的GPS主数据，并计算中心点和覆盖范围"""
+        """获取优化后的GPS主数据，并计算中心点和覆盖范围 私有方法 不对外提供API接口"""
         try:
             conn = self.get_db()
             cursor = conn.cursor()
@@ -475,25 +470,22 @@ class GPSService:
             cursor.execute(query, params)
             records = [dict(row) for row in cursor.fetchall()]
 
-            return json.dumps({
-                'code': 0,
-                'msg': '获取GPS记录成功',
-                'data': {
+            return ResponseHandler.success(
+                data={
                     'records': records,
                     'total': len(records)
-                }
-            })
+                },
+                msg="获取GPS记录成功"
+            )
 
         except Exception as e:
             print(f"Error in get_gps_records: {str(e)}")
-            return json.dumps({
-                'code': 1,
-                'msg': str(e),
-                'data': None
-            })
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取GPS记录失败: {str(e)}"
+            )
         finally:
             conn.close()
-
 
     def get_gps_records(self, player_id=None, start_time=None, end_time=None, page=None, per_page=None):
         """获取优化后的GPS记录，支持分页"""
@@ -513,6 +505,7 @@ class GPSService:
 
             # 获取优化后的数据
             records = self.get_master_GPS_data(player_id, start_time, end_time)
+            
             # 如果记录数为0，则返回测试的38条数据 2月16日
             if len(records['data']) == 0:
                 records = self.get_master_GPS_data(player_id, 1739635190, 1739721600)
@@ -529,30 +522,27 @@ class GPSService:
             else:
                 total = len(records['data'])
 
-            response = {
-                'code': 0,
-                'msg': '获取GPS记录成功',
-                'data': {
+            return ResponseHandler.success(
+                data={
                     'records': records['data'],
                     'center': records['center'],
                     'bounds': records['bounds'],
                     'stats': records['stats'],
                     'total': total
-                }
-            }
-            return json.dumps(response)
+                },
+                msg="获取GPS记录成功"
+            )
 
         except Exception as e:
             error_msg = f"获取GPS记录失败: {str(e)}"
             print(f"[GPS Service] 错误: {error_msg}")
             logger.error(error_msg)
-            return json.dumps({
-                'code': 1,
-                'msg': error_msg,
-                'data': None
-            })
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=error_msg
+            )
 
-    def update_gps(self, gps_id, data):
+    def update_gps(self, gps_id: int, data: Dict) -> Dict:
         """更新GPS记录"""
         try:
             conn = self.get_db()
@@ -571,29 +561,26 @@ class GPSService:
             ))
 
             if cursor.rowcount == 0:
-                return json.dumps({
-                    'code': 1,
-                    'msg': 'GPS记录不存在',
-                    'data': None
-                })
+                return ResponseHandler.error(
+                    code=StatusCode.GPS_RECORD_NOT_FOUND,
+                    msg='GPS记录不存在'
+                )
 
             conn.commit()
-            return json.dumps({
-                'code': 0,
-                'msg': '更新GPS记录成功',
-                'data': None
-            })
+            return ResponseHandler.success(
+                msg='更新GPS记录成功'
+            )
 
         except sqlite3.Error as e:
-            return json.dumps({
-                'code': 1,
-                'msg': f'更新GPS记录失败: {str(e)}',
-                'data': None
-            })
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'更新GPS记录失败: {str(e)}'
+            )
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
-    def delete_gps(self, gps_id):
+    def delete_gps(self, gps_id: int) -> Dict:
         """删除GPS记录"""
         try:
             conn = self.get_db()
@@ -602,27 +589,24 @@ class GPSService:
             cursor.execute('DELETE FROM GPS WHERE id = ?', (gps_id,))
 
             if cursor.rowcount == 0:
-                return json.dumps({
-                    'code': 1,
-                    'msg': 'GPS记录不存在',
-                    'data': None
-                }), 404
+                return ResponseHandler.error(
+                    code=StatusCode.GPS_RECORD_NOT_FOUND,
+                    msg='GPS记录不存在'
+                )
 
             conn.commit()
-            return json.dumps({
-                'code': 0,
-                'msg': '删除GPS记录成功',
-                'data': None
-            })
+            return ResponseHandler.success(
+                msg='删除GPS记录成功'
+            )
 
-        except sqlite3.Error as e:
-            return json.dumps({
-                'code': 1,
-                'msg': f'删除GPS记录失败: {str(e)}',
-                'data': None
-            }), 500
+        except Exception as e:
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'删除GPS记录失败: {str(e)}'
+            )
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
 
 gps_service = GPSService()

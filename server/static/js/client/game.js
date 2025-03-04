@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-03-04 13:46:26
+ * @LastEditTime: 2025-03-04 21:09:13
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -24,6 +24,7 @@ import UIService from "./service/uiService.js";
 import AudioService from "./service/audioService.js";
 import Live2DService from "./service/live2dService.js";
 import WebSocketService from "./service/websocketService.js";
+import NotificationService from "./service/notificationService.js";
 import { gameUtils } from "../utils/utils.js";
 import { TASK_EVENTS, PLAYER_EVENTS, MAP_EVENTS, UI_EVENTS, WS_EVENTS, AUDIO_EVENTS, LIVE2D_EVENTS, SHOP_EVENTS, ROUTE_EVENTS } from "./config/events.js";
 import EventManager from "./core/eventManager.js";
@@ -72,7 +73,6 @@ class GameManager {
       layer.msg("初始化失败，请刷新页面重试", { icon: 2 });
       throw error;
     }
-
   }
 
   // 初始化核心组件
@@ -178,7 +178,8 @@ class GameManager {
     this.live2dService = new Live2DService(this.eventBus, this.store);
     // 初始化 Live2D 服务
     await this.live2dService.initialize();
-
+    // 初始化通知服务
+    // this.notificationService = new NotificationService(this.eventBus, this.websocketService, this.api);
     // 设置ICP备案号
     gameUtils.setICPAndMPS(ICP, MPS);
   }
@@ -268,41 +269,41 @@ class GameManager {
   }
 
   // 初始化观察器 已经在uiService中初始化
-  setupDOMObserver() {
-    Logger.debug("GameManager", "初始化DOM观察器");
-    const taskObserver = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.type === "childList") {
-          mutation.addedNodes.forEach((node) => {
-            if (node.nodeType === 1) {
-              // 处理任务卡片
-              if (node.classList?.contains("task-card")) {
-                this.uiService.initializeTaskCard(node);
-              }
-              // 处理新添加节点中的任务卡片
-              // const taskCards = node.getElementsByClassName("task-card");
-              // Array.from(taskCards).forEach((card) => this.uiService.initializeTaskCard(card));
-            }
-          });
-        }
-      });
-    });
+  // setupDOMObserver() {
+  //   Logger.debug("GameManager", "初始化DOM观察器");
+  //   const taskObserver = new MutationObserver((mutations) => {
+  //     mutations.forEach((mutation) => {
+  //       if (mutation.type === "childList") {
+  //         mutation.addedNodes.forEach((node) => {
+  //           if (node.nodeType === 1) {
+  //             // 处理任务卡片
+  //             if (node.classList?.contains("task-card")) {
+  //               this.uiService.initializeTaskCard(node);
+  //             }
+  //             // 处理新添加节点中的任务卡片
+  //             // const taskCards = node.getElementsByClassName("task-card");
+  //             // Array.from(taskCards).forEach((card) => this.uiService.initializeTaskCard(card));
+  //           }
+  //         });
+  //       }
+  //     });
+  //   });
 
-    // 设置观察器配置
-    const config = { childList: true, subtree: true };
+  //   // 设置观察器配置
+  //   const config = { childList: true, subtree: true };
 
-    // 监听相关容器
-    const containers = [document.getElementById("taskList"), document.querySelector(".active-tasks-swiper .swiper-wrapper"), document.querySelector(".tasks-list")].filter(Boolean);
+  //   // 监听相关容器
+  //   const containers = [document.getElementById("taskList"), document.querySelector(".active-tasks-swiper .swiper-wrapper"), document.querySelector(".tasks-list")].filter(Boolean);
 
-    containers.forEach((container) => {
-      taskObserver.observe(container, config);
-      // 初始化已存在的任务卡片
-      // Array.from(container.getElementsByClassName("task-card")).forEach((card) => this.uiService.initializeTaskCard(card));
-    });
+  //   containers.forEach((container) => {
+  //     taskObserver.observe(container, config);
+  //     // 初始化已存在的任务卡片
+  //     // Array.from(container.getElementsByClassName("task-card")).forEach((card) => this.uiService.initializeTaskCard(card));
+  //   });
 
-    // 存储观察器实例以便后续清理
-    this._taskObserver = taskObserver;
-  }
+  //   // 存储观察器实例以便后续清理
+  //   this._taskObserver = taskObserver;
+  // }
 
   // 初始化文字云
   async initWordCloud() {
@@ -329,21 +330,6 @@ class GameManager {
       if (!this.websocketService) throw new Error("WebSocket服务未初始化");
 
       // 初始化事件管理器
-      await this.initializeEventManager();
-
-      Logger.info("GameManager", "setupEventListeners:330", "事件监听器设置完成");
-    } catch (error) {
-      Logger.error("GameManager", "setupEventListeners:332", "设置事件监听器失败:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 初始化事件管理器
-   */
-  async initializeEventManager() {
-    Logger.info("GameManager", "初始化事件管理器");
-    try {
       // 创建 EventManager 实例
       this.eventManager = new EventManager({
         eventBus: this.eventBus,
@@ -358,9 +344,12 @@ class GameManager {
         live2dService: this.live2dService,
         swiperService: this.swiperService,
         router: this.router,
+        notificationService: this.notificationService,
       });
+
+      Logger.info("GameManager", "setupEventListeners:330", "事件监听器设置完成");
     } catch (error) {
-      Logger.error("GameManager", "初始化事件管理器失败:", error);
+      Logger.error("GameManager", "setupEventListeners:332", "设置事件监听器失败:", error);
       throw error;
     }
   }

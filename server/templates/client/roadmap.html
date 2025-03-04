@@ -31,7 +31,7 @@
       .task-board {
         display: flex;
         gap: 20px;
-        padding: 20px;
+        /* padding: 20px; */
         min-height: 80vh;
       }
 
@@ -195,8 +195,8 @@
       .task-card[style*="background-color: #16b777"] {
         border-left-color: #16b777;
       }
-      .task-card[style*="background-color: #16baaa"] {
-        border-left-color: #16baaa;
+      .task-card[style*="background-color: #3f51b5"] {
+        border-left-color: #3f51b5;
       }
       .task-card[style*="background-color: #ffb800"] {
         border-left-color: #ffb800;
@@ -511,6 +511,59 @@
       .dark-mode .task-count {
         color: #bdbdbd;
       }
+
+      .color-legend {
+        background-color: #f4f5f7;
+        border-radius: 4px;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 3px rgba(9, 30, 66, 0.1);
+        transition: all 0.3s ease;
+      }
+
+      .legend-title {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 10px;
+      }
+
+      .legend-items {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .color-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .legend-text {
+        font-size: 13px;
+        color: #666;
+      }
+
+      /* 暗黑模式适配 */
+      .dark-mode .color-legend {
+        background-color: #2d2d2d;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      .dark-mode .legend-title {
+        color: #e0e0e0;
+      }
+
+      .dark-mode .legend-text {
+        color: #bdbdbd;
+      }
     </style>
   </head>
 
@@ -537,6 +590,40 @@
     </div>
 
     <div class="layui-container">
+      <!-- 新增颜色图例说明 -->
+      <div class="color-legend">
+        <div class="legend-title">任务类别说明：</div>
+        <div class="legend-items">
+          <div class="legend-item">
+            <span class="color-dot" style="background-color: #1e9fff;"></span>
+            <span class="legend-text">任务开发</span>
+          </div>
+          <div class="legend-item">
+            <span class="color-dot" style="background-color: #16b777;"></span>
+            <span class="legend-text">样式开发</span>
+          </div>
+          <div class="legend-item">
+            <span class="color-dot" style="background-color: #3f51b5;"></span>
+            <span class="legend-text">学习任务</span>
+          </div>
+          <div class="legend-item">
+            <span class="color-dot" style="background-color: #ffb800;"></span>
+            <span class="legend-text">内容开发</span>
+          </div>
+          <div class="legend-item">
+            <span class="color-dot" style="background-color: #ff5722;"></span>
+            <span class="legend-text">BUG处理计划</span>
+          </div>
+          <div class="legend-item">
+            <span class="color-dot" style="background-color: #a233c6;"></span>
+            <span class="legend-text">新功能开发</span>
+          </div>
+          <div class="legend-item">
+            <span class="color-dot" style="background-color: #fafafa;"></span>
+            <span class="legend-text">默认计划</span>
+          </div>
+        </div>
+      </div>
       <div class="task-board">
         <div class="task-column" data-status="PLANNED">
           <div class="column-title">

@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-03-04 10:51:08
+ * @LastEditTime: 2025-03-04 22:10:21
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -18,7 +18,7 @@ class UIService {
     this.taskService = taskService;
     this.playerService = playerService;
     this.swiperService = swiperService;
-    this.notificationService = new NotificationService();
+    // this.notificationService = new NotificationService();
     this.observers = new Map();
     this.componentId = "uiService";
     // 初始化默认状态
@@ -836,70 +836,39 @@ class UIService {
     Logger.info("UIService", `处理接受任务: ${taskId}`);
 
     try {
-      // 使用 Promise 包装 layer.confirm
-      await new Promise((resolve, reject) => {
-        layer.confirm(
-          "确定要接受这个任务吗？",
-          {
-            title: "接受任务",
-            btn: ["确定", "取消"],
-            icon: 3,
-          },
-          async (index) => {
-            try {
-              // 关闭确认对话框
-              layer.close(index);
-
-              // 调用任务服务接受任务
-              const result = await this.taskService.handleTaskAccept(taskId);
-              Logger.info("UIService", "接受任务结果:", result);
-              // 根据返回结果显示不同的提示
-              if (result.code === 1) {
-                // 已接受的情况
-                this.showNotification({
-                  type: "INFO",
-                  message: result.msg || "已接受该任务",
-                });
-              } else if (result.code === 0) {
-                // 成功接受的情况
-                this.showNotification({
-                  type: "SUCCESS",
-                  message: "任务接受成功",
-                });
-                // 任务接受完成，更新任务状态
-                this.eventBus.emit(TASK_EVENTS.ACCEPTED, {
-                  taskId: taskId,
-                  playerId: this.playerService.getPlayerId(),
-                });
-                // 发送音频播放事件
-                this.eventBus.emit(AUDIO_EVENTS.PLAY, "ACCEPT");
-              }
-
-              resolve();
-            } catch (error) {
-              Logger.error("UIService", "接受任务失败:", error);
-              this.showNotification({
-                type: "ERROR",
-                message: error.message || "接受任务失败",
-              });
-
-              // 发送错误音频事件
-              this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
-              reject(error);
-            }
-          },
-          () => {
-            // 取消按钮回调
-            resolve();
-          }
-        );
-      });
+      // 直接调用任务服务接受任务
+      const result = await this.taskService.handleTaskAccept(taskId);
+      Logger.info("UIService", "接受任务结果:", result);
+      
+      if (result.code === 0) {
+        // 只在成功接受的情况下触发事件和播放音效
+        this.showNotification({
+          type: "SUCCESS",
+          message: "任务接受成功",
+        });
+        // 任务接受完成，更新任务状态
+        this.eventBus.emit(TASK_EVENTS.ACCEPTED, {
+          taskId: taskId,
+          playerId: this.playerService.getPlayerId(),
+        });
+        // 发送音频播放事件
+        this.eventBus.emit(AUDIO_EVENTS.PLAY, "ACCEPT");
+      } else {
+        Logger.error("UIService", "接受任务失败:", result);
+        // 其他情况只显示提示信息
+        this.showNotification({
+          type: "INFO",
+          message: result.msg || "无法接受该任务",
+        });
+      }
     } catch (error) {
       Logger.error("UIService", "处理任务接受失败:", error);
       this.showNotification({
         type: "ERROR",
-        message: "处理任务接受失败",
+        message: error.message || "接受任务失败",
       });
+      // 发送错误音频事件
+      this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
     }
   }
 

@@ -306,7 +306,7 @@ class EventManager {
   }
   async handleTaskAccept(data) {
     try {
-      await this.taskService.handleTaskAccept(data);
+      await this.uiService.handleTaskAccept(data);
     } catch (error) {
       this.handleError("任务接受", error, "接受任务失败");
     }
