@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:48
- * @LastEditTime: 2025-02-18 12:41:09
+ * @LastEditTime: 2025-03-04 09:22:46
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -130,10 +130,18 @@ export const gameUtils = {
     return `${year}-${month}-${day} ${hour}:${minute}`;
   },
   // 设置ICP备案号
-  setICP(icp) {
+  setICPAndMPS(icp, mps) {
     const icpElement = document.getElementById("icp");
+    const mpsElement = document.getElementById("mps");
     if (icpElement) {
       icpElement.textContent = icp;
     }
+    if (mpsElement) {
+      mpsElement.textContent = mps;
+    }
+  },
+  // 设置页面标题
+  setPageTitle(title) {
+    document.title = title;
   },
 };

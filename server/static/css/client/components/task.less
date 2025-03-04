@@ -11,214 +11,221 @@
 
 // 通用任务卡片样式
 .task-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-  
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: all @transition-duration ease;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all @transition-duration ease;
+  margin-bottom: 12px;
+  position: relative;
+  min-height: 120px;
+  overflow: hidden;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 196, 71, 0.3);
+    transform: translateY(-2px);
+  }
+
+  // 任务卡片头部
+  .task-header {
+    display: flex;
+    align-items: center;
     margin-bottom: 12px;
-    position: relative;
-    min-height: 120px;
-    overflow: hidden;
-  
-    &:last-child {
-      margin-bottom: 0;
-    }
-  
-    &:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 196, 71, 0.3);
-      transform: translateY(-2px);
-    }
-  
-    // 任务卡片头部
-    .task-header {
+    padding: 10px;
+    color: #fff;
+
+    .task-icon {
+      width: 56px;
+      height: 56px;
+      background: rgba(13, 27, 45, 0.5);
+      border-radius: 10px;
+      border: 1px solid rgba(138, 162, 193, 0.2);
       display: flex;
       align-items: center;
-      margin-bottom: 12px;
-      padding: 10px;
-      color: #fff;
-  
-      .task-icon {
-        width: 56px;
-        height: 56px;
-        background: rgba(13, 27, 45, 0.5);
-        border-radius: 10px;
-        border: 1px solid rgba(138, 162, 193, 0.2);
+      justify-content: center;
+      margin-right: 16px;
+
+      i {
+        font-size: 28px;
+        transition: transform @transition-duration ease;
+      }
+    }
+
+    &:hover .task-icon i {
+      transform: scale(1.1);
+    }
+
+    .task-info {
+      flex: 1;
+      text-align: right;
+      padding-right: 16px;
+
+      .task-name {
+        font-size: 18px;
+        font-weight: bolder;
+        color: @text-color;
+        margin: 0 0 8px;
+      }
+
+      .task-type {
+        font-size: 12px;
+        font-weight: 500;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+
+  // 任务卡片内容
+  .task-content {
+
+    padding: 15px;
+    background: transparent;
+
+    .task-details {
+      margin-bottom: 16px;
+
+      .task-description {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.7);
+        margin: 0 0 12px;
+        line-height: 1.5;
+      }
+
+      .task-time {
+        color: @text-color-secondary;
+        font-size: 13px;
         display: flex;
         align-items: center;
-        justify-content: center;
-        margin-right: 16px;
-  
+        gap: 4px;
+
         i {
-          font-size: 28px;
-          transition: transform @transition-duration ease;
-        }
-      }
-  
-      &:hover .task-icon i {
-        transform: scale(1.1);
-      }
-  
-      .task-info {
-        flex: 1;
-        text-align: right;
-        padding-right: 16px;
-  
-        .task-name {
-          font-size: 18px;
-          font-weight: bolder;
-          color: @text-color;
-          margin: 0 0 8px;
-        }
-  
-        .task-type {
-          font-size: 12px;
-          font-weight: 500;
-          padding: 2px 8px;
-          border-radius: 4px;
-          background: rgba(255, 255, 255, 0.1);
+          color: @primary-color;
         }
       }
     }
-  
-    // 任务卡片内容
-    .task-content {
-      padding: 15px;
-      background: transparent;
-  
-      .task-details {
-        margin-bottom: 16px;
-  
-        .task-description {
-          font-size: 14px;
-          color: rgba(255, 255, 255, 0.7);
-          margin: 0 0 12px;
-          line-height: 1.5;
-        }
-  
-        .task-time {
-          color: @text-color-secondary;
-          font-size: 13px;
+
+    .task-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .task-rewards {
+        font-size: 16px; // 扩大奖励文本的字体大小
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        .reward-item {
           display: flex;
           align-items: center;
-          gap: 4px;
-  
+          gap: 8px;
+          color: @text-color;
+          padding: 4px 8px;
+          background: rgba(255, 196, 71, 0.1);
+          border-radius: 4px;
+          font-size: 12px;
+          flex: 1 1 auto;
+
           i {
             color: @primary-color;
           }
-        }
-      }
-  
-      .task-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-  
-        .task-rewards {
-          display: flex;
-          gap: 15px;
-  
-          .reward-item {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            color: @text-color;
-            padding: 4px 8px;
-            background: rgba(255, 196, 71, 0.1);
-            border-radius: 4px;
-            font-size: 12px;
-  
-            i {
-              color: @primary-color;
-            }
-          }
-        }
-  
-        .accept-btn,
-        .abandon-task {
-          padding: 8px 24px;
-          border-radius: 20px;
-          font-size: 14px;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          cursor: pointer;
-          transition: all @transition-duration ease;
-  
-          i {
-            font-size: 12px;
-          }
-        }
-  
-        .accept-btn {
-          background: rgba(76, 175, 80, 0.1);
-          color: #4caf50;
-          border: 1px solid rgba(76, 175, 80, 0.3);
-  
-          &:hover {
-            background: rgba(76, 175, 80, 0.2);
-          }
-        }
-  
-        .abandon-task {
-          background: rgba(255, 77, 79, 0.1);
-          color: #ff4d4f;
-          border: 1px solid rgba(255, 77, 79, 0.3);
-  
-          &:hover {
-            background: rgba(255, 77, 79, 0.2);
+          img {
+            width: 35px;
+            height: 35px;
           }
         }
       }
-    }
-  
-    // 进行中任务的特殊样式
-    &.active-task {
-      margin: 0;
-      height: 100%;
-      position: relative;
-  
-      .task-progress-bar {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 2px;
-        background: linear-gradient(90deg, @primary-color, rgba(255, 196, 71, 0.5));
-        transition: width 0.3s linear;
-      }
-    }
-  
-    // 过期状态
-    &.expired {
-      opacity: 0.6;
-  
-      &::after {
-        content: "已过期";
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) rotate(-15deg);
-        background: rgba(255, 0, 0, 0.8);
-        padding: 5px 15px;
-        border-radius: 4px;
-        font-weight: bold;
-      }
-  
+
       .accept-btn,
       .abandon-task {
-        background: #999;
-        border-color: #999;
-        color: #fff;
-        cursor: not-allowed;
-  
+        padding: 8px 24px;
+        border-radius: 20px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        transition: all @transition-duration ease;
+
+        i {
+          font-size: 12px;
+        }
+      }
+
+      .accept-btn {
+        background: rgba(76, 175, 80, 0.1);
+        color: #4caf50;
+        border: 1px solid rgba(76, 175, 80, 0.3);
+
         &:hover {
-          opacity: 1;
-          transform: none;
+          background: rgba(76, 175, 80, 0.2);
+        }
+      }
+
+      .abandon-task {
+        background: rgba(255, 77, 79, 0.1);
+        color: #ff4d4f;
+        border: 1px solid rgba(255, 77, 79, 0.3);
+
+        &:hover {
+          background: rgba(255, 77, 79, 0.2);
         }
       }
     }
   }
+
+  // 进行中任务的特殊样式
+  &.active-task {
+    margin: 0;
+    height: 100%;
+    position: relative;
+
+    .task-progress-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 2px;
+      background: linear-gradient(90deg, @primary-color, rgba(255, 196, 71, 0.5));
+      transition: width 0.3s linear;
+    }
+  }
+
+  // 过期状态
+  &.expired {
+    opacity: 0.6;
+
+    &::after {
+      content: "已过期";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-15deg);
+      background: rgba(255, 0, 0, 0.8);
+      padding: 5px 15px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
+    .accept-btn,
+    .abandon-task {
+      background: #999;
+      border-color: #999;
+      color: #fff;
+      cursor: not-allowed;
+
+      &:hover {
+        opacity: 1;
+        transform: none;
+      }
+    }
+  }
+}
 // 任务列表
 .task-list {
   &-container {
@@ -278,7 +285,8 @@
 
   .task-rewards {
     display: flex;
-    gap: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
     margin: 16px 0;
     padding: 12px;
     background: rgba(255, 255, 255, 0.05);
@@ -286,7 +294,8 @@
   }
 
   .reward-item {
-    .flex-center();
+    display: flex;
+    align-items: center;
     gap: 8px;
 
     i {
@@ -317,163 +326,147 @@
   background-color: #ccc !important;
 }
 // 任务详情弹窗样式
-// 任务详情弹窗样式
 .task-detail-popup {
   color: @text-color;
   background: rgba(0, 0, 0, 0.8); // 背景颜色
   border-radius: 12px; // 圆角
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); // 阴影效果
-  padding: 20px; // 内边距
-
+  // padding: 20px; // 内边距
+  height: 100%;
   .task-header {
-      padding: 20px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+
+    .task-icon {
+      width: 64px;
+      height: 64px;
+      background: rgba(255, 255, 255, 0.1); // 背景
+      border-radius: 12px;
       display: flex;
       align-items: center;
-      gap: 20px;
+      justify-content: center;
 
-      .task-icon {
-          width: 64px;
-          height: 64px;
-          background: rgba(255, 255, 255, 0.1); // 背景
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+      i {
+        font-size: 32px;
+        color: #fff; // 图标颜色
+      }
+    }
 
-          i {
-              font-size: 32px;
-              color: #fff; // 图标颜色
-          }
+    .task-info {
+      flex: 1;
+      text-align: right;
+      padding-right: 16px;
+      h2 {
+        margin: 0 0 8px;
+        color: #fff; // 任务名称颜色
+        font-size: 24px;
       }
 
-      .task-info {
-        flex: 1;
-        text-align: right;
-        padding-right: 16px;
-          h2 {
-              margin: 0 0 8px;
-              color: #fff; // 任务名称颜色
-              font-size: 24px;
-          }
-
-          .task-type {
-              background: rgba(0, 0, 0, 0.2);
-              padding: 4px 12px;
-              border-radius: 20px;
-              font-size: 14px;
-              color: #fff; // 任务类型颜色
-          }
+      .task-type {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 14px;
+        color: #fff; // 任务类型颜色
       }
+    }
   }
 
   .task-content {
-      padding: 20px;
+    padding: 20px;
 
-      .description{
-          margin-bottom: 24px;
+    .description {
+      margin-bottom: 24px;
+      color: rgba(255, 255, 255, 0.9); // 描述颜色
+      font-size: 16px;
+    }
 
-          h3 {
-              color: @primary-color; // 主色调
-              font-size: 16px;
-              margin-bottom: 12px;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-          }
-
-          ul {
-              list-style: none;
-              padding: 0;
-              margin: 0;
-
-              li {
-                  display: flex;
-                  align-items: center;
-                  gap: 8px;
-                  margin-bottom: 8px;
-                  color: @text-color-secondary;
-
-                  i {
-                      color: @primary-color;
-                      font-size: 12px;
-                  }
-              }
-          }
-      }
-
-      .task-rewards {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 15px;
-
-          .reward-detail {
-              background: rgba(255, 255, 255, 0.05);
-              padding: 12px;
-              border-radius: 8px;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-
-              i {
-                  color: @primary-color;
-                  font-size: 20px;
-              }
-
-              span {
-                  color: @text-color;
-              }
-          }
-      }
-  }
-
-  .task-actions{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 10px;
-
-    .submit-btn,
-    .accept-btn,
-    .abandon-btn {
-      padding: 8px 24px;
-      border-radius: 20px;
-      font-size: 14px;
+    .rewards-section {
+      margin-top: 10px;
+      font-size: 16px; // 扩大奖励文本的字体大小
       display: flex;
       align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      transition: all @transition-duration ease;
+      gap: 8px;
+      flex-direction: row; // 设置为横向排列
+      h4 {
+        font-size: 18px;
+        color: @primary-color; // 奖励标题颜色
+      }
+      .rewards-list {
+        display: flex; // 设置为 flex 布局
+        flex-direction: row; // 横向排列
+        gap: 10px;
+        margin-top: 10px;
+        .reward-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: @text-color;
+          padding: 4px 8px;
+          background: rgba(255, 196, 71, 0.1);
+          border-radius: 4px;
+          font-size: 12px;
+          flex: 1 1 auto;
 
-      i {
-        font-size: 12px;
+          i {
+            color: @primary-color;
+          }
+          img {
+            width: 35px;
+            height: 35px;
+          }
+        }
       }
     }
-    .submit-btn {
-      background: rgba(76, 175, 80, 0.1);
-      color: #4caf50;
-      border: 1px solid rgba(76, 175, 80, 0.3);
 
-      &:hover {
-        background: rgba(76, 175, 80, 0.2);
+    .task-actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+
+      .submit-btn,
+      .accept-btn,
+      .abandon-btn {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        transition: all 0.3s;
+
+        &:hover {
+          opacity: 0.9;
+        }
       }
-    }
-    .accept-btn {
-      background: rgba(76, 175, 80, 0.1);
-      color: #4caf50;
-      border: 1px solid rgba(76, 175, 80, 0.3);
 
-      &:hover {
-        background: rgba(76, 175, 80, 0.2);
+      .submit-btn {
+        background: rgba(76, 175, 80, 0.1);
+        color: #4caf50;
+        border: 1px solid rgba(76, 175, 80, 0.3);
+        &:hover {
+          background: rgba(76, 175, 80, 0.2);
+        }
       }
-    }
+      .accept-btn {
+        background: rgba(76, 175, 80, 0.1);
+        color: #4caf50;
+        border: 1px solid rgba(76, 175, 80, 0.3);
+        &:hover {
+          background: rgba(76, 175, 80, 0.2);
+        }
+      }
 
-    .abandon-btn {
-      background: rgba(255, 77, 79, 0.1);
-      color: #ff4d4f;
-      border: 1px solid rgba(255, 77, 79, 0.3);
-
-      &:hover {
-        background: rgba(255, 77, 79, 0.2);
+      .abandon-btn {
+        background: rgba(255, 77, 79, 0.1);
+        color: #ff4d4f;
+        border: 1px solid rgba(255, 77, 79, 0.3);
+        &:hover {
+          background: rgba(255, 77, 79, 0.2);
+        }
       }
     }
   }

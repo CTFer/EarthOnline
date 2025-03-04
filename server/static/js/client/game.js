@@ -1,13 +1,13 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-03-03 09:34:01
+ * @LastEditTime: 2025-03-04 09:55:51
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
  * Copyright 2025 迷舍
  */
-import { SERVER, ICP } from "../config/config.js";
+import { SERVER, ICP, MPS, WEBNAME } from "../config/config.js";
 import APIClient from "./core/api.js";
 import TemplateService from "./service/templateService.js";
 import TaskService from "./service/taskService.js";
@@ -49,6 +49,8 @@ class GameManager {
     Logger.info("GameManager", "constructor:47", "核心组件初始化完成");
 
     try {
+      // 0. 设置页面标题
+      gameUtils.setPageTitle(WEBNAME);
       // 1. 初始化核心组件
       this.initializeCoreComponents();
 
@@ -181,7 +183,7 @@ class GameManager {
     await this.live2dService.initialize();
 
     // 设置ICP备案号
-    gameUtils.setICP(ICP);
+    gameUtils.setICPAndMPS(ICP, MPS);
   }
 
   // 初始化基础属性

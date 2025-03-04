@@ -297,25 +297,25 @@ class TemplateService {
                 ` : ''}
                 ${rewards.points > 0 ? `
                     <div class="reward-item">
-                        <i class="layui-icon layui-icon-diamond"></i>
+                         <img src="/static/img/points.png" alt="积分">
                         <span>+${rewards.points}</span>
                     </div>
                 ` : ''}
                 ${rewards.enrichedCards.map(card => `
                     <div class="reward-item" title="${card?.name || '道具卡'}">
-                        <i class="layui-icon ${card?.icon || 'layui-icon-gift'}"></i>
+                        <img src="${card?.icon || '/static/img/default-icon.png'}" alt="${card?.name || '道具卡'}" >
                         <span>${card?.name || '道具卡'} ${card?.number > 1 ? `x${card.number}` : ''}</span>
                     </div>
                 `).join('')}
                 ${rewards.enrichedMedals.map(medal => `
                     <div class="reward-item" title="${medal?.name || '勋章'}">
-                        <i class="layui-icon ${medal?.icon || 'layui-icon-medal'}"></i>
+                        <img src="${medal?.icon || '/static/img/default-medal.png'}" alt="${medal?.name || '勋章'}" >
                         <span>${medal?.name || '勋章'}</span>
                     </div>
                 `).join('')}
                 ${rewards.real_rewards?.map(reward => `
                     <div class="reward-item" title="${reward?.name || '实物'}">
-                        <i class="layui-icon layui-icon-gift"></i>
+                        <img src="${reward?.icon || '/static/img/default-reward.png'}" alt="${reward?.name || '实物'}" style="width: 20px; height: 20px;">
                         <span>${reward?.name || '实物'} ${reward?.number > 1 ? `x${reward.number}` : ''}</span>
                     </div>
                 `).join('') || ''}
