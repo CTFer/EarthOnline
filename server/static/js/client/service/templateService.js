@@ -398,7 +398,7 @@ class TemplateService {
                     </div>
                     <div class="task-content">
                         <div class="task-details">
-                            <p class="task-description">${task.description}</p>
+                            <!--<p class="task-description">${task.description}</p>-->
                             <div class="task-time">
                                 <i class="layui-icon layui-icon-time"></i>
                                 计算中...

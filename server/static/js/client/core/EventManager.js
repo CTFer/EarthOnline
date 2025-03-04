@@ -83,11 +83,9 @@ class EventManager {
    * 初始化路由事件
    */
   initializeRouteEvents() {
-    Logger.info("EventManager", "initializeRouteEvents", "初始化路由事件");
-
     // 路由变化事件
     this.eventBus.on(ROUTE_EVENTS.CHANGED, async ({ from, to, isPopState }) => {
-      Logger.info("EventManager", "routeChanged", `路由变化: ${from} -> ${to}, isPopState: ${isPopState}`);
+      Logger.info("EventManager", "initializeRouteEvents", `路由变化: ${from} -> ${to}, isPopState: ${isPopState}`);
       try {
         // 根据路由路径处理不同页面
         switch (to) {
@@ -115,12 +113,14 @@ class EventManager {
    * 处理首页路由
    */
   async handleHomeRoute() {
-    Logger.info("EventManager", "handleHomeRoute", "处理首页路由");
+    Logger.info('EventManager', 'handleHomeRoute 处理首页路由');
     try {
-      // 确保清理之前的状态
+      await this.router.navigate("/");
+      // 先进行清理
       await this.handleHomeCleanup();
       // 初始化首页
       await this.handleHomeInit();
+      this.uiService.setupDOMObserver();
     } catch (error) {
       this.handleError("首页初始化", error, "首页加载失败，请刷新重试");
       throw error;
@@ -176,6 +176,7 @@ class EventManager {
         }
       }
       this.swiperService.initSwipers();
+      this.uiService.setupDOMObserver();
       // 4. 初始化词云服务
       if (this.wordcloudService) {
         await this.wordcloudService.initialize();
@@ -227,7 +228,10 @@ class EventManager {
       if (this.wordcloudService) {
         this.wordcloudService.cleanup();
       }
-
+      // 清理live2d
+      if (this.live2dService) {
+        this.live2dService.cleanup();
+      }
       Logger.info("EventManager", "handleHomeCleanup", "首页清理完成");
     } catch (error) {
       Logger.error("EventManager", "handleHomeCleanup", "首页清理失败:", error);

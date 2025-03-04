@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-13 19:10:14
- * @LastEditTime: 2025-02-28 16:47:59
+ * @LastEditTime: 2025-03-04 14:00:02
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -73,29 +73,12 @@ class Logger {
         const moduleStr = `[${module}]`;
         const levelStr = `[${level.toUpperCase()}]`;
         
-        // 检查第一个参数是否包含位置信息
-        const locationInfo = this.parseLocationInfo(args[0]);
-        let messageArgs = args;
-        let callerStr = '';
-        
-        if (locationInfo && LOG_CONFIG.openCallerStack) {
-            // 如果第一个参数是位置信息，使用它并移除
-            callerStr = ` [${locationInfo.function}:${locationInfo.line}]`;
-            messageArgs = args.slice(1);
-        } else {
-            // 否则使用调用栈信息
-            const callerInfo = this.getCallerInfo();
-            if (callerInfo) {
-                callerStr = ` [${callerInfo.function}@${callerInfo.file}:${callerInfo.line}]`;
-            }
-        }
-        
         if (LOG_CONFIG.styleOutput) {
             const style = LOG_CONFIG.styles[level];
-            return [`${timeStr}${moduleStr}${levelStr}${callerStr}`, style, ...messageArgs];
+            return [`${timeStr}${moduleStr}${levelStr}`, style, ...args];
         }
         
-        return [`${timeStr}${moduleStr}${levelStr}${callerStr}`, ...messageArgs];
+        return [`${timeStr}${moduleStr}${levelStr}`, ...args];
     }
 
     static shouldLog(module, level) {

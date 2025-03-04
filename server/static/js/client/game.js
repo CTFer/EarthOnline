@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-03-04 09:55:51
+ * @LastEditTime: 2025-03-04 13:46:26
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -57,9 +57,6 @@ class GameManager {
       // 2. 初始化基础属性
       this.initializeBaseProperties();
 
-      // 3. 初始化DOM观察器
-      this.setupDOMObserver();
-
       // 4. 初始化服务
       this.initializeServices()
         .then(() => {
@@ -75,6 +72,7 @@ class GameManager {
       layer.msg("初始化失败，请刷新页面重试", { icon: 2 });
       throw error;
     }
+
   }
 
   // 初始化核心组件
@@ -139,7 +137,7 @@ class GameManager {
       this.taskService = new TaskService(this.api, this.eventBus, this.store, this.playerService, this.templateService);
 
       // 8. 初始化UI服务（依赖：eventBus, store, templateService, taskService, playerService）
-      this.uiService = new UIService(this.eventBus, this.store, this.templateService, this.taskService, this.playerService,this.swiperService);
+      this.uiService = new UIService(this.eventBus, this.store, this.templateService, this.taskService, this.playerService, this.swiperService);
       await this.uiService.initialize();
 
       // 9. 初始化商城服务（依赖：eventBus, api, playerService, router）
@@ -157,7 +155,6 @@ class GameManager {
       // 12. 设置事件监听器
       await this.setupEventListeners();
       await this.websocketService.connect();
-
       this.initialized = true;
       Logger.info("GameManager", "[initializeServices:131]", "服务组件初始化完成");
     } catch (error) {
@@ -178,7 +175,7 @@ class GameManager {
     this.swiperService = new SwiperService();
     this.nfcService = new NFCService(this.api, this.eventBus, this.store);
     this.audioService = new AudioService(this.eventBus, this.store);
-    this.live2dService = new Live2DService(this.eventBus,this.store);
+    this.live2dService = new Live2DService(this.eventBus, this.store);
     // 初始化 Live2D 服务
     await this.live2dService.initialize();
 
@@ -270,10 +267,9 @@ class GameManager {
     return this.initializationPromise;
   }
 
-  // 初始化观察器
+  // 初始化观察器 已经在uiService中初始化
   setupDOMObserver() {
     Logger.debug("GameManager", "初始化DOM观察器");
-
     const taskObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.type === "childList") {
@@ -281,11 +277,11 @@ class GameManager {
             if (node.nodeType === 1) {
               // 处理任务卡片
               if (node.classList?.contains("task-card")) {
-                this.initializeTaskCard(node);
+                this.uiService.initializeTaskCard(node);
               }
               // 处理新添加节点中的任务卡片
-              const taskCards = node.getElementsByClassName("task-card");
-              Array.from(taskCards).forEach((card) => this.initializeTaskCard(card));
+              // const taskCards = node.getElementsByClassName("task-card");
+              // Array.from(taskCards).forEach((card) => this.uiService.initializeTaskCard(card));
             }
           });
         }
@@ -301,28 +297,11 @@ class GameManager {
     containers.forEach((container) => {
       taskObserver.observe(container, config);
       // 初始化已存在的任务卡片
-      Array.from(container.getElementsByClassName("task-card")).forEach((card) => this.initializeTaskCard(card));
+      // Array.from(container.getElementsByClassName("task-card")).forEach((card) => this.uiService.initializeTaskCard(card));
     });
 
     // 存储观察器实例以便后续清理
     this._taskObserver = taskObserver;
-  }
-
-  // 初始化任务卡片
-  initializeTaskCard(taskCard) {
-    const timeElement = taskCard.querySelector(".task-time");
-    if (!timeElement) return;
-
-    const endtime = parseInt(taskCard.dataset.endtime);
-    if (!endtime) return;
-
-    const timeUpdateInterval = setInterval(() => {
-      const isActive = gameUtils.updateTaskTime(taskCard, endtime);
-      if (!isActive) {
-        clearInterval(timeUpdateInterval);
-        taskCard.classList.add("expired");
-      }
-    }, 1000);
   }
 
   // 初始化文字云
@@ -378,7 +357,7 @@ class GameManager {
         wordcloudService: this.wordcloudService,
         live2dService: this.live2dService,
         swiperService: this.swiperService,
-        router: this.router
+        router: this.router,
       });
     } catch (error) {
       Logger.error("GameManager", "初始化事件管理器失败:", error);

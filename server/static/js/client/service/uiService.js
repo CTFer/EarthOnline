@@ -1,12 +1,12 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-03-04 10:30:20
+ * @LastEditTime: 2025-03-04 10:51:08
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
 import Logger from "../../utils/logger.js";
-import { TASK_EVENTS, UI_EVENTS, AUDIO_EVENTS, MAP_EVENTS, WS_EVENTS, PLAYER_EVENTS, SHOP_EVENTS } from "../config/events.js";
+import { TASK_EVENTS, UI_EVENTS, AUDIO_EVENTS, MAP_EVENTS, WS_EVENTS, PLAYER_EVENTS, SHOP_EVENTS, ROUTE_EVENTS } from "../config/events.js";
 import { WS_STATE, WS_CONFIG } from "../config/wsConfig.js";
 import { gameUtils } from "../../utils/utils.js";
 import NotificationService from "./notificationService.js";
@@ -1068,7 +1068,7 @@ class UIService {
     const target = e.target;
     // 处理返回首页点击
     if (target.classList.contains("back-home-btn")) {
-      this.eventBus.emit(ROUTE_EVENTS.CHANGE, { from: window.location.pathname, to: '/' });
+      this.eventBus.emit(ROUTE_EVENTS.CHANGED, { from: window.location.pathname, to: '/' });
     }
 
     // 处理任务卡片点击 需要判断是进行中的任务还是可用任务    

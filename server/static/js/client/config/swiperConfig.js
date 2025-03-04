@@ -9,8 +9,8 @@
  */
 export const SWIPER_CONFIG = {
     activeTasks: {
-        slidesPerView: 3,
-        spaceBetween: 30,
+        slidesPerView: 4,
+        spaceBetween: 20,
         direction: "horizontal",
         loop: false,
         freeMode: {
