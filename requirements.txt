@@ -7,3 +7,4 @@ waitress==3.0.2
 ndef==0.3.3
 python-dotenv==1.0.0
 logging==0.5.1.2 
+pycryptodome==3.18.0

@@ -70,7 +70,21 @@
   body {
     padding: @spacing-sm;
   }
-
+  // 调整页脚样式
+  footer {
+    position: relative;
+    margin-top: @spacing-lg;
+    padding: @spacing-md;
+    text-align: center;
+    .websocket-status{
+        // 居中显示，单列一行
+        position: relative;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+  }
   // 重置所有面板的基础样式
   .panel-base {
     width: 100% !important;
