@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-03-04 22:10:21
+ * @LastEditTime: 2025-03-05 15:37:59
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -620,9 +620,7 @@ class UIService {
           .map(
             (card) => `
                     <div class="swiper-slide">
-                        <div class="task-panel">
                             ${card}
-                        </div>
                     </div>
                 `
           )
@@ -1518,7 +1516,7 @@ class UIService {
             item: item,
             quantity: quantity,
             onConfirm: (index) => {
-              this.eventBus.emit(SHOP_EVENTS.PURCHASE_REQUESTED, {
+              this.eventBus.emit(SHOP_EVENTS.PURCHASE, {
                 item: item,
                 quantity: quantity,
               });
@@ -1696,8 +1694,6 @@ class UIService {
       container.innerHTML = '<div class="error-notification">加载通知失败</div>';
     }
   }
-
-
 }
 
 export default UIService;

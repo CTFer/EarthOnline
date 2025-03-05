@@ -448,13 +448,13 @@ class EventManager {
     }
   }
 
-  handleModalShow(data) {
-    try {
-      this.uiService.showModal(data);
-    } catch (error) {
-      this.handleError("显示模态框", error, "显示对话框失败");
-    }
-  }
+  // handleModalShow(data) {
+  //   try {
+  //     this.uiService.showModal(data);
+  //   } catch (error) {
+  //     this.handleError("显示模态框", error, "显示对话框失败");
+  //   }
+  // }
 
   handleUIPlayerInfoUpdate(playerInfo) {
     try {
@@ -467,7 +467,7 @@ class EventManager {
   initializeUIEvents() {
     // UI相关事件监听
     this.eventBus.on(UI_EVENTS.NOTIFICATION_SHOW, this.handleNotificationShow.bind(this));
-    this.eventBus.on(UI_EVENTS.MODAL_SHOW, this.handleModalShow.bind(this));
+    // this.eventBus.on(UI_EVENTS.MODAL_SHOW, this.handleModalShow.bind(this));
 
     // 地图相关UI事件
 

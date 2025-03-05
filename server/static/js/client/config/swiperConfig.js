@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-13 21:56:01
- * @LastEditTime: 2025-02-15 18:50:53
+ * @LastEditTime: 2025-03-05 15:52:20
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -13,6 +13,20 @@ export const SWIPER_CONFIG = {
         spaceBetween: 20,
         direction: "horizontal",
         loop: false,
+        breakpoints: {
+            1200: {
+                slidesPerView: 4,
+                spaceBetween: 20,
+            },
+            768: {
+                slidesPerView: 2,
+                spaceBetween: 15,
+            },
+            0: {
+                slidesPerView: 1,
+                spaceBetween: 10,
+            },
+        },
         freeMode: {
             enabled: true,
             momentum: true,

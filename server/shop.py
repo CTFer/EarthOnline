@@ -236,7 +236,7 @@ class Shop:
             logger.error(f"删除商品失败: {str(e)}")
             raise
         
-    def purchase_item(self, user_id: int, item_id: int, quantity: int = 1) -> dict:
+    def purchase_item(self, player_id: int, item_id: int, quantity: int = 1) -> dict:
         """购买商品"""
         try:
             current_timestamp = int(datetime.now().timestamp())
@@ -268,7 +268,7 @@ class Shop:
             # 检查并更新用户积分
             cursor.execute(
                 "SELECT points FROM player_data WHERE player_id = ?", 
-                (user_id,)
+                (player_id,)
             )
             user = cursor.fetchone()
             
@@ -283,7 +283,7 @@ class Shop:
                 UPDATE player_data 
                 SET points = points - ? 
                 WHERE player_id = ?
-            """, (total_price, user_id))
+            """, (total_price, player_id))
             
             # 记录积分变动
             cursor.execute("""
@@ -292,7 +292,7 @@ class Shop:
                 VALUES (?, ?, strftime('%s','now'), (
                     SELECT points FROM player_data WHERE player_id = ?
                 ))
-            """, (user_id, -total_price, user_id))
+            """, (player_id, -total_price, player_id))
             
             # 更新库存
             cursor.execute("""
@@ -306,7 +306,7 @@ class Shop:
                 INSERT INTO shop_record 
                 (user_id, product_id, exchange_quantity, exchange_time, status)
                 VALUES (?, ?, ?, datetime('now'), '已完成')
-            """, (user_id, item_id, quantity))
+            """, (player_id, item_id, quantity))
             
             self.get_db().commit()
             return {"success": True}
@@ -425,11 +425,11 @@ def delete_item(item_id):
 def purchase():
     """购买商品"""
     data = request.get_json()
-    user_id = data['user_id']
+    player_id = data['player_id']
     item_id = data['item_id']
     quantity = data.get('quantity', 1)
     
-    result = shop.purchase_item(user_id, item_id, quantity)
+    result = shop.purchase_item(player_id, item_id, quantity)
     return json.dumps({"code": 0 if result['success'] else 1, "msg": result.get('error')})
 
 @shop_bp.route('/admin/shop')

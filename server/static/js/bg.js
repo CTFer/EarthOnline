@@ -187,6 +187,8 @@ var trans = {
 
     Build.prototype.go = function () {
         this.canvas = document.getElementById("bg-star");
+        // 如果canvas的display属性为none，则不执行
+        if (this.canvas.style.display === 'none') return;
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
         this.$ =this.canvas.getContext("2d");

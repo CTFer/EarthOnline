@@ -8,6 +8,7 @@
 
 @import "./variables.less";
 @import "./mixins.less";
+@import "./responsive.less";  // 引入响应式样式
 
 // 基础布局
 body {
@@ -16,6 +17,9 @@ body {
   background: linear-gradient(135deg, #0c1d35 0%, #0a1422 100%);
   color: @text-color;
   font-family: "Microsoft YaHei", Arial, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 // 全局布局
@@ -23,11 +27,10 @@ body {
   display: grid;
   grid-template-columns: 380px 1fr 400px;
   gap: @spacing-md;
-  // padding: @spacing-md;
-  // min-height: 100vh;
   position: relative;
   height: @height-base;
   box-sizing: border-box;
+  flex: 1;
   @media screen and (max-width: 1200px) {
     grid-template-columns: 250px 1fr 250px;
   }
@@ -35,10 +38,10 @@ body {
   @media screen and (max-width: 992px) {
     grid-template-columns: 1fr;
 
-    .character-panel,
-    .task-panel {
-      display: none;
-    }
+    // .character-panel,
+    // .task-panel {
+    //   display: none;
+    // }
   }
 }
 
@@ -72,6 +75,12 @@ body {
 
 // 响应式布局补充
 @media screen and (max-width: 768px) {
+  #bg-star{
+    display: none;
+  }
+  .bg-box{
+    display: none;
+  }
   .task-card {
     .task-header {
       flex-direction: column;
@@ -93,5 +102,44 @@ body {
     width: 90%;
     left: 5%;
     right: 5%;
+  }
+}
+
+// 页脚样式
+footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: @spacing-md;
+  background: rgba(0, 0, 0, 0.2);
+  margin-top: auto;
+  
+  p {
+    margin: 0 @spacing-md;
+    display: flex;
+    align-items: center;
+    
+    .logo {
+      height: 20px;
+      margin-right: @spacing-sm;
+    }
+  }
+  
+  .websocket-status {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #ff4d4f;
+      margin-right: @spacing-xs;
+      
+      &.connected {
+        background-color: #52c41a;
+      }
+    }
   }
 } 

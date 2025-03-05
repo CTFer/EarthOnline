@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:01
- * @LastEditTime: 2025-03-02 19:52:32
+ * @LastEditTime: 2025-03-05 13:01:31
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -282,6 +282,21 @@ class APIClient {
     async getSecurityCode() {
         Logger.info('API', '获取高德地图安全密钥');
         return this.request('/api/amap/security-config');
+    }
+
+    async purchaseShopItem(itemId, quantity, playerId) {
+        Logger.info('API', '购买商品:', { itemId, quantity, playerId });
+        return this.request('/api/shop/purchase', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                item_id: itemId,
+                quantity: quantity,
+                player_id: playerId
+            })
+        });
     }
 
 }

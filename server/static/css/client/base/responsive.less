@@ -1,0 +1,349 @@
+// out: false
+/*
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-03-04 11:30:30
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 响应式布局样式
+ */
+
+@import "./variables.less";
+@import "./mixins.less";
+
+// 平板设备样式（768px - 1200px）
+@media screen and (max-width: 1200px) {
+  .game-container {
+    // 调整网格布局为两列
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap: @spacing-sm;
+    padding: @spacing-sm;
+    height: auto;
+    min-height: calc(100vh - 100px); // 减去页脚高度
+
+    // 调整面板顺序和布局
+    .character-panel {
+      grid-column: 1;
+      grid-row: 1;
+      height: auto;
+      min-width: 300px; // 确保最小宽度
+    }
+
+    .main-content {
+      grid-column: 1 / span 2;
+      grid-row: 2;
+      height: auto;
+      min-height: 60vh;
+    }
+
+    .task-panel {
+      grid-column: 2;
+      grid-row: 1;
+      height: auto;
+      min-width: 300px; // 确保最小宽度
+    }
+  }
+
+  // 调整地图容器高度
+  .gps-map-container {
+    height: 40vh !important;
+  }
+
+  // 调整页脚样式
+  footer {
+    position: relative;
+    margin-top: @spacing-lg;
+    padding: @spacing-md;
+    text-align: center;
+    .websocket-status{
+        // 居中显示，单列一行
+        position: relative;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+  }
+}
+
+// 手机设备样式（<= 768px）
+@media screen and (max-width: 768px) {
+  body {
+    padding: @spacing-sm;
+  }
+
+  // 重置所有面板的基础样式
+  .panel-base {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    box-sizing: border-box;
+    display: block !important; // 强制块级显示
+    float: none !important; // 清除浮动
+  }
+
+  .game-container {
+    // 调整为单列布局
+    display: block !important; // 改用块级布局
+    height: auto;
+    min-height: calc(100vh - 100px); // 减去页脚高度
+    padding: 0;
+    
+    // 角色面板样式 - 最先显示
+    .character-panel {
+      width: 100% !important;
+      height: auto;
+      min-height: 150px;
+      margin-bottom: @spacing-md;
+      order: unset; // 清除flex order
+
+      .panel-title {
+        margin-bottom: @spacing-sm;
+      }
+
+      .character-container {
+        width: 100%;
+        height: auto;
+        display: flex;
+        flex-direction: column;
+        gap: @spacing-sm;
+        padding: @spacing-sm;
+      }
+
+      .word-cloud-container {
+        width: 100%;
+        height: 150px;
+      }
+
+      .character-stats {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: @spacing-sm;
+
+        .character-info {
+          display: flex;
+          flex-wrap: wrap;
+          gap: @spacing-sm;
+          
+          .info-row {
+            flex: 1;
+            min-width: 150px;
+          }
+        }
+      }
+    }
+
+    // 主内容区域 - 第二显示
+    .main-content {
+      width: 100% !important;
+      height: auto;
+      margin-bottom: @spacing-md;
+      order: unset; // 清除flex order
+
+      &-top {
+        height: auto;
+        min-height: 200px;
+      }
+
+      &-bottom {
+        height: auto;
+        min-height: 150px;
+      }
+    }
+
+    // 任务面板样式 - 最后显示
+    .task-panel {
+      width: 100% !important;
+      height: auto;
+      min-height: 150px;
+      margin-bottom: @spacing-md;
+      order: unset; // 清除flex order
+
+      .panel-title {
+        margin-bottom: @spacing-sm;
+      }
+    }
+  }
+
+  // 优化地图控制器布局
+  .map-controls {
+    flex-direction: column;
+    gap: @spacing-sm;
+    padding: @spacing-sm;
+
+    .control-group {
+      width: 100%;
+      justify-content: space-between;
+      padding: @spacing-xs;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+
+    .time-filter {
+      flex-wrap: wrap;
+      
+      select, input {
+        width: 100%;
+        margin-bottom: @spacing-xs;
+      }
+    }
+
+    .status-info {
+      flex-wrap: wrap;
+      gap: @spacing-sm;
+      
+      .info-item {
+        flex: 1;
+        min-width: 100px;
+        text-align: center;
+        padding: @spacing-xs;
+      }
+    }
+  }
+
+  // 调整地图容器高度
+  .gps-map-container {
+    height: 30vh !important; // 减小地图高度
+    min-height: 200px;
+    max-height: 300px;
+  }
+
+  // 调整通知面板样式
+  .notification-section {
+    margin-top: @spacing-md;
+    width: 100%;
+    
+    .notification-item {
+      padding: @spacing-sm;
+      margin-bottom: @spacing-sm;
+    }
+
+    .notification-container {
+      width: 100%;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+  }
+
+  // 调整任务列表样式
+  .task-list-container {
+    max-height: none;
+    height: auto;
+    min-height: 200px;
+    max-height: 300px;
+    width: 100%;
+    overflow-y: auto;
+  }
+
+  // 优化页脚布局
+  footer {
+    flex-direction: column;
+    gap: @spacing-sm;
+    padding: @spacing-sm;
+    height: auto;
+    min-height: 80px;
+    width: 100%;
+
+    p {
+      margin: @spacing-xs 0;
+      justify-content: center;
+    }
+
+    .websocket-status {
+      margin: @spacing-sm auto 0;
+    }
+  }
+
+  // 优化字体大小
+  .panel-title {
+    font-size: 1.2rem;
+    padding: @spacing-sm;
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    margin: 0;
+  }
+
+  // 调整角色信息布局
+  .character-stats {
+    flex-direction: column;
+    padding: @spacing-sm;
+    width: 100%;
+    
+    .character-info {
+      margin-top: @spacing-sm;
+      width: 100%;
+      margin: 0;
+    }
+
+    #live2dContainer,
+    #character-image {
+      max-height: 150px;
+      margin: 0 auto;
+      width: 100%;
+      text-align: center;
+
+      img {
+        max-width: 100%;
+        height: auto;
+      }
+    }
+  }
+}
+
+// 超小屏幕设备优化（<= 480px）
+@media screen and (max-width: 480px) {
+  body {
+    padding: @spacing-xs;
+  }
+
+  .game-container {
+    gap: @spacing-xs;
+  }
+
+  // 进一步简化UI元素
+  .map-controls {
+    .control-group {
+      font-size: 0.9rem;
+      padding: @spacing-xs;
+    }
+
+    .status-info .info-item {
+      min-width: 90px;
+      font-size: 0.9rem;
+    }
+  }
+
+  // 调整通知样式
+  .notification-item {
+    .notification-header {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: @spacing-xs;
+    }
+  }
+
+  // 优化按钮大小
+  .control-btn {
+    padding: @spacing-xs @spacing-sm;
+    font-size: 0.9rem;
+  }
+
+  // 缩小面板间距
+  .panel-title {
+    font-size: 1.1rem;
+    padding: @spacing-xs;
+  }
+
+  .character-stats,
+  .task-list-container {
+    padding: @spacing-xs;
+  }
+
+  // 调整地图容器高度
+  .gps-map-container {
+    height: 25vh !important;
+    min-height: 180px;
+    max-height: 250px;
+  }
+} 
