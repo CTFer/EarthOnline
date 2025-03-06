@@ -37,6 +37,7 @@ from function.NotificationService import notification_service
 from function.MedalService import medal_service
 from function.GameCardService import game_card_service
 from utils.response_handler import ResponseHandler, StatusCode, api_response
+from wechat import wechat_bp  # 导入微信蓝图
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -51,6 +52,7 @@ app.register_blueprint(admin_bp, url_prefix='/admin')
 
 # 注册商店蓝图
 app.register_blueprint(shop_bp)
+app.register_blueprint(wechat_bp, url_prefix='/wechat')  # 注册微信蓝图
 
 # 修改 SocketIO 配置
 socketio = SocketIO(
@@ -972,138 +974,6 @@ def handle_error(e):
         code=StatusCode.SERVER_ERROR,
         msg=f"服务器错误: {str(e)}"
     ))
-
-@app.route('/MP_verify_KtDy5Swi8adVxGhD.txt')
-def mp_verify():
-    """微信公众号域名验证"""
-    return 'KtDy5Swi8adVxGhD'
-@app.route('/WW_verify_mMdUEG9xb15zsh7U.txt')
-def qywechat_verify():
-    """企业微信域名验证"""
-    return 'mMdUEG9xb15zsh7U'
-
-@app.route('/wechat', methods=['GET', 'POST'])
-def wechat():
-    """
-    微信公众号接入接口
-    GET: 验证服务器有效性
-    POST: 处理微信消息和事件
-    """
-    try:
-        if request.method == 'GET':
-            # 获取参数
-            signature = request.args.get('signature', '')
-            timestamp = request.args.get('timestamp', '')
-            nonce = request.args.get('nonce', '')
-            echostr = request.args.get('echostr', '')
-            
-            logger.info(f"[WeChat] 收到验证请求: signature={signature}, timestamp={timestamp}, nonce={nonce}, echostr={echostr}")
-            
-            # 检查参数完整性
-            if not all([signature, timestamp, nonce, echostr]):
-                logger.error("[WeChat] 缺少必要的请求参数")
-                return 'Missing parameters', 400
-            
-            # 检查签名
-            if wechat_service.check_signature(signature, timestamp, nonce):
-                logger.info("[WeChat] 签名验证通过，返回echostr")
-                return echostr
-            else:
-                logger.warning("[WeChat] 签名验证失败")
-                return 'Invalid signature', 403
-        
-        elif request.method == 'POST':
-            # 获取请求参数
-            signature = request.args.get('signature', '')
-            timestamp = request.args.get('timestamp', '')
-            nonce = request.args.get('nonce', '')
-            msg_signature = request.args.get('msg_signature', '')
-            encrypt_type = request.args.get('encrypt_type', '')
-            
-            # 获取原始消息数据
-            xml_data = request.data
-            
-            logger.info(f"[WeChat] 收到消息推送: encrypt_type={encrypt_type}, msg_signature={msg_signature}")
-            logger.debug(f"[WeChat] 消息内容: {xml_data}")
-            
-            # 验证签名
-            if not wechat_service.check_signature(signature, timestamp, nonce):
-                logger.warning("[WeChat] 消息推送签名验证失败")
-                return 'Invalid signature', 403
-            
-            # 处理消息
-            response = wechat_service.handle_message(
-                xml_data,
-                msg_signature=msg_signature,
-                timestamp=timestamp,
-                nonce=nonce,
-                encrypt_type=encrypt_type
-            )
-            
-            logger.info(f"[WeChat] 消息处理完成，返回: {response}")
-            return response
-            
-    except Exception as e:
-        logger.error(f"[WeChat] 处理请求失败: {str(e)}", exc_info=True)
-        return 'Server error', 500
-
-@app.route('/wechat/access_token', methods=['GET'])
-@api_response
-def get_wechat_access_token():
-    """获取微信access_token"""
-    try:
-        # 获取access_token
-        access_token = wechat_service.get_access_token()
-        
-        return ResponseHandler.success(data={
-            'access_token': access_token,
-            'expires_in': 7200  # access_token有效期为2小时
-        })
-    except Exception as e:
-        logger.error(f"[WeChat] 获取access_token失败: {str(e)}", exc_info=True)
-        return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
-            msg=f"获取access_token失败: {str(e)}"
-        )
-
-@app.route('/wechat/access_token/refresh', methods=['POST'])
-@api_response
-def refresh_wechat_access_token():
-    """强制刷新微信access_token"""
-    try:
-        # 刷新access_token
-        access_token = wechat_service.refresh_access_token()
-        
-        return ResponseHandler.success(data={
-            'access_token': access_token,
-            'expires_in': 7200  # access_token有效期为2小时
-        })
-    except Exception as e:
-        logger.error(f"[WeChat] 刷新access_token失败: {str(e)}", exc_info=True)
-        return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
-            msg=f"刷新access_token失败: {str(e)}"
-        )
-
-@app.route('/wechat/menu/create', methods=['POST'])
-@api_response
-def create_wechat_menu():
-    """创建微信自定义菜单"""
-    try:
-        success = wechat_service.create_menu()
-        if success:
-            return ResponseHandler.success(msg="自定义菜单创建成功")
-        else:
-            return ResponseHandler.error(
-                code=StatusCode.WECHAT_ERROR,
-                msg="自定义菜单创建失败"
-            )
-    except Exception as e:
-        logger.error(f"[WeChat] 创建自定义菜单失败: {str(e)}", exc_info=True)
-        return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
-            msg=f"创建自定义菜单失败: {str(e)}"
-        )
 
 if __name__ == '__main__':
     logger = setup_logging()

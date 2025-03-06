@@ -117,7 +117,7 @@ class WeChatService:
             # 1. 将token、timestamp、nonce三个参数进行字典序排序
             temp = [self.token, timestamp, nonce]
             temp.sort()
-            
+
             # 2. 将三个参数字符串拼接成一个字符串进行sha1加密
             temp_str = ''.join(temp)
             sign = hashlib.sha1(temp_str.encode('utf-8')).hexdigest()
