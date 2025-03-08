@@ -13,3 +13,5 @@ test/
 server.log
 package-lock.json
 MP_verify_KtDy5Swi8adVxGhD.txt
+cursor_free/
+sync_to_server.bat

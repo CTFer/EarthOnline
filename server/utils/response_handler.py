@@ -27,7 +27,8 @@ class StatusCode:
     USER_NOT_FOUND = 2001      # 用户不存在
     LOGIN_FAILED = 2002        # 登录失败
     TOKEN_EXPIRED = 2003       # Token过期
-    
+    # 玩家相关
+    PLAYER_NOT_FOUND = 2004    # 玩家不存在
     # GPS相关状态码 (3000-3999)
     GPS_DATA_INVALID = 3001    # GPS数据无效
     GPS_RECORD_NOT_FOUND = 3002 # GPS记录不存在

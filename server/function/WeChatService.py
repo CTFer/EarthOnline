@@ -494,7 +494,7 @@ class WeChatService:
             logger.error(f"[WeChat] 处理菜单点击事件异常: {str(e)}", exc_info=True)
             return "抱歉，服务器处理请求时出现错误，请稍后再试"
 
-    def create_menu(self):
+    def create_menu(self, menu_data):
         """
         创建自定义菜单
         """
@@ -503,20 +503,20 @@ class WeChatService:
             access_token = self.get_access_token()
             
             # 菜单配置
-            menu_data = {
-                "button": [
-                    {
-                        "name": "位置服务",
-                        "type": "location_select",
-                        "key": "send_location"
-                    },
-                    {
-                        "name": "我的积分",
-                        "type": "click",
-                        "key": "get_points"
-                    }
-                ]
-            }
+            # menu_data = {
+            #     "button": [
+            #         {
+            #             "name": "位置服务",
+            #             "type": "location_select",
+            #             "key": "send_location"
+            #         },
+            #         {
+            #             "name": "我的积分",
+            #             "type": "click",
+            #             "key": "get_points"
+            #         }
+            #     ]
+            # }
             
             # 调用微信接口创建菜单
             url = f"https://api.weixin.qq.com/cgi-bin/menu/create?access_token={access_token}"

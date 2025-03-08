@@ -1,0 +1,22 @@
+# -*- coding: utf-8 -*-
+
+# Author: 一根鱼骨棒 Email 775639471@qq.com
+# Date: 2025-02-25 20:26:28
+# LastEditTime: 2025-03-07 13:58:13
+# LastEditors: 一根鱼骨棒
+# Description: 本开源代码使用GPL 3.0协议
+# Software: VScode
+# Copyright 2025 迷舍
+
+
+AMAP_SECURITY_JS_CODE = "00000000000000000000000000000000"  # 您的安全密钥
+
+# 微信公众号配置
+WECHAT_APP_ID = '0000000000000000'
+WECHAT_APP_SECRET = '0000000000000000'  # 请在微信公众平台获取AppSecret并填写在这里
+WECHAT_TOKEN = '0000000000000000'
+WECHAT_ENCODING_AES_KEY = '0000000000000000'
+# 企业微信配置
+QYWECHAT_CORP_ID = '0000000000000000'#企业CorpID
+QYWECHAT_AGENT_ID = '0000000000000000'#地球ONline应用AgentId
+QYWECHAT_CORP_SECRET = '0000000000000000'#企业Secret

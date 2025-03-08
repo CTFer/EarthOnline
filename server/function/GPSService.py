@@ -39,11 +39,15 @@ class GPSService:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def add_gps(self, gps_data: Dict) -> Dict:
+    def add_gps(self, data: Dict) -> Dict:
         """添加GPS记录"""
         try:
             conn = self.get_db()
             cursor = conn.cursor()
+
+            # 先对输入的坐标进行精度处理
+            current_x = round(float(data.get('x')), GPS_ACCURACY)
+            current_y = round(float(data.get('y')), GPS_ACCURACY)
 
             # 获取当前玩家最新的GPS记录
             cursor.execute('''
@@ -63,47 +67,59 @@ class GPSService:
                 # 将坐标转换为浮点数并保留GPS_ACCURACY位小数
                 last_x = round(float(last_record['x']), GPS_ACCURACY)
                 last_y = round(float(last_record['y']), GPS_ACCURACY)
-                current_x = round(float(data.get('x')), GPS_ACCURACY)
-                current_y = round(float(data.get('y')), GPS_ACCURACY)
 
-                # 如果坐标相同（精确到6位小数），则只更新时间
+                # 如果坐标相同（精确到GPS_ACCURACY位小数），则只更新时间
                 if last_x == current_x and last_y == current_y:
                     print("坐标相同更新时间")
-                    cursor.execute('''
-                        UPDATE GPS 
-                        SET addtime = ? 
-                        WHERE id = ?
-                    ''', (current_time, last_record['id']))
+                    try:
+                        cursor.execute('''
+                            UPDATE GPS 
+                            SET addtime = ? 
+                            WHERE id = ?
+                        ''', (current_time, last_record['id']))
 
-                    conn.commit()
-                    return json.dumps({
-                        'code': 0,
-                        'msg': '更新GPS时间成功',
-                        'data': {'id': last_record['id']}
-                    })
+                        conn.commit()
+                        return ResponseHandler.success(
+                            data={'id': last_record['id']},
+                            msg='更新GPS时间成功'
+                        )
+                    except Exception as e:
+                        logger.error(f"[GPS] 更新GPS时间失败: {str(e)}")
+                        return ResponseHandler.error(
+                            code=StatusCode.SERVER_ERROR,
+                            msg=f'更新GPS时间失败: {str(e)}'
+                        )
 
-            # 如果是新位置或没有最新记录，则插入新记录
-            cursor.execute('''
-                INSERT INTO GPS (x, y, player_id, addtime, device, remark)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
-                data.get('x'),
-                data.get('y'),
-                data.get('player_id'),
-                current_time,
-                data.get('device'),
-                data.get('remark')
-            ))
-            print(f"[GPS] 插入新GPS记录: {data}")
-            gps_id = cursor.lastrowid
-            conn.commit()
+            # 如果是新位置或没有最新记录，则插入新记录（使用精度处理后的坐标）
+            try:
+                cursor.execute('''
+                    INSERT INTO GPS (x, y, player_id, addtime, device, remark)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    current_x,  # 使用精度处理后的坐标
+                    current_y,  # 使用精度处理后的坐标
+                    data.get('player_id'),
+                    current_time,
+                    data.get('device'),
+                    data.get('remark')
+                ))
+                print(f"[GPS] 插入新GPS记录: x={current_x}, y={current_y}")
+                gps_id = cursor.lastrowid
+                conn.commit()
 
-            return ResponseHandler.success(
-                data={'id': gps_id},
-                msg='添加GPS记录成功'
-            )
+                return ResponseHandler.success(
+                    data={'id': gps_id},
+                    msg='添加GPS记录成功'
+                )
+            except Exception as e:
+                logger.error(f"[GPS] 插入GPS记录失败: {str(e)}")
+                return ResponseHandler.error(
+                    code=StatusCode.SERVER_ERROR,
+                    msg=f'插入GPS记录失败: {str(e)}'
+                )
 
         except Exception as e:
+            logger.error(f"[GPS] 添加GPS记录失败: {str(e)}")
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
                 msg=f'添加GPS记录失败: {str(e)}'
@@ -603,6 +619,43 @@ class GPSService:
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
                 msg=f'删除GPS记录失败: {str(e)}'
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    def get_latest_gps_records(self, limit=1000) -> Dict:
+        """获取最新的GPS记录
+        
+        Args:
+            limit: 限制返回的记录数量，默认1000条
+        """
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 获取最新的GPS记录
+            cursor.execute('''
+                SELECT * FROM GPS 
+                ORDER BY addtime DESC 
+                LIMIT ?
+            ''', (limit,))
+            
+            records = [dict(row) for row in cursor.fetchall()]
+            
+            return ResponseHandler.success(
+                data={
+                    'records': records,
+                    'total': len(records)
+                },
+                msg="获取最新GPS记录成功"
+            )
+            
+        except Exception as e:
+            logger.error(f"[GPS] 获取最新GPS记录失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'获取最新GPS记录失败: {str(e)}'
             )
         finally:
             if conn:

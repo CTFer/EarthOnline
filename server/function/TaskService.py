@@ -10,6 +10,7 @@ from datetime import datetime
 import json
 from typing import Dict, List, Optional
 from utils.response_handler import ResponseHandler, StatusCode
+from function.PlayerService import player_service
 
 logger = logging.getLogger(__name__)
 
@@ -232,7 +233,8 @@ class TaskService:
                 msg=f"获取任务失败: {str(e)}"
             )
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     def get_current_tasks(self, player_id: int) -> Dict:
         """获取用户当前未过期的任务列表"""

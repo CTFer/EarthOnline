@@ -1,0 +1,40 @@
+@echo off
+setlocal enabledelayedexpansion
+
+:: 设置中文编码
+chcp 936
+
+:: 配置信息
+set "LOCAL_PATH=D:\code\EarthOnline\server"
+set "REMOTE_PATH=/"
+set "HOST=127.0.0.1"
+set "USERNAME=sync"
+set "PASSWORD=123456"
+set "WINSCP_PATH=D:\WinSCP\WinSCP.com"
+
+:: 创建同步规则文件
+echo option batch abort > sync_rules.txt
+echo option confirm off >> sync_rules.txt
+echo option transfer binary >> sync_rules.txt
+
+:: 添加排除规则
+echo open ftps://%USERNAME%@%HOST%/ -explicit -password=%PASSWORD% >> sync_rules.txt
+echo synchronize remote -delete -criteria=size^|time "%LOCAL_PATH%" "%REMOTE_PATH%" ^
+    -filemask="|__pycache__/; */__pycache__/; */config.py; */config.js; *.pyc; sync_rules.txt; sync.log; sync_to_server.bat" >> sync_rules.txt
+echo exit >> sync_rules.txt
+
+:: 执行同步
+"%WINSCP_PATH%" /script=sync_rules.txt /log=sync.log
+
+:: 检查同步结果
+if %ERRORLEVEL% equ 0 (
+    echo 同步成功完成！
+) else (
+    echo 同步过程中出现错误，请检查 sync.log 文件了解详情。
+)
+
+:: 删除临时规则文件
+del sync_rules.txt
+
+:: 暂停以查看结果
+pause 

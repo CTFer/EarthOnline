@@ -8,6 +8,8 @@
 
 # 服务器配置
 SERVER_IP = '192.168.5.18'
+DOMAIN = 'duonline.top'
+DOMAIN_IP = '1.95.11.164'
 PORT = 80
 # 环境配置 本地开发环境 local 生产环境 prod 生产环境中NFC读写卡功能关闭
 ENV = 'local'
@@ -18,7 +20,7 @@ DATABASE_PATH = 'database/game.db'
 DEBUG = True
 
 # GPS更新精度阈值 int值
-GPS_ACCURACY = 6
+GPS_ACCURACY = 3
 
 # GPS更新间隔 时间 秒
 GPS_DURATION = 60
@@ -45,7 +47,7 @@ WAITRESS_CONFIG = {
 
 # 生产环境配置 用于同步数据库
 PROD_SERVER = {
-    'URL': 'http://1.95.11.164',  # 生产环境服务器地址
+    'URL': DOMAIN,  # 生产环境服务器地址
     'API_KEY': '95279527',    # API认证密钥 用于同步数据库
     'TIMEOUT': 5,                      # 请求超时时间（秒）
     'RETRY': 3                         # 失败重试次数
@@ -58,3 +60,10 @@ SYNC_ENDPOINTS = [
     '/api/roadmap/add',
     '/api/roadmap/<id>',  # PUT/DELETE
 ]
+# 定义任务类型
+TASK_TYPE = {
+    'DAILY': '每日任务',
+    'MAIN': '主线任务',
+    'BRANCH': '支线任务',
+    'SPECIAL': '特殊任务',
+}

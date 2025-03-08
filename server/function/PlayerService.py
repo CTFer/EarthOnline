@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-02-04 23:29:47
-# LastEditTime: 2025-03-04 21:06:52
+# LastEditTime: 2025-03-07 20:32:40
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -15,6 +15,7 @@ import json
 import time
 from typing import Dict, List, Optional
 from utils.response_handler import ResponseHandler, StatusCode
+from config.config import DEBUG
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,27 @@ class PlayerService:
     def get_db(self):
         """获取数据库连接"""
         return sqlite3.connect(self.db_path)
-
+    def get_player_by_wechat_userid(self, wechat_userid):
+        """根据企业微信用户ID获取玩家信息"""
+        try:
+            if DEBUG:
+                wechat_userid = 'duyucheng'
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM player_data WHERE wechat_userid = ?', (wechat_userid,))
+            player = cursor.fetchone()
+            if player:
+                # 获取列名并将查询结果转换为字典
+                columns = [col[0] for col in cursor.description]
+                player_dict = dict(zip(columns, player))
+                return ResponseHandler.success(data=player_dict, msg="获取玩家信息成功")
+            else:
+                return ResponseHandler.error(code=StatusCode.PLAYER_NOT_FOUND, msg="玩家不存在")
+        except sqlite3.Error as e:
+            logger.error(f"获取玩家信息失败: {str(e)}")
+            return ResponseHandler.error(code=StatusCode.SERVER_ERROR, msg="获取玩家信息失败")
+        finally:
+            conn.close()
     def get_player(self, player_id: int) -> Dict:
         """获取玩家信息"""
         logger.debug(f"获取角色信息: player_id={player_id}")
@@ -193,4 +214,4 @@ class PlayerService:
         finally:
             conn.close()
 
-player_service = PlayerService() 
+player_service = PlayerService()

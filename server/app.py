@@ -585,7 +585,18 @@ def handle_nfc_card():
             'msg': error_msg,
             'data': None
         }), 500
-
+@app.route('/api/gps/sync', methods=['GET'])
+def sync_gps_records():
+    """提供GPS数据同步接口"""
+    try:
+        limit = request.args.get('limit', 1000, type=int)
+        return gps_service.get_latest_gps_records(limit)
+    except Exception as e:
+        logger.error(f"[GPS] 同步GPS记录失败: {str(e)}")
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=f'同步GPS记录失败: {str(e)}'
+        )
 @app.route('/api/gps', methods=['POST'])
 @api_response
 def add_gps():
@@ -974,6 +985,7 @@ def handle_error(e):
         code=StatusCode.SERVER_ERROR,
         msg=f"服务器错误: {str(e)}"
     ))
+
 
 if __name__ == '__main__':
     logger = setup_logging()
