@@ -1,13 +1,14 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:01
- * @LastEditTime: 2025-03-05 13:01:31
+ * @LastEditTime: 2025-03-09 14:47:43
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
  * Copyright 2025 迷舍
  */
 import Logger from '../../utils/logger.js';
+import { SSL_ENABLED } from '../../config/config.js';
 
 // API 请求封装
 class APIClient {
@@ -24,7 +25,21 @@ class APIClient {
      * @returns {Promise<any>}
      */
     async request(endpoint, options = {}) {
-        const url = endpoint.startsWith('http') ? endpoint : this.baseURL + endpoint;
+        // 获取当前页面协议
+        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        
+        // 构建基础URL
+        let baseUrl = this.baseURL;
+        
+        // 如果baseURL包含协议，则直接使用
+        if (!baseUrl.startsWith('http')) {
+            baseUrl = `${protocol}//${baseUrl}`;
+        }
+        
+        // 构建完整URL
+        const url = endpoint.startsWith('http') 
+            ? endpoint 
+            : `${baseUrl}${endpoint}`;
         
         try {
             Logger.debug('API', '发送请求:', { url, options });

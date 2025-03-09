@@ -1,12 +1,12 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-17 13:47:42
- * @LastEditTime: 2025-02-22 20:46:07
+ * @LastEditTime: 2025-03-09 16:56:34
  * @LastEditors: 一根鱼骨棒
  * @Description: WebSocket服务管理
  */
 import Logger from '../../utils/logger.js';
-import { SERVER } from '../../config/config.js';
+import { SERVER,DOMAIN } from '../../config/config.js';
 import { 
     WS_STATE,
     WS_EVENT_TYPES,
@@ -150,7 +150,6 @@ class WebSocketService {
 
         if (this.socket?.connected) {
             Logger.info('WebSocketService', 'WebSocket已连接');
-            // 不立即触发连接事件，等待其他服务初始化完成
             return;
         }
 
@@ -159,26 +158,56 @@ class WebSocketService {
         Logger.info('WebSocketService', '开始初始化WebSocket');
         
         try {
-            // 创建socket连接，但不自动连接
-            this.socket = io(SERVER, {
-                ...WS_CONFIG.CONNECTION,
-                autoConnect: false
+            // 使用当前页面协议
+            const protocol = window.location.protocol;
+            const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+            
+            // 使用当前页面的主机名，而不是配置的域名
+            const host = window.location.host;
+            const serverUrl = `${wsProtocol}//${host}`;
+            
+            Logger.info('WebSocketService', '使用WebSocket URL:', serverUrl);
+            
+            // 创建socket连接
+            this.socket = io(serverUrl, {
+                autoConnect: false,
+                secure: protocol === 'https:',
+                path: '/socket.io',
+                transports: ['websocket'],
+                rejectUnauthorized: false,
+                withCredentials: true,
+                reconnection: true,
+                reconnectionAttempts: WS_CONFIG.RECONNECT.maxAttempts,
+                reconnectionDelay: WS_CONFIG.RECONNECT.baseDelay,
+                timeout: WS_CONFIG.CONNECTION.timeout
             });
+
+            // 设置连接错误处理
+            this.socket.on('connect_error', (error) => {
+                Logger.error('WebSocketService', 'WebSocket连接错误:', error);
+                this.handleWSError({
+                    type: WS_ERROR_TYPES.CONNECTION_ERROR,
+                    message: `连接错误: ${error.message}`,
+                    details: error
+                });
+            });
+
+
             
-            // 设置事件处理器
-            this.setupEventHandlers();
+            // 连接WebSocket
+            await this.connect();
             
-            Logger.info('WebSocketService', 'WebSocket初始化配置完成，等待连接');
             this.isInitializing = false;
+            Logger.info('WebSocketService', 'WebSocket初始化完成');
+            
         } catch (error) {
             this.isInitializing = false;
-            this.state = WS_STATE.ERROR;
             this.handleWSError(error, 'initialize');
             throw error;
         }
     }
 
-    // 开始连接
+    // 添加连接方法
     async connect() {
         if (!this.socket) {
             Logger.error('WebSocketService', '无法连接：WebSocket未初始化');
@@ -220,6 +249,8 @@ class WebSocketService {
             this.socket.once(WS_EVENT_TYPES.SYSTEM.CONNECT, () => {
                 clearTimeout(timeout);
                 this.state = WS_STATE.CONNECTED;
+                this.reconnectAttempts = 0;
+                Logger.info('WebSocketService', 'WebSocket连接成功');
                 this.eventBus.emit(WS_EVENTS.CONNECTED);
                 resolve();
             });

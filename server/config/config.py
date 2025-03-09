@@ -6,11 +6,18 @@
 # Software: VScode
 # Copyright 2025 迷舍
 
+import os
+
 # 服务器配置
 SERVER_IP = '192.168.5.18'
 DOMAIN = 'duonline.top'
 DOMAIN_IP = '1.95.11.164'
 PORT = 80
+# HTTPS配置
+HTTPS_ENABLED = True
+SSL_CERT_PATH = os.path.join(os.path.dirname(__file__), 'cert.pem')  # SSL证书路径
+SSL_KEY_PATH = os.path.join(os.path.dirname(__file__), 'private.key')   # SSL私钥路径
+HTTPS_PORT = 443  # HTTPS端口号
 # 环境配置 本地开发环境 local 生产环境 prod 生产环境中NFC读写卡功能关闭
 ENV = 'local'
 # 数据库配置
@@ -24,7 +31,6 @@ GPS_ACCURACY = 3
 
 # GPS更新间隔 时间 秒
 GPS_DURATION = 60
-
 # GPS数据处理相关配置
 GPS_CONFIG = {
     'AUTO_OPTIMIZE': True,           # 是否自动优化

@@ -4,7 +4,7 @@
  * @LastEditors: 一根鱼骨棒
  * @Description: WebSocket配置常量
  */
-
+import { SSL_ENABLED } from '../../config/config.js';
 // WebSocket错误类型枚举
 export const WS_ERROR_TYPES = {
     CONNECTION_ERROR: 'CONNECTION_ERROR',       // 连接错误
@@ -70,7 +70,10 @@ export const WS_CONFIG = {
         transports: ['websocket'],
         upgrade: false,
         forceNew: true,
-        closeOnBeforeunload: true
+        closeOnBeforeunload: true,
+        secure: SSL_ENABLED,
+        rejectUnauthorized: false,
+        withCredentials: true  // 允许跨域请求携带凭证
     },
     // 重连配置
     RECONNECT: {

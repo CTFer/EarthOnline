@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:31
- * @LastEditTime: 2025-03-04 10:38:15
+ * @LastEditTime: 2025-03-09 14:45:50
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -9,7 +9,10 @@
  */
 
 // 声明配置变量
-export const SERVER = "http://192.168.5.18/";
+export const SERVER = "192.168.5.18/";  // 使用相对协议
+export const DOMAIN = SERVER;  // 不包含协议，让 WebSocket 服务自己处理
+export const SSL_ENABLED = false;  // 启用 SSL
+export const SSL_PORT = 443;
 export const WEBNAME = "团团圆圆的生活家";
 export const ICP = "蜀ICP备2025125672号-1";
 export const MPS = "川公网安备51019002007781号";//公安备案

@@ -2,6 +2,8 @@ vue-version/
 earthonline/
 __pycache__/
 server/config/private.py
+server/config/private.key
+server/config/cert.pem
 server/static/css/client/components/*.css
 server/static/css/client/base/*.css
 earthonline/nginx.htaccess
@@ -15,3 +17,4 @@ package-lock.json
 MP_verify_KtDy5Swi8adVxGhD.txt
 cursor_free/
 sync_to_server.bat
+sync.log

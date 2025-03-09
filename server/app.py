@@ -30,6 +30,10 @@ from config.config import (
     WAITRESS_CONFIG, 
     ENV,
     PROD_SERVER,  # 添加这行
+    HTTPS_ENABLED,
+    SSL_CERT_PATH,
+    SSL_KEY_PATH,
+    HTTPS_PORT,
 )
 from config.private import AMAP_SECURITY_JS_CODE, WECHAT_TOKEN, WECHAT_ENCODING_AES_KEY, WECHAT_APP_ID
 import requests
@@ -586,6 +590,7 @@ def handle_nfc_card():
             'data': None
         }), 500
 @app.route('/api/gps/sync', methods=['GET'])
+@api_response
 def sync_gps_records():
     """提供GPS数据同步接口"""
     try:
@@ -594,7 +599,7 @@ def sync_gps_records():
     except Exception as e:
         logger.error(f"[GPS] 同步GPS记录失败: {str(e)}")
         return ResponseHandler.error(
-            code=StatusCode.SERVER_ERROR,
+            code=StatusCode.GPS_SYNC_FAILED,
             msg=f'同步GPS记录失败: {str(e)}'
         )
 @app.route('/api/gps', methods=['POST'])
@@ -805,6 +810,7 @@ def nfc_test():
     return render_template('nfc_test.html')
 # 通知相关接口
 @app.route('/api/notifications', methods=['GET'])
+@api_response
 def get_notifications():
     """获取通知列表"""
     try:
@@ -813,71 +819,61 @@ def get_notifications():
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        with get_db_connection() as conn:
-            notifications = notification_service.get_notifications(
-                target_type=target_type,
-                target_id=target_id,
-                limit=limit,
-                offset=offset
-            )
+        notifications = notification_service.get_notifications(
+            target_type=target_type,
+            target_id=target_id,
+            limit=limit,
+            offset=offset
+        )
             
-        return jsonify({
-            'code': 0,
-            'msg': 'success',
-            'data': notifications
-        })
+        return ResponseHandler.success(data=notifications)
     except Exception as e:
-        return jsonify({
-            'code': 1,
-            'msg': str(e)
-        })
+        return ResponseHandler.error(
+            code=StatusCode.NOTIFICATION_NOT_FOUND,
+            msg=str(e)
+        )
 
 @app.route('/api/notifications/<int:notification_id>', methods=['GET'])
+@api_response
 def get_notification(notification_id):
     """获取单个通知"""
     try:
         notification = notification_service.get_notification(notification_id)
         
         if not notification:
-            return jsonify({
-                'code': 1,
-                'msg': '通知不存在'
-            })
+            return ResponseHandler.error(
+                code=StatusCode.NOTIFICATION_NOT_FOUND,
+                msg='通知不存在'
+            )
         
-        return jsonify({
-            'code': 0,
-            'msg': 'success',
-            'data': notification
-        })
+        return ResponseHandler.success(data=notification)
     except Exception as e:
-        return jsonify({
-            'code': 1,
-            'msg': str(e)
-        })
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=str(e)
+        )
 
 @app.route('/api/notifications/<int:notification_id>/read', methods=['POST'])
+@api_response
 def mark_notification_as_read(notification_id):
     """标记通知为已读"""
     try:
         success = notification_service.mark_as_read(notification_id)
         
         if success:
-            return jsonify({
-                'code': 0,
-                'msg': 'success'
-            })
-        else:
-            return jsonify({
-                'code': 1,
-                'msg': '标记失败'
-            })
+            return ResponseHandler.success(msg='标记成功')
+        return ResponseHandler.error(
+            code=StatusCode.NOTIFICATION_READ_ERROR,
+            msg='标记失败'
+        )
     except Exception as e:
-        return jsonify({
-            'code': 1,
-            'msg': str(e)
-        })
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=str(e)
+        )
 
 @app.route('/api/notifications/unread/count', methods=['GET'])
+@api_response
 def get_unread_notifications_count():
     """获取未读通知数量"""
     try:
@@ -889,16 +885,12 @@ def get_unread_notifications_count():
             target_id=target_id
         )
         
-        return jsonify({
-            'code': 0,
-            'msg': 'success',
-            'data': count
-        })
+        return ResponseHandler.success(data=count)
     except Exception as e:
-        return jsonify({
-            'code': 1,
-            'msg': str(e)
-        })
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=str(e)
+        )
 
 # WebSocket通知事件
 @socketio.on('notification:read')
@@ -1001,16 +993,35 @@ if __name__ == '__main__':
     
     try:
         if DEBUG:
-            # 开发环境：使用 eventlet（支持热重载和WebSocket）
+            # 开发环境：使用 eventlet
             logger.info("Starting development server with eventlet...")
-            socketio.run(
-            app,
-                host=SERVER_IP,
-                port=PORT,
-            debug=True,
-            use_reloader=True,
-            log_output=True
-        )
+            if HTTPS_ENABLED:
+                import ssl
+                import eventlet
+                
+                # 创建SSL上下文
+                ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                ssl_context.load_cert_chain(
+                    certfile=SSL_CERT_PATH,
+                    keyfile=SSL_KEY_PATH
+                )
+                
+                # 创建socket并包装SSL
+                sock = eventlet.listen((SERVER_IP, HTTPS_PORT))
+                ssl_sock = ssl_context.wrap_socket(sock, server_side=True)
+                
+                logger.info(f"Starting HTTPS server on port {HTTPS_PORT}")
+                eventlet.wsgi.server(ssl_sock, app)
+            else:
+                # 启动HTTP服务器
+                socketio.run(
+                    app,
+                    host=SERVER_IP,
+                    port=PORT,
+                    debug=True,
+                    use_reloader=True,
+                    log_output=True
+                )
         else:
             # 生产环境：使用 waitress
             from waitress import serve
@@ -1020,7 +1031,8 @@ if __name__ == '__main__':
             # 使用 TransLogger 记录访问日志
             app_logged = TransLogger(app)
             
-            # 配置 waitress
+            # 启动HTTP服务器
+            logger.info(f"Starting HTTP server on port {PORT}")
             serve(
                 app_logged,
                 host=SERVER_IP,

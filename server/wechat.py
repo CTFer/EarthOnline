@@ -3,7 +3,7 @@ from flask import Blueprint, request
 import logging
 from function.WeChatService import wechat_service
 from function.QYWeChatService import qywechat_service
-from utils.response_handler import ResponseHandler, StatusCode
+from utils.response_handler import ResponseHandler, StatusCode, api_response
 import xml.etree.ElementTree as ET
 
 # 创建蓝图
@@ -57,7 +57,7 @@ def wechat():
         elif request.method == 'POST':
             # 获取原始消息数据
             xml_data = request.data
-            logger.info(f"[QYWeChat] 收到消息推送: {xml_data}")
+            logger.info(f"[WeChat] 收到消息推送: {xml_data}")
             
             # 使用企业微信服务处理加密消息
             # 传入消息签名、时间戳和随机数用于验证和解密
@@ -70,12 +70,12 @@ def wechat():
 
 
 @wechat_bp.route('/access_token', methods=['GET'])
+@api_response
 def get_wechat_access_token():
     """获取微信access_token"""
     try:
         # 获取access_token
         access_token = wechat_service.get_access_token()
-
         return ResponseHandler.success(data={
             'access_token': access_token,
             'expires_in': 7200  # access_token有效期为2小时
@@ -83,18 +83,18 @@ def get_wechat_access_token():
     except Exception as e:
         logger.error(f"[WeChat] 获取access_token失败: {str(e)}", exc_info=True)
         return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
+            code=StatusCode.WECHAT_API_ERROR,
             msg=f"获取access_token失败: {str(e)}"
         )
 
 
 @wechat_bp.route('/access_token/refresh', methods=['POST'])
+@api_response
 def refresh_wechat_access_token():
     """强制刷新微信access_token"""
     try:
         # 刷新access_token
         access_token = wechat_service.refresh_access_token()
-
         return ResponseHandler.success(data={
             'access_token': access_token,
             'expires_in': 7200  # access_token有效期为2小时
@@ -102,38 +102,38 @@ def refresh_wechat_access_token():
     except Exception as e:
         logger.error(f"[WeChat] 刷新access_token失败: {str(e)}", exc_info=True)
         return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
+            code=StatusCode.WECHAT_API_ERROR,
             msg=f"刷新access_token失败: {str(e)}"
         )
 
 
 @wechat_bp.route('/menu/create', methods=['POST'])
+@api_response
 def create_wechat_menu():
     """创建微信自定义菜单"""
     try:
         success = wechat_service.create_menu()
         if success:
             return ResponseHandler.success(msg="自定义菜单创建成功")
-        else:
-            return ResponseHandler.error(
-                code=StatusCode.WECHAT_ERROR,
-                msg="自定义菜单创建失败"
-            )
+        return ResponseHandler.error(
+            code=StatusCode.WECHAT_MENU_ERROR,
+            msg="自定义菜单创建失败"
+        )
     except Exception as e:
         logger.error(f"[WeChat] 创建自定义菜单失败: {str(e)}", exc_info=True)
         return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
+            code=StatusCode.WECHAT_API_ERROR,
             msg=f"创建自定义菜单失败: {str(e)}"
         )
 
 
 @wechat_bp.route('/qy/access_token', methods=['GET'])
+@api_response
 def get_qywechat_access_token():
     """获取企业微信access_token"""
     try:
         # 获取access_token
         access_token = qywechat_service.get_access_token()
-
         return ResponseHandler.success(data={
             'access_token': access_token,
             'expires_in': 7200  # access_token有效期为2小时
@@ -141,18 +141,18 @@ def get_qywechat_access_token():
     except Exception as e:
         logger.error(f"[QYWeChat] 获取access_token失败: {str(e)}", exc_info=True)
         return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
+            code=StatusCode.WECHAT_API_ERROR,
             msg=f"获取access_token失败: {str(e)}"
         )
 
 
 @wechat_bp.route('/qy/access_token/refresh', methods=['POST'])
+@api_response
 def refresh_qywechat_access_token():
     """强制刷新企业微信access_token"""
     try:
         # 刷新access_token
         access_token = qywechat_service.refresh_access_token()
-
         return ResponseHandler.success(data={
             'access_token': access_token,
             'expires_in': 7200  # access_token有效期为2小时
@@ -160,12 +160,13 @@ def refresh_qywechat_access_token():
     except Exception as e:
         logger.error(f"[QYWeChat] 刷新access_token失败: {str(e)}", exc_info=True)
         return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
+            code=StatusCode.WECHAT_API_ERROR,
             msg=f"刷新access_token失败: {str(e)}"
         )
 
 
 @wechat_bp.route('/qy/message/send', methods=['POST'])
+@api_response
 def send_qywechat_message():
     """发送企业微信消息"""
     try:
@@ -192,21 +193,21 @@ def send_qywechat_message():
 
         if success:
             return ResponseHandler.success(msg=message)
-        else:
-            return ResponseHandler.error(
-                code=StatusCode.WECHAT_ERROR,
-                msg=message
-            )
+        return ResponseHandler.error(
+            code=StatusCode.WECHAT_MSG_ERROR,
+            msg=message
+        )
 
     except Exception as e:
         logger.error(f"[QYWeChat] 发送消息失败: {str(e)}", exc_info=True)
         return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
+            code=StatusCode.WECHAT_API_ERROR,
             msg=f"发送消息失败: {str(e)}"
         )
 
 
 @wechat_bp.route('/qy/app/menu/create', methods=['POST'])
+@api_response
 def create_wechat_app_menu():
     """创建企业微信应用菜单"""
     menu_data = {
@@ -234,10 +235,16 @@ def create_wechat_app_menu():
         ]
     }
     success, message = qywechat_service.create_menu(menu_data)
-    return ResponseHandler.success(data=message, msg="菜单创建成功") if success else ResponseHandler.error(msg=message)
+    if success:
+        return ResponseHandler.success(data=message, msg="菜单创建成功")
+    return ResponseHandler.error(
+        code=StatusCode.WECHAT_MENU_ERROR,
+        msg=message
+    )
 
 
 @wechat_bp.route('/qy/menu', methods=['POST'])
+@api_response
 def create_qywechat_menu():
     """创建企业微信应用菜单"""
     try:
@@ -249,63 +256,59 @@ def create_qywechat_menu():
             )
 
         success, message = qywechat_service.create_menu(menu_data)
-
         if success:
             return ResponseHandler.success(msg=message)
-        else:
-            return ResponseHandler.error(
-                code=StatusCode.WECHAT_ERROR,
-                msg=message
-            )
+        return ResponseHandler.error(
+            code=StatusCode.WECHAT_MENU_ERROR,
+            msg=message
+        )
 
     except Exception as e:
         logger.error(f"[QYWeChat] 创建菜单失败: {str(e)}", exc_info=True)
         return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
+            code=StatusCode.WECHAT_API_ERROR,
             msg=f"创建菜单失败: {str(e)}"
         )
 
 
 @wechat_bp.route('/qy/menu', methods=['GET'])
+@api_response
 def get_qywechat_menu():
     """获取企业微信应用菜单"""
     try:
         success, result = qywechat_service.get_menu()
-
         if success:
             return ResponseHandler.success(data=result)
-        else:
-            return ResponseHandler.error(
-                code=StatusCode.WECHAT_ERROR,
-                msg=result
-            )
+        return ResponseHandler.error(
+            code=StatusCode.WECHAT_MENU_ERROR,
+            msg=result
+        )
 
     except Exception as e:
         logger.error(f"[QYWeChat] 获取菜单失败: {str(e)}", exc_info=True)
         return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
+            code=StatusCode.WECHAT_API_ERROR,
             msg=f"获取菜单失败: {str(e)}"
         )
 
 
 @wechat_bp.route('/qy/menu', methods=['DELETE'])
+@api_response
 def delete_qywechat_menu():
     """删除企业微信应用菜单"""
     try:
         success, message = qywechat_service.delete_menu()
-
         if success:
             return ResponseHandler.success(msg=message)
-        else:
-            return ResponseHandler.error(
-                code=StatusCode.WECHAT_ERROR,
-                msg=message
-            )
+        return ResponseHandler.error(
+            code=StatusCode.WECHAT_MENU_ERROR,
+            msg=message
+        )
 
     except Exception as e:
         logger.error(f"[QYWeChat] 删除菜单失败: {str(e)}", exc_info=True)
         return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
+            code=StatusCode.WECHAT_API_ERROR,
             msg=f"删除菜单失败: {str(e)}"
         )
 
@@ -355,13 +358,13 @@ def qywechat():
             response = qywechat_service.handle_message(xml_data, msg_signature, timestamp, nonce)
             return response
 
-
     except Exception as e:
         logger.error(f"[QYWeChat] 处理请求失败: {str(e)}", exc_info=True)
         return 'success'  # 返回success避免企业微信重试
 
 
 @wechat_bp.route('/qy/template_card/update', methods=['POST'])
+@api_response
 def update_qywechat_template_card():
     """更新企业微信模板卡片"""
     try:
@@ -379,21 +382,21 @@ def update_qywechat_template_card():
 
         if success:
             return ResponseHandler.success(msg=message)
-        else:
-            return ResponseHandler.error(
-                code=StatusCode.WECHAT_ERROR,
-                msg=message
-            )
+        return ResponseHandler.error(
+            code=StatusCode.WECHAT_API_ERROR,
+            msg=message
+        )
 
     except Exception as e:
         logger.error(f"[QYWeChat] 更新模板卡片失败: {str(e)}", exc_info=True)
         return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
+            code=StatusCode.WECHAT_API_ERROR,
             msg=f"更新模板卡片失败: {str(e)}"
         )
 
 
 @wechat_bp.route('/qy/task/send_card', methods=['POST'])
+@api_response
 def send_qywechat_task_card():
     """发送企业微信任务卡片消息"""
     try:
@@ -430,15 +433,14 @@ def send_qywechat_task_card():
 
         if success:
             return ResponseHandler.success(msg=message)
-        else:
-            return ResponseHandler.error(
-                code=StatusCode.WECHAT_ERROR,
-                msg=message
-            )
+        return ResponseHandler.error(
+            code=StatusCode.WECHAT_MSG_ERROR,
+            msg=message
+        )
 
     except Exception as e:
         logger.error(f"[QYWeChat] 发送任务卡片消息失败: {str(e)}", exc_info=True)
         return ResponseHandler.error(
-            code=StatusCode.WECHAT_ERROR,
+            code=StatusCode.WECHAT_API_ERROR,
             msg=f"发送任务卡片消息失败: {str(e)}"
         )

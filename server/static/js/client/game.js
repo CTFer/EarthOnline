@@ -1,13 +1,13 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-03-04 21:09:13
+ * @LastEditTime: 2025-03-09 11:26:23
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
  * Copyright 2025 迷舍
  */
-import { SERVER, ICP, MPS, WEBNAME } from "../config/config.js";
+import { SERVER,DOMAIN, ICP, MPS, WEBNAME } from "../config/config.js";
 import APIClient from "./core/api.js";
 import TemplateService from "./service/templateService.js";
 import TaskService from "./service/taskService.js";
@@ -30,6 +30,7 @@ import { TASK_EVENTS, PLAYER_EVENTS, MAP_EVENTS, UI_EVENTS, WS_EVENTS, AUDIO_EVE
 import EventManager from "./core/eventManager.js";
 import Router from "./core/router.js";
 import ShopService from "./service/shopService.js";
+import { checkSSLStatus } from "../../js/config/sslConfig.js";
 
 // 在文件开头声明全局变量
 let taskManager;
@@ -38,6 +39,24 @@ let taskManager;
 class GameManager {
   constructor() {
     Logger.info("GameManager", "constructor:37", "开始初始化游戏管理器");
+
+    // 检查SSL状态
+    const sslStatus = checkSSLStatus();
+    if (sslStatus.shouldRedirect) {
+        // 需要重定向到HTTPS
+        const newUrl = window.location.href.replace('http:', 'https:');
+        Logger.info("GameManager", "constructor", "重定向到HTTPS:", newUrl);
+        window.location.href = newUrl;
+        return;
+    }
+
+    // 确保在HTTPS环境下WebSocket使用安全连接
+    if (window.location.protocol === 'https:') {
+        Logger.info("GameManager", "constructor", "检测到HTTPS环境，确保WebSocket使用安全连接");
+        this.wsProtocol = 'wss://';
+    } else {
+        this.wsProtocol = 'ws://';
+    }
 
     // 确保核心组件最先初始化
     // this.eventBus = new EventBus();
@@ -81,7 +100,7 @@ class GameManager {
 
     try {
       // 初始化API客户端
-      this.api = new APIClient(SERVER);
+      this.api = new APIClient(DOMAIN);
 
       // 初始化事件总线
       this.eventBus = new EventBus();

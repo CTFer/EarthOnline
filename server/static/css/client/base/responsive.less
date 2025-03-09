@@ -11,6 +11,10 @@
 
 // 平板设备样式（768px - 1200px）
 @media screen and (max-width: 1200px) {
+  body{
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
   .game-container {
     // 调整网格布局为两列
     grid-template-columns: 1fr 1fr;
@@ -68,6 +72,8 @@
 // 手机设备样式（<= 768px）
 @media screen and (max-width: 768px) {
   body {
+    overflow-x: hidden;
+    overflow-y: auto;
     padding: @spacing-sm;
   }
   // 调整页脚样式
