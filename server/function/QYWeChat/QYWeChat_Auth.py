@@ -4,7 +4,13 @@ import logging
 import time
 import requests
 import threading
-from config.private import QYWECHAT_CORP_ID, QYWECHAT_AGENT_ID, QYWECHAT_CORP_SECRET
+from config.private import (
+    QYWECHAT_CORP_ID, 
+    QYWECHAT_AGENT_ID, 
+    QYWECHAT_CORP_SECRET,
+    QYWECHAT_TOKEN,
+    QYWECHAT_ENCODING_AES_KEY
+)
 from Crypto.Cipher import AES
 import base64
 import struct
@@ -30,8 +36,8 @@ class QYWeChatAuth:
             self.corp_id = QYWECHAT_CORP_ID
             self.agent_id = QYWECHAT_AGENT_ID
             self.corp_secret = QYWECHAT_CORP_SECRET
-            self.token = "xCmY3kAhUPNFjQjwUboMvii2oJxCNg6K"  # 用于验证URL
-            self.encoding_aes_key = "c5GBoCr1nkrowd1AlaqjpUNQL6dcg9ervFSitvToarB"  # 消息加解密密钥
+            self.token = QYWECHAT_TOKEN  # 从配置文件读取
+            self.encoding_aes_key = QYWECHAT_ENCODING_AES_KEY  # 从配置文件读取
             self._access_token = None
             self._access_token_expires = 0
             self.initialized = True
@@ -56,6 +62,7 @@ class QYWeChatAuth:
                 if "access_token" in result:
                     self._access_token = result["access_token"]
                     self._access_token_expires = now + result["expires_in"]
+                    logger.info(f"[QYWeChat] 获取access_token成功: {self._access_token}")
                     return self._access_token
                 else:
                     logger.error(f"[QYWeChat] 获取access_token失败: {result}")
@@ -167,6 +174,8 @@ class QYWeChatAuth:
         try:
             # 1. 验证签名
             signature = self._generate_signature(self.token, timestamp, nonce, echostr)
+            logger.info(f"[QYWeChat] 计算的签名: {signature}")
+            logger.info(f"[QYWeChat] 接收的签名: {msg_signature}")
             if signature != msg_signature:
                 logger.error("[QYWeChat] URL验证失败：签名不匹配")
                 logger.debug(f"计算的签名: {signature}")

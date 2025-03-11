@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 :: 设置中文编码
-chcp 936
+chcp 65001
 
 :: 配置信息
 set "LOCAL_PATH=D:\code\EarthOnline\server"

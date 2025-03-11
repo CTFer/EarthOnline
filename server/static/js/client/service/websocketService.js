@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-17 13:47:42
- * @LastEditTime: 2025-03-09 16:56:34
+ * @LastEditTime: 2025-03-11 17:16:55
  * @LastEditors: 一根鱼骨棒
  * @Description: WebSocket服务管理
  */
@@ -161,38 +161,84 @@ class WebSocketService {
             // 使用当前页面协议
             const protocol = window.location.protocol;
             const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
-            
-            // 使用当前页面的主机名，而不是配置的域名
             const host = window.location.host;
             const serverUrl = `${wsProtocol}//${host}`;
             
-            Logger.info('WebSocketService', '使用WebSocket URL:', serverUrl);
+            Logger.info('WebSocketService', `使用WebSocket URL: ${serverUrl}, 协议: ${wsProtocol}`);
             
-            // 创建socket连接
-            this.socket = io(serverUrl, {
+            // 修改 socket.io 配置
+            const socketConfig = {
                 autoConnect: false,
                 secure: protocol === 'https:',
                 path: '/socket.io',
-                transports: ['websocket'],
+                transports: ['websocket', 'polling'],
                 rejectUnauthorized: false,
                 withCredentials: true,
                 reconnection: true,
                 reconnectionAttempts: WS_CONFIG.RECONNECT.maxAttempts,
                 reconnectionDelay: WS_CONFIG.RECONNECT.baseDelay,
-                timeout: WS_CONFIG.CONNECTION.timeout
-            });
+                timeout: WS_CONFIG.CONNECTION.timeout,
+                forceNew: true,
+                upgrade: true,
+                rememberUpgrade: true,
+                extraHeaders: {
+                    'X-Forwarded-Proto': protocol.replace(':', ''),
+                    'X-Forwarded-For': window.location.hostname,
+                    'X-Real-IP': window.location.hostname
+                },
+                query: {
+                    protocol: protocol.replace(':', ''),
+                    EIO: '4',
+                    transport: 'websocket'
+                }
+            };
 
-            // 设置连接错误处理
-            this.socket.on('connect_error', (error) => {
-                Logger.error('WebSocketService', 'WebSocket连接错误:', error);
-                this.handleWSError({
-                    type: WS_ERROR_TYPES.CONNECTION_ERROR,
-                    message: `连接错误: ${error.message}`,
-                    details: error
+            Logger.info('WebSocketService', '使用Socket.IO配置:', socketConfig);
+            this.socket = io(serverUrl, socketConfig);
+
+            // 添加更详细的连接事件监听
+            this.socket.on('connect', () => {
+                Logger.info('WebSocketService', '连接成功', {
+                    id: this.socket.id,
+                    transport: this.socket.io.engine.transport.name,
+                    protocol: this.socket.io.engine.protocol,
+                    hostname: window.location.hostname
                 });
             });
 
+            this.socket.on('connect_error', (error) => {
+                Logger.error('WebSocketService', '连接错误:', {
+                    error: error.message,
+                    transport: this.socket.io.engine.transport.name,
+                    protocol: protocol,
+                    url: serverUrl,
+                    stack: error.stack
+                });
+            });
 
+            this.socket.on('disconnect', (reason) => {
+                Logger.warn('WebSocketService', `连接断开: ${reason}`, {
+                    wasConnected: this.socket.connected,
+                    reconnecting: this.socket.io.reconnecting,
+                    attempts: this.reconnectAttempts
+                });
+            });
+
+            // 添加传输升级日志
+            this.socket.on('upgrade', (transport) => {
+                Logger.info('WebSocketService', `传输升级到: ${transport}`, {
+                    previousTransport: this.socket.io.engine.transport.name
+                });
+            });
+
+            // 添加ping/pong监控
+            this.socket.on('ping', () => {
+                Logger.debug('WebSocketService', 'Ping发送');
+            });
+
+            this.socket.on('pong', (latency) => {
+                Logger.debug('WebSocketService', `Pong接收, 延迟: ${latency}ms`);
+            });
             
             // 连接WebSocket
             await this.connect();
@@ -224,13 +270,21 @@ class WebSocketService {
             this.state = WS_STATE.CONNECTING;
             this.eventBus.emit(WS_EVENTS.CONNECTING);
             
+            Logger.info('WebSocketService', '开始连接WebSocket...', {
+                attempts: this.reconnectAttempts,
+                maxAttempts: WS_CONFIG.RECONNECT.maxAttempts
+            });
+            
             // 连接
             this.socket.connect();
             
             // 等待连接完成
             await this.waitForConnection();
             
-            Logger.info('WebSocketService', 'WebSocket连接成功');
+            Logger.info('WebSocketService', 'WebSocket连接成功', {
+                socketId: this.socket.id,
+                transport: this.socket.io.engine.transport.name
+            });
         } catch (error) {
             this.state = WS_STATE.ERROR;
             this.handleWSError(error, 'connect');
@@ -243,6 +297,7 @@ class WebSocketService {
     waitForConnection() {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
+                Logger.error('WebSocketService', `连接超时 (${WS_CONFIG.CONNECTION.timeout}ms)`);
                 reject(new Error('WebSocket连接超时'));
             }, WS_CONFIG.CONNECTION.timeout);
 
@@ -250,13 +305,21 @@ class WebSocketService {
                 clearTimeout(timeout);
                 this.state = WS_STATE.CONNECTED;
                 this.reconnectAttempts = 0;
-                Logger.info('WebSocketService', 'WebSocket连接成功');
+                Logger.info('WebSocketService', 'WebSocket连接成功', {
+                    id: this.socket.id,
+                    transport: this.socket.io.engine.transport.name
+                });
                 this.eventBus.emit(WS_EVENTS.CONNECTED);
                 resolve();
             });
 
             this.socket.once(WS_EVENT_TYPES.SYSTEM.CONNECT_ERROR, (error) => {
                 clearTimeout(timeout);
+                Logger.error('WebSocketService', '连接错误:', {
+                    error: error.message,
+                    transport: this.socket?.io?.engine?.transport?.name,
+                    attempts: this.reconnectAttempts
+                });
                 reject(error);
             });
         });

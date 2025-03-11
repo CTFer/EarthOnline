@@ -5,10 +5,10 @@ eventlet.monkey_patch()
 import traceback
 import uuid
 import json
+import sys
 from functools import wraps
 import time as time_module
 import threading
-import schedule
 from datetime import datetime, time, timedelta
 from admin import admin_bp
 import os
@@ -23,6 +23,10 @@ from function.TaskService import task_service
 from function.GPSService import gps_service
 from function.RoadmapService import roadmap_service
 from function.WeChatService import wechat_service
+from function.LogService import log_service  # 导入日志服务
+from function.SchedulerService import scheduler_service  # 导入调度器服务
+from function.ServerService import server_service  # 导入服务器管理服务
+from function.WebSocketService import websocket_service
 from config.config import (
     SERVER_IP, 
     PORT, 
@@ -30,10 +34,14 @@ from config.config import (
     WAITRESS_CONFIG, 
     ENV,
     PROD_SERVER,  # 添加这行
-    HTTPS_ENABLED,
-    SSL_CERT_PATH,
-    SSL_KEY_PATH,
+    SSL_CERT_DIR,
+    SSL_KEY_FILE,
     HTTPS_PORT,
+    HTTPS_ENABLED,
+    SSL_CERT_FILE,
+    SSL_KEY_FILE,
+    CLOUDFLARE,
+    SECURITY
 )
 from config.private import AMAP_SECURITY_JS_CODE, WECHAT_TOKEN, WECHAT_ENCODING_AES_KEY, WECHAT_APP_ID
 import requests
@@ -42,11 +50,41 @@ from function.MedalService import medal_service
 from function.GameCardService import game_card_service
 from utils.response_handler import ResponseHandler, StatusCode, api_response
 from wechat import wechat_bp  # 导入微信蓝图
+from function.SecurityService import security_service
+from function.RateLimitService import rate_limit_service
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+# 初始化日志
+logger = log_service.setup_logging(DEBUG)
+
 app = Flask(__name__, static_folder='static')
-CORS(app)
+CORS(app, 
+     resources={
+         r"/*": {
+             "origins": SECURITY['cors']['allowed_origins'],
+             "methods": SECURITY['cors']['allowed_methods'],
+             "allow_headers": SECURITY['cors']['allowed_headers']
+         }
+     })
+
+# 添加Cloudflare代理支持
+if CLOUDFLARE['enabled']:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=CLOUDFLARE['headers']['X-Forwarded-For'],
+        x_proto=CLOUDFLARE['headers']['X-Forwarded-Proto'],
+        x_host=CLOUDFLARE['headers']['X-Forwarded-Host'],
+        x_port=CLOUDFLARE['headers']['X-Forwarded-Port'],
+        x_prefix=1
+    )
+
+# 获取项目根目录
+if getattr(sys, 'frozen', False):
+    # 如果是打包后的可执行文件
+    project_root = os.path.dirname(sys.executable)
+else:
+    # 如果是直接运行Python脚本
+    project_root = os.path.dirname(os.path.abspath(__file__))
 
 # 数据库路径
 DB_PATH = os.path.join(os.path.dirname(__file__), 'database', 'game.db')
@@ -58,224 +96,57 @@ app.register_blueprint(admin_bp, url_prefix='/admin')
 app.register_blueprint(shop_bp)
 app.register_blueprint(wechat_bp, url_prefix='/wechat')  # 注册微信蓝图
 
-# 修改 SocketIO 配置
+# 初始化WebSocket服务
+websocket_service.init_app(app)
+
+# 配置 SocketIO
 socketio = SocketIO(
     app,
-    cors_allowed_origins="*",
-    async_mode='eventlet',
-    logger=False,
-    engineio_logger=False,
-    ping_timeout=5,
-    ping_interval=2
+    cors_allowed_origins=CLOUDFLARE['websocket']['cors_allowed_origins'],
+    async_mode=CLOUDFLARE['websocket']['async_mode'],
+    logger=CLOUDFLARE['websocket']['logger'],
+    engineio_logger=CLOUDFLARE['websocket']['engineio_logger'],
+    ping_timeout=CLOUDFLARE['websocket']['ping_timeout'] / 1000,
+    ping_interval=CLOUDFLARE['websocket']['ping_interval'] / 1000,
+    max_http_buffer_size=CLOUDFLARE['websocket']['max_http_buffer_size'],
+    manage_session=CLOUDFLARE['websocket']['manage_session'],
+    transports=CLOUDFLARE['websocket']['transports'],
+    always_connect=CLOUDFLARE['websocket']['always_connect'],
+    path=CLOUDFLARE['websocket']['path'],
+    cookie=CLOUDFLARE['websocket']['cookie'],
+    cors_credentials=True,
+    # 添加额外的Cloudflare支持
+    allow_upgrades=True,
+    upgrade_logger=True,
+    handle_sigint=False,  # 避免信号处理冲突
+    # 添加额外的安全头
+    headers={
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN',
+        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
+    }
 )
 
-# 添加请求记录列表
-request_logs = []
-MAX_LOGS = 100  # 最多保存100条记录
-
-# 记录请求的装饰器
-
-
-def log_request(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # 获取请求信息
-        log_entry = {
-            'id': str(uuid.uuid4()),
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'method': request.method,
-            'path': request.path,
-            'args': dict(request.args),
-            'form': dict(request.form),
-            'headers': {k: v for k, v in request.headers.items()},
-            'remote_addr': request.remote_addr,
-            'request_data': request.get_json() if request.is_json else None
-        }
-
-        # 执行原始函数并捕获响应
-        response = f(*args, **kwargs)
-
-        # 添加响应信息
-        try:
-            # 处理不同类型的响应
-            if isinstance(response, tuple):
-                response_data, status_code = response
-            else:
-                response_data = response
-                status_code = 200
-
-            # 处理Response对象
-            if hasattr(response_data, 'get_json'):
-                response_data = response_data.get_json()
-            elif hasattr(response_data, 'response'):
-                response_data = response_data.response[0].decode('utf-8')
-                try:
-                    response_data = json.loads(response_data)
-                except:
-                    pass
-
-            log_entry['response'] = {
-                'status_code': status_code,
-                'data': response_data
-            }
-        except Exception as e:
-            log_entry['response'] = {
-                'error': str(e),
-                'status_code': 500
-            }
-
-        # 添加新记录并保持最大长度
-        request_logs.insert(0, log_entry)
-        if len(request_logs) > MAX_LOGS:
-            request_logs.pop()
-
-        # 通过WebSocket发送更新
-        socketio.emit('log_update', {
-            'logs': request_logs,
-            'latest': log_entry
-        })
-
-        return response
-
-    return decorated_function
-
-
-def get_db_connection():
-    """创建数据库连接"""
-
-    try:
-
-        # 确保数据库目录存在
-
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-
-        # 创建连接
-
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-
-        print(f"Successfully connected to database at {DB_PATH}")  # 调试输出
-        return conn
-
-    except Exception as e:
-
-        print(f"Database connection error: {str(e)}")  # 调试输出
-        raise
-
-
-def assign_daily_tasks():
-    """分配每日任务并处理过期任务"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # 获取当天的7点和22点时间戳
-        today = datetime.now().date()
-        start_time = datetime.combine(today, time(7, 0))  # 早上7点
-        end_time = datetime.combine(today, time(22, 0))   # 晚上10点
-        start_timestamp = int(start_time.timestamp())
-        end_timestamp = int(end_time.timestamp())
-        current_time = int(datetime.now().timestamp())
-        
-        # 更新过期任务状态为UNFINISH
-        cursor.execute('''
-            UPDATE player_task 
-            SET status = 'UNFINISH'
-            WHERE status = 'IN_PROGRESS' 
-            AND endtime < ? 
-            AND endtime != 0
-        ''', (current_time,))
-
-        # 获取所有启用的每日任务
-        cursor.execute('''
-            SELECT id, task_scope 
-            FROM task 
-            WHERE is_enabled = 1 AND task_type = 'DAILY'
-        ''')
-        daily_tasks = cursor.fetchall()
-
-        # 获取所有玩家ID
-        cursor.execute('SELECT player_id FROM player_data')
-        all_players = [row[0] for row in cursor.fetchall()]
-
-        # 为每个任务分配玩家
-        for task_id, task_scope in daily_tasks:
-            if task_scope == 0:  # 所有玩家都可见的任务
-                players = all_players
-            else:  # 特定玩家的任务
-                players = [task_scope]
-
-            # 为符合条件的玩家添加任务
-            for player_id in players:
-                # 检查玩家是否已有该任务
-                cursor.execute('''
-                    SELECT id FROM player_task 
-                    WHERE player_id = ? AND task_id = ? 
-                    AND starttime >= ? AND starttime < ?
-                ''', (player_id, task_id, start_timestamp, end_timestamp))
-
-                if not cursor.fetchone():  # 如果玩家在今天还没有这个任务
-                    cursor.execute('''
-                        INSERT INTO player_task 
-                        (player_id, task_id, starttime, endtime, status) 
-                        VALUES (?, ?, ?, ?, 'IN_PROGRESS')
-                    ''', (player_id, task_id, start_timestamp, end_timestamp))
-
-        conn.commit()
-        print(f"Daily tasks assigned successfully at {datetime.now()}")
-
-    except sqlite3.Error as e:
-        print(f"Database error in assign_daily_tasks: {str(e)}")
-        if conn:
-            conn.rollback()
-    finally:
-        if conn:
-            conn.close()
-
-
-def check_daily_tasks():
-    """在程序启动时检查今日任务分配情况"""
-    current_hour = datetime.now().hour
-    if current_hour >= 7:  # 如果当前时间已过早上7点
-        assign_daily_tasks()  # 执行一次任务分配检查
-
-
-def run_scheduler():
-    """运行调度器"""
-    schedule.every().day.at("07:00").do(assign_daily_tasks)
-
-    while True:
-        schedule.run_pending()
-        time_module.sleep(60)  # 每分钟检查一次
-
-# 在应用启动时启动调度器
-
-
-def start_scheduler():
-    check_daily_tasks()  # 启动时检查今日任务
-    scheduler_thread = threading.Thread(target=run_scheduler)
-    scheduler_thread.daemon = True
-    scheduler_thread.start()
+# 初始化日志服务的WebSocket
+log_service.init_websocket(websocket_service)
 
 # 为所有现有路由添加日志装饰器
 app.view_functions = {
-    endpoint: log_request(func)
+    endpoint: log_service.log_request(func)
     for endpoint, func in app.view_functions.items()
 }
+
 # 添加模板目录配置
-TEMPLATE_DIR = os.path.join(os.path.dirname(
-    os.path.abspath(__file__)), 'templates')
+TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+
 # WebSocket连接处理
-
-
-@socketio.on('connect')
+@websocket_service.socketio.on('connect')
 def handle_connect():
     """处理WebSocket连接"""
     print("Client connected")
     emit('connected', {'status': 'success'})
 
-
-@socketio.on('subscribe_tasks')
+@websocket_service.socketio.on('subscribe_tasks')
 def handle_task_subscription(data):
     """处理任务订阅"""
     print(f"[WebSocket] Received subscription request: {data}")
@@ -292,17 +163,15 @@ def handle_task_subscription(data):
     else:
         print(f"[WebSocket] Warning: Received subscribe_tasks without player_id")
 
-
 def broadcast_task_update(player_id, task_data):
     """向指定用户广播任务更新"""
-    socketio.emit('task_update', task_data, room=f'user_{player_id}')
+    websocket_service.socketio.emit('task_update', task_data, room=f'user_{player_id}')
 
 @app.route('/api/player/<int:player_id>', methods=['GET'])
 @api_response
 def get_player_api(player_id):
     """获取角色信息"""
     return player_service.get_player(player_id)
-
 
 @app.route('/api/get_players', methods=['GET'])
 @api_response
@@ -333,7 +202,6 @@ def get_current_task_by_id(task_id):
 def get_current_tasks(player_id):
     """获取用户当前未过期的任务列表"""
     return task_service.get_current_tasks(player_id)
-
 
 @app.route('/api/tasks/accept', methods=['POST'])
 @api_response
@@ -417,9 +285,6 @@ def complete_task_api():
     data = request.get_json()
     return task_service.complete_task_api(data['player_id'], data['task_id'])
 
-
-
-
 @app.route('/record')
 def record():
     """显示后端请求记录的首页"""
@@ -430,14 +295,8 @@ def record():
         method_filter = request.args.get('method', '').upper()
         path_filter = request.args.get('path', '')
 
-        # 过滤日志
-        filtered_logs = request_logs
-        if method_filter:
-            filtered_logs = [
-                log for log in filtered_logs if log['method'] == method_filter]
-            if path_filter:
-                filtered_logs = [
-                    log for log in filtered_logs if path_filter in log['path']]
+        # 使用日志服务获取过滤后的日志
+        filtered_logs = log_service.get_request_logs(method_filter, path_filter)
 
         with open(template_path, 'r', encoding='utf-8') as f:
             template = f.read()
@@ -445,26 +304,15 @@ def record():
         # 生成请求记录HTML
         logs_html = ''
         for log in filtered_logs:
-            logs_html += f"""
-                <div class="request-log">
-                    <div class="timestamp">{log['timestamp']}</div>
-                    <div>
-                        <span class="method {log['method']}">{log['method']}</span>
-                        <span class="path">{log['path']}</span>
-                        <span class="ip">from {log['remote_addr']}</span>
-                    </div>
-                    <pre>{json.dumps(log, indent=2, ensure_ascii=False)}</pre>
-                </div>
-            """
+            logs_html += log_service.format_log_entry(log)
 
         # 替换模板中的占位符
         html = template.replace('{{request_logs}}', logs_html)
         return html
 
     except Exception as e:
-        print(f"Error: {str(e)}")
+        logger.error(f"Error: {str(e)}")
         return f"Error: {str(e)}", 500
-
 
 @app.route('/')
 @app.route('/shop')
@@ -495,19 +343,12 @@ def get_template(template_name):
         logger.error(f"读取模板失败: {str(e)}")
         return "模板加载失败", 500
 
-# 添加清除日志的路由
 @app.route('/clear-logs', methods=['POST'])
 def clear_logs():
     """清除所有请求日志"""
-    global request_logs
-    request_logs = []
+    log_service.clear_logs()
     return redirect('/')
 
-
-
-
-
-# 添加初始数据加载路由
 @app.route('/api/logs')
 def get_logs():
     """获取初始日志数据"""
@@ -523,15 +364,23 @@ def get_logs():
             log for log in filtered_logs if path_filter in log['path']]
 
     return json.dumps(filtered_logs)
-
-
+    
 # 如果需要自定义静态文件路由
-
-
 @app.route('/static/<path:path>')
 def send_static(path):
-    return send_from_directory('static', path)
-
+    """提供静态文件访问"""
+    try:
+        # 对于 .well-known 路径的请求，使用专门的处理
+        if path.startswith('.well-known/acme-challenge/'):
+            token = path.split('/')[-1]
+            return acme_challenge(token)
+        return send_from_directory('static', path)
+    except Exception as e:
+        logger.error(f"Error serving static file: {str(e)}")
+        return jsonify(ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=f"服务器错误: {str(e)}"
+        ))
 
 @app.route('/api/nfc_post', methods=['POST'])
 def handle_nfc_card():
@@ -566,7 +415,7 @@ def handle_nfc_card():
         # 调用 NFC 服务处理
         from function.NFC_service import NFCService
         nfc_service = NFCService()
-        response, status_code = nfc_service.handle_nfc_card(card_id, player_id, socketio)
+        response, status_code = nfc_service.handle_nfc_card(card_id, player_id, websocket_service.socketio)
 
         print(f"[NFC API Debug] 处理结果: {json.dumps(response, ensure_ascii=False)}")
         print("[NFC API] ====== NFC卡片请求处理完成 ======\n")
@@ -579,7 +428,7 @@ def handle_nfc_card():
         print(f"[NFC API] 详细错误信息: ", traceback.format_exc())
 
         if 'player_id' in locals():
-            socketio.emit('nfc_task_update', {
+            websocket_service.socketio.emit('nfc_task_update', {
                 'type': 'ERROR',
                 'message': error_msg
             }, room=f'user_{player_id}')
@@ -589,6 +438,7 @@ def handle_nfc_card():
             'msg': error_msg,
             'data': None
         }), 500
+
 @app.route('/api/gps/sync', methods=['GET'])
 @api_response
 def sync_gps_records():
@@ -602,6 +452,7 @@ def sync_gps_records():
             code=StatusCode.GPS_SYNC_FAILED,
             msg=f'同步GPS记录失败: {str(e)}'
         )
+
 @app.route('/api/gps', methods=['POST'])
 @api_response
 def add_gps():
@@ -677,7 +528,7 @@ def add_gps():
                 'accuracy': gps_data['accuracy']
             }
             print(f"[GPS] 仅更新时间，发送电量、速度、更新时间：{socket_data}")
-        socketio.emit('gps_update', socket_data, room=f'user_{player_id}')    
+        websocket_service.socketio.emit('gps_update', socket_data, room=f'user_{player_id}')    
         return result
 
     except Exception as e:
@@ -703,25 +554,28 @@ def update_gps(gps_id):
     data = request.get_json()
     return gps_service.update_gps(gps_id, data)
 
-
 # 开发计划相关接口
 @app.route('/api/roadmap/login', methods=['POST'])
 def roadmap_login():
     """开发计划登录"""
     data = request.get_json()
     return roadmap_service.roadmap_login(data)
+
 @app.route('/api/roadmap/check_login', methods=['GET'])
 def roadmap_check_login():
     """开发计划检查登录"""
     return roadmap_service.check_login()
+
 @app.route('/api/roadmap/logout', methods=['GET'])
 def roadmap_logout():
     """开发计划登出"""
     return roadmap_service.roadmap_logout()
+
 @app.route('/roadmap')
 def roadmap():
     """开发计划首页"""
     return render_template('client/roadmap.html')
+
 @app.route('/api/roadmap', methods=['GET'])
 def get_roadmap():
     """获取开发计划"""
@@ -794,6 +648,7 @@ def update_roadmap(roadmap_id):
 def delete_roadmap(roadmap_id):
     """删除开发计划"""
     return roadmap_service.delete_roadmap(roadmap_id)
+
 @app.route('/api/roadmap/get_sync', methods=['GET'])
 def sync_roadmap():
     """手动触发同步_仅本地环境可用"""
@@ -804,10 +659,12 @@ def sync_roadmap():
 def sync_roadmap_data():
     """提供数据同步接口（仅在生产环境可用）"""
     return roadmap_service.sync_data()
+
 # 添加NFC接口测试页面路由
 @app.route('/nfc_test')
 def nfc_test():
     return render_template('nfc_test.html')
+
 # 通知相关接口
 @app.route('/api/notifications', methods=['GET'])
 @api_response
@@ -893,7 +750,7 @@ def get_unread_notifications_count():
         )
 
 # WebSocket通知事件
-@socketio.on('notification:read')
+@websocket_service.socketio.on('notification:read')
 def handle_notification_read(data):
     """处理通知已读事件"""
     try:
@@ -911,7 +768,6 @@ def handle_notification_read(data):
     except Exception as e:
         Logger.error('WebSocket', f'处理通知已读事件失败: {str(e)}')
 
-
 def setup_logging():
     """配置日志系统"""
     log_level = logging.DEBUG if DEBUG else logging.INFO
@@ -924,28 +780,32 @@ def setup_logging():
         ]
     )
     return logging.getLogger(__name__)
+
 @app.route('/reminder')
 def reminder():
     """提词器页面"""
     return render_template('client/reminder.html')
-    # 在应用启动时调用
+
 @app.route('/api/amap/security-config')
 def get_amap_security_config():
     """获取高德地图安全配置"""
     return jsonify({
         'securityJsCode': AMAP_SECURITY_JS_CODE
     })
+
 # 勋章 词云相关接口
 @app.route('/api/wordcloud', methods=['GET'])
 def get_wordcloud():
     """获取词云数据 - 展示中的勋章"""
     return medal_service.get_wordcloud_medals()
+
 # 获取勋章列表
 @app.route('/api/medals', methods=['GET'])
 @api_response
 def get_medals():
     """获取勋章列表"""
     return medal_service.get_medals()
+
 # 获取勋章详情
 @app.route('/api/medals/<int:medal_id>', methods=['GET'])
 @api_response
@@ -972,78 +832,94 @@ def get_game_card(game_card_id):
 @app.errorhandler(Exception)
 def handle_error(e):
     """全局错误处理器"""
-    logger.exception("未捕获的异常")
-    return jsonify(ResponseHandler.error(
-        code=StatusCode.SERVER_ERROR,
-        msg=f"服务器错误: {str(e)}"
-    ))
+    error_id = str(uuid.uuid4())
+    logger.error(f"未捕获的异常 [{error_id}]: {str(e)}", exc_info=True)
+    
+    error_response = {
+        'code': StatusCode.SERVER_ERROR,
+        'msg': f"服务器错误 (ID: {error_id})",
+        'error': {
+            'type': e.__class__.__name__,
+            'message': str(e),
+            'id': error_id
+        }
+    }
+    
+    if DEBUG:
+        error_response['error']['traceback'] = traceback.format_exc()
+    
+    return jsonify(error_response), 500
 
+@app.route('/.well-known/acme-challenge/<token>')
+def acme_challenge(token):
+    """处理 Let's Encrypt ACME 验证请求"""
+    try:
+        # 使用绝对路径
+        acme_path = os.path.join(project_root, 'static', '.well-known', 'acme-challenge', token)
+        logger.info(f"查找ACME验证文件: {acme_path}")
+        
+        if os.path.exists(acme_path):
+            with open(acme_path, 'r') as f:
+                content = f.read().strip()
+            logger.info(f"成功读取ACME验证文件内容: {content}")
+            return content, 200, {'Content-Type': 'text/plain'}
+        else:
+            logger.error(f"找不到ACME验证文件: {acme_path}")
+            # 列出目录内容以帮助调试
+            challenge_dir = os.path.join(project_root, 'static', '.well-known', 'acme-challenge')
+            if os.path.exists(challenge_dir):
+                files = os.listdir(challenge_dir)
+                logger.info(f"验证目录中的文件: {files}")
+            return 'Not Found', 404
+    except Exception as e:
+        logger.error(f"处理ACME验证请求时出错: {str(e)}", exc_info=True)
+        return 'Internal Server Error', 500
+
+# 在全局错误处理之前添加
+@app.errorhandler(404)
+def handle_404(e):
+    """处理404错误"""
+    return security_service.handle_404(e)
+
+# 添加安全中间件
+@app.before_request
+def before_request():
+    """请求前处理"""
+    # 安全检查
+    security_check_result = security_service.security_check()
+    if security_check_result is not None:
+        return security_check_result
+        
+    # 速率限制检查
+    rate_limit_result = rate_limit_service.handle_rate_limit()
+    if rate_limit_result is not None:
+        return rate_limit_result
+
+# 添加安全头
+@app.after_request
+def after_request(response):
+    """请求后处理"""
+    return security_service.add_security_headers(response)
 
 if __name__ == '__main__':
-    logger = setup_logging()
-    logger.info("Starting server initialization...")
+    logger.info("开始初始化服务器...")
     
     try:
-        start_scheduler()
-        logger.info("Scheduler started successfully")
+        # 启动调度器服务
+        scheduler_service.start()
+        logger.info("调度器服务启动成功")
     except Exception as e:
-        logger.error(f"Failed to start scheduler: {str(e)}", exc_info=True)
+        logger.error(f"调度器服务启动失败: {str(e)}", exc_info=True)
     
-    logger.info(f"Server configuration - IP: {SERVER_IP}, Port: {PORT}, Debug: {DEBUG}")
+    logger.info(f"服务器配置 - IP: {SERVER_IP}, 端口: {PORT}, 调试模式: {DEBUG}")
     
     try:
-        if DEBUG:
-            # 开发环境：使用 eventlet
-            logger.info("Starting development server with eventlet...")
-            if HTTPS_ENABLED:
-                import ssl
-                import eventlet
-                
-                # 创建SSL上下文
-                ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-                ssl_context.load_cert_chain(
-                    certfile=SSL_CERT_PATH,
-                    keyfile=SSL_KEY_PATH
-                )
-                
-                # 创建socket并包装SSL
-                sock = eventlet.listen((SERVER_IP, HTTPS_PORT))
-                ssl_sock = ssl_context.wrap_socket(sock, server_side=True)
-                
-                logger.info(f"Starting HTTPS server on port {HTTPS_PORT}")
-                eventlet.wsgi.server(ssl_sock, app)
-            else:
-                # 启动HTTP服务器
-                socketio.run(
-                    app,
-                    host=SERVER_IP,
-                    port=PORT,
-                    debug=True,
-                    use_reloader=True,
-                    log_output=True
-                )
-        else:
-            # 生产环境：使用 waitress
-            from waitress import serve
-            from paste.translogger import TransLogger
-            
-            logger.info("Starting production server with waitress...")
-            # 使用 TransLogger 记录访问日志
-            app_logged = TransLogger(app)
-            
-            # 启动HTTP服务器
-            logger.info(f"Starting HTTP server on port {PORT}")
-            serve(
-                app_logged,
-                host=SERVER_IP,
-                port=PORT,
-                threads=WAITRESS_CONFIG['THREADS'],               
-                connection_limit=WAITRESS_CONFIG['CONNECTION_LIMIT'],   
-                channel_timeout=WAITRESS_CONFIG['TIMEOUT'],      
-                cleanup_interval=WAITRESS_CONFIG['CLEANUP_INTERVAL'],     
-                ident=WAITRESS_CONFIG['IDENT']      
-            )
-            
+        # 使用服务器管理服务启动服务器
+        server_service.start_server(app, websocket_service.socketio)
     except Exception as e:
-        logger.error(f"Failed to start server: {str(e)}", exc_info=True)
-        raise
+        logger.error(f"服务器启动失败: {str(e)}")
+    finally:
+        # 停止服务
+        scheduler_service.stop()
+        server_service.stop()
+        logger.info("服务器关闭完成")

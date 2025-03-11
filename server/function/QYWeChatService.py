@@ -26,11 +26,11 @@ class QYWeChatService:
         self.agent_id = QYWECHAT_AGENT_ID
         self.auth = qywechat_auth
         self.send = qywechat_send
-
+        
     def get_access_token(self):
         """获取access_token"""
         return self.auth.get_access_token()
-
+                
     def refresh_access_token(self):
         """强制刷新access_token"""
         return self.auth.refresh_access_token()
@@ -348,19 +348,19 @@ class QYWeChatService:
             batch_tasks = current_tasks_list[i:i+6]
             template_card = {
                 "card_type": "button_interaction",
-                "source": {
+                    "source": {
                     "icon_url": f"https://{DOMAIN}/static/img/favicon.svg",
-                    "desc": "任务系统",
+                        "desc": "任务系统",
                     "desc_color": 0
-                },
-                "main_title": {
+                    },
+                    "main_title": {
                     "title": "进行中的任务",
                     "desc": f"第{i//6 + 1}页 | 共{(len(current_tasks_list)-1)//6 + 1}页"
                 },
                 "task_id": f"current_task_list_{int(time.time())}_{i//6}",
                 "horizontal_content_list": [],
-                "card_action": {
-                    "type": 1,
+                    "card_action": {
+                        "type": 1,
                     "url": f"https://{DOMAIN}/task/current"
                 },
                 "button_list": []
@@ -492,7 +492,7 @@ class QYWeChatService:
                 <TimeStamp>{timestamp}</TimeStamp>
                 <Nonce><![CDATA[{nonce}]]></Nonce>
             </xml>"""
-            
+                
         except Exception as e:
             logger.error(f"[QYWeChat] 生成加密响应失败: {str(e)}")
             raise
