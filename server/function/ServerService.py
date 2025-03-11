@@ -21,8 +21,8 @@ from config.config import (
     SSL_CERT_DIR,
     SSL_CERT_FILE,
     SSL_KEY_FILE,
-    SSL_CHAIN_FILE,
-    SSL_FULLCHAIN_FILE
+    DOMAIN,
+    CLOUDFLARE
 )
 
 logger = logging.getLogger(__name__)
@@ -140,13 +140,14 @@ class ServerService:
                 
                 return True, ssl_context
             
-            # 生产环境使用Let's Encrypt证书
+            # 生产环境使用Cloudflare证书
             else:
-                logger.info("[SSL] 生产环境，使用Let's Encrypt证书")
+                logger.info("[SSL] 生产环境，使用Cloudflare证书")
+                
                 # 检查证书文件是否存在
-                if not os.path.exists(SSL_FULLCHAIN_FILE) or not os.path.exists(SSL_KEY_FILE):
-                    logger.error("[SSL] Let's Encrypt证书文件不存在")
-                    logger.error(f"[SSL] fullchain.pem: {os.path.exists(SSL_FULLCHAIN_FILE)}")
+                if not os.path.exists(SSL_CERT_FILE) or not os.path.exists(SSL_KEY_FILE):
+                    logger.error("[SSL] Cloudflare证书文件不存在")
+                    logger.error(f"[SSL] cloudfare.pem: {os.path.exists(SSL_CERT_FILE)}")
                     logger.error(f"[SSL] domain.key: {os.path.exists(SSL_KEY_FILE)}")
                     return False, None
 
@@ -158,16 +159,19 @@ class ServerService:
                 ssl_context.options |= ssl.OP_NO_SSLv3
                 ssl_context.options |= ssl.OP_NO_TLSv1
                 ssl_context.options |= ssl.OP_NO_TLSv1_1
+                ssl_context.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
+                
+                # 设置密码套件
+                ssl_context.set_ciphers('ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384')
                 
                 # 加载证书
                 try:
-                    # 使用完整证书链
                     ssl_context.load_cert_chain(
-                        certfile=SSL_FULLCHAIN_FILE,  # 使用完整证书链
-                        keyfile=SSL_KEY_FILE,  # 使用私钥
+                        certfile=SSL_CERT_FILE,  # 使用Cloudflare证书
+                        keyfile=SSL_KEY_FILE,    # 使用私钥
                         password=None
                     )
-                    logger.info("[SSL] Let's Encrypt证书加载成功")
+                    logger.info("[SSL] Cloudflare证书加载成功")
                     
                     # 验证证书和私钥是否匹配
                     try:
@@ -180,7 +184,7 @@ class ServerService:
                     return True, ssl_context
                     
                 except Exception as e:
-                    logger.error(f"[SSL] 加载Let's Encrypt证书失败: {str(e)}")
+                    logger.error(f"[SSL] 加载Cloudflare证书失败: {str(e)}")
                     return False, None
             
         except Exception as e:
@@ -221,6 +225,47 @@ class ServerService:
         except Exception as e:
             logger.error(f"HTTP服务器启动失败: {str(e)}")
 
+    def _run_socketio_server(self, app: Flask, socketio) -> None:
+        """
+        运行SocketIO服务器
+        
+        Args:
+            app: Flask应用实例
+            socketio: SocketIO实例
+        """
+        try:
+            # 基础配置
+            server_config = {
+                'host': SERVER_IP,
+                'port': PORT,
+                'debug': DEBUG,
+                'use_reloader': False,
+                'log_output': True if ENV == 'local' else False
+            }
+
+            # HTTPS模式配置
+            if ENV == 'local' and HTTPS_ENABLED:
+                # 本地开发环境使用自签名证书
+                ssl_success, ssl_context = self.setup_ssl(SSL_CERT_DIR)
+                if ssl_success:
+                    server_config.update({
+                        'port': HTTPS_PORT,  # 使用HTTPS端口
+                        'ssl_context': ssl_context
+                    })
+                else:
+                    # 如果SSL配置失败，回退到HTTP
+                    logger.warning("SSL配置失败，回退到HTTP模式")
+                    server_config['port'] = PORT + 1  # 使用不同的端口避免冲突
+
+            logger.info(f"[SocketIO] 服务器配置: {server_config}")
+            
+            # 启动服务器
+            socketio.run(app, **server_config)
+
+        except Exception as e:
+            logger.error(f"启动SocketIO服务器失败: {str(e)}")
+            raise
+
     def start_server(self, app: Flask, socketio) -> None:
         """
         启动服务器（HTTP和/或HTTPS）
@@ -241,12 +286,16 @@ class ServerService:
                 ssl_success, ssl_context = self.setup_ssl(SSL_CERT_DIR)
                 
                 if ssl_success:
-                    # 创建socket并包装SSL
-                    sock = eventlet.listen((SERVER_IP, HTTPS_PORT))
-                    ssl_sock = ssl_context.wrap_socket(sock, server_side=True)
-                    
-                    logger.info(f"启动HTTPS服务器，端口 {HTTPS_PORT}")
-                    eventlet.wsgi.server(ssl_sock, app)
+                    try:
+                        # 创建socket并包装SSL
+                        sock = eventlet.listen((SERVER_IP, HTTPS_PORT))
+                        ssl_sock = ssl_context.wrap_socket(sock, server_side=True)
+                        
+                        logger.info(f"启动HTTPS服务器，端口 {HTTPS_PORT}")
+                        eventlet.wsgi.server(ssl_sock, app)
+                    except Exception as e:
+                        logger.error(f"HTTPS服务器启动失败，回退到HTTP模式: {str(e)}")
+                        self._run_socketio_server(app, socketio)
                 else:
                     logger.info("回退到仅HTTP模式...")
                     self._run_socketio_server(app, socketio)
@@ -256,56 +305,6 @@ class ServerService:
                 
         except Exception as e:
             logger.error(f"服务器启动失败: {str(e)}")
-            raise
-
-    def _run_socketio_server(self, app: Flask, socketio) -> None:
-        """
-        运行SocketIO服务器
-        
-        Args:
-            app: Flask应用实例
-            socketio: SocketIO实例
-        """
-        try:
-            # 配置 WebSocket 服务器
-            if ENV == 'local' and HTTPS_ENABLED:
-                # 本地开发环境使用自签名证书
-                ssl_success, ssl_context = self.setup_ssl(SSL_CERT_DIR)
-                if ssl_success:
-                    # 使用不同的端口避免冲突
-                    socketio.run(
-                        app,
-                        host=SERVER_IP,
-                        port=HTTPS_PORT,  # 使用HTTPS端口
-                        debug=DEBUG,
-                        use_reloader=False,
-                        log_output=True,
-                        ssl_context=ssl_context
-                    )
-                else:
-                    # 如果SSL配置失败，回退到HTTP
-                    logger.warning("SSL配置失败，回退到HTTP模式")
-                    socketio.run(
-                        app,
-                        host=SERVER_IP,
-                        port=PORT + 1,  # 使用不同的端口避免冲突
-                        debug=DEBUG,
-                        use_reloader=False,
-                        log_output=True
-                    )
-            else:
-                # 生产环境 - 使用Cloudflare Flexible SSL
-                logger.info("以HTTP模式启动服务器，SSL由Cloudflare处理")
-                socketio.run(
-                    app,
-                    host=SERVER_IP,
-                    port=PORT,
-                    debug=DEBUG,
-                    use_reloader=False,
-                    log_output=True
-                )
-        except Exception as e:
-            logger.error(f"启动SocketIO服务器失败: {str(e)}")
             raise
 
     def stop(self) -> None:

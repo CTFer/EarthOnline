@@ -5,7 +5,7 @@ WebSocket服务模块
 import logging
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from typing import Dict, Any, Optional
-from config.config import CLOUDFLARE, ENV
+from config.config import CLOUDFLARE, ENV, DOMAIN
 import time
 
 logger = logging.getLogger(__name__)
@@ -29,42 +29,20 @@ class WebSocketService:
         """初始化SocketIO"""
         logger.info("[WebSocket] 开始初始化WebSocket服务")
         try:
-            # 根据环境选择配置
-            if ENV == 'local':
-                # 本地开发环境配置
-                logger.info("[WebSocket] 使用本地开发环境配置")
-                config = {
-                    'cors_allowed_origins': "*",
-                    'async_mode': 'eventlet',
-                    'logger': True,
-                    'engineio_logger': True,
-                    'ping_timeout': 5000,
-                    'ping_interval': 2500,
-                    'max_http_buffer_size': 1e6,
-                    'manage_session': False,
-                    'transports': ['websocket'],
-                    'verify_client': False,  # 本地开发不验证客户端
-                    **kwargs
-                }
-            else:
-                # 生产环境配置（Cloudflare）
-                logger.info("[WebSocket] 使用生产环境配置(Cloudflare)")
-                ws_config = CLOUDFLARE.get('websocket', {})
-                config = {
-                    'cors_allowed_origins': ws_config.get('cors_allowed_origins', "*"),
-                    'async_mode': ws_config.get('async_mode', 'eventlet'),
-                    'logger': ws_config.get('logger', True),
-                    'engineio_logger': ws_config.get('engineio_logger', True),
-                    'ping_timeout': ws_config.get('ping_timeout', 20000),
-                    'ping_interval': ws_config.get('ping_interval', 25000),
-                    'max_http_buffer_size': ws_config.get('max_http_buffer_size', 1e8),
-                    'manage_session': ws_config.get('manage_session', False),
-                    'transports': ws_config.get('transports', ['websocket', 'polling']),
-                    'path': ws_config.get('path', '/socket.io'),
-                    'always_connect': ws_config.get('always_connect', True),
-                    'cookie': ws_config.get('cookie', None),
-                    **kwargs
-                }
+            # 简化的基础配置
+            config = {
+                'cors_allowed_origins': '*',  # 允许所有来源
+                'async_mode': 'eventlet',
+                'logger': True,
+                'engineio_logger': True,
+                'ping_timeout': 20000,
+                'ping_interval': 25000,
+                'max_http_buffer_size': 1e8,
+                'manage_session': True,
+                'transports': ['websocket', 'polling'],
+                'always_connect': True,
+                **kwargs
+            }
             
             logger.info(f"[WebSocket] 使用配置: {config}")
             
@@ -161,6 +139,7 @@ class WebSocketService:
 
     def broadcast_log_update(self, logs: list, latest: Dict[str, Any]) -> None:
         """广播日志更新"""
+        return
         try:
             logger.debug(f"[WebSocket] 广播日志更新: latest={latest}")
             self.emit('log_update', {

@@ -33,7 +33,7 @@ LOCAL_SSL = {
 }
 
 # HTTPS配置
-HTTPS_ENABLED = True  # 是否启用HTTPS
+HTTPS_ENABLED = False  # 是否启用HTTPS
 HTTPS_PORT = 443     # HTTPS端口号
 
 # 根据环境选择证书路径
@@ -41,11 +41,9 @@ if ENV == 'local':
     SSL_CERT_FILE = LOCAL_SSL['cert_file']
     SSL_KEY_FILE = LOCAL_SSL['key_file']
 else:
-    # 生产环境使用 Let's Encrypt 证书
-    SSL_CERT_FILE = os.path.join(SSL_CERT_DIR, 'signed.crt')  # 主证书
-    SSL_KEY_FILE = os.path.join(SSL_CERT_DIR, 'domain.key')   # 私钥
-    SSL_CHAIN_FILE = os.path.join(SSL_CERT_DIR, 'chain.pem')  # 中间证书
-    SSL_FULLCHAIN_FILE = os.path.join(SSL_CERT_DIR, 'fullchain.pem')  # 完整证书链
+    # 生产环境使用 Cloudflare 证书
+    SSL_CERT_FILE = os.path.join(SSL_CERT_DIR, 'cloudfare.pem')  # Cloudflare 证书
+    SSL_KEY_FILE = os.path.join(SSL_CERT_DIR, 'domain.key')      # 私钥
 
 # ACME验证目录（用于Let's Encrypt证书续期）
 ACME_CHALLENGE_DIR = os.path.join('static', '.well-known', 'acme-challenge')
@@ -53,7 +51,7 @@ ACME_CHALLENGE_DIR = os.path.join('static', '.well-known', 'acme-challenge')
 # Cloudflare配置
 CLOUDFLARE = {
     'enabled': True,  # 启用Cloudflare
-    'flexible_ssl': False,  # 使用Flexible SSL模式
+    'flexible_ssl': False,  # 使用Full SSL模式（不是Flexible）
     'proxy_fix': True,  # 启用代理修复
     'websocket': {
         'enabled': True,
@@ -61,40 +59,19 @@ CLOUDFLARE = {
         'ping_interval': 25000,
         'ping_timeout': 20000,
         'max_http_buffer_size': 1e8,
-        'transports': ['polling', 'websocket'],  # 先使用polling，再升级到websocket
-        'cors_allowed_origins': '*',
+        'transports': ['websocket', 'polling'],
         'async_mode': 'eventlet',
         'logger': True,
         'engineio_logger': True,
-        'always_connect': True,
-        'upgrade_logger': True,
-        'cookie': None,
-        'manage_session': False
+        'always_connect': True
     },
     'headers': {
-        'X-Forwarded-For': 2,  # Cloudflare + 原始客户端
+        'X-Forwarded-For': 2,
         'X-Forwarded-Proto': 1,
         'X-Forwarded-Host': 1,
         'X-Forwarded-Port': 1,
         'X-Real-IP': 1
-    },
-    'trusted_proxies': [
-        '173.245.48.0/20',
-        '103.21.244.0/22',
-        '103.22.200.0/22',
-        '103.31.4.0/22',
-        '141.101.64.0/18',
-        '108.162.192.0/18',
-        '190.93.240.0/20',
-        '188.114.96.0/20',
-        '197.234.240.0/22',
-        '198.41.128.0/17',
-        '162.158.0.0/15',
-        '104.16.0.0/13',
-        '104.24.0.0/14',
-        '172.64.0.0/13',
-        '131.0.72.0/22'
-    ]
+    }
 }
 
 # 数据库配置
@@ -158,17 +135,11 @@ SECURITY = {
         'limit': 300,  # 每个IP每分钟最大请求数
         'window': 60   # 时间窗口（秒）
     },
-    'cors': {
-        'allowed_origins': ['https://duonline.top'],
-        'allowed_methods': ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        'allowed_headers': ['Content-Type', 'Authorization', 'X-Requested-With']
-    },
     'headers': {
         'X-Frame-Options': 'SAMEORIGIN',
         'X-Content-Type-Options': 'nosniff',
         'X-XSS-Protection': '1; mode=block',
         'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
-        'Content-Security-Policy': "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';"
     },
     'blocked_ips': [
         '0.0.0.0/8',          # 本地网络

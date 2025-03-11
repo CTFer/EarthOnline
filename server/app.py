@@ -57,14 +57,7 @@ from function.RateLimitService import rate_limit_service
 logger = log_service.setup_logging(DEBUG)
 
 app = Flask(__name__, static_folder='static')
-CORS(app, 
-     resources={
-         r"/*": {
-             "origins": SECURITY['cors']['allowed_origins'],
-             "methods": SECURITY['cors']['allowed_methods'],
-             "allow_headers": SECURITY['cors']['allowed_headers']
-         }
-     })
+CORS(app)
 
 # 添加Cloudflare代理支持
 if CLOUDFLARE['enabled']:
@@ -100,32 +93,7 @@ app.register_blueprint(wechat_bp, url_prefix='/wechat')  # 注册微信蓝图
 websocket_service.init_app(app)
 
 # 配置 SocketIO
-socketio = SocketIO(
-    app,
-    cors_allowed_origins=CLOUDFLARE['websocket']['cors_allowed_origins'],
-    async_mode=CLOUDFLARE['websocket']['async_mode'],
-    logger=CLOUDFLARE['websocket']['logger'],
-    engineio_logger=CLOUDFLARE['websocket']['engineio_logger'],
-    ping_timeout=CLOUDFLARE['websocket']['ping_timeout'] / 1000,
-    ping_interval=CLOUDFLARE['websocket']['ping_interval'] / 1000,
-    max_http_buffer_size=CLOUDFLARE['websocket']['max_http_buffer_size'],
-    manage_session=CLOUDFLARE['websocket']['manage_session'],
-    transports=CLOUDFLARE['websocket']['transports'],
-    always_connect=CLOUDFLARE['websocket']['always_connect'],
-    path=CLOUDFLARE['websocket']['path'],
-    cookie=CLOUDFLARE['websocket']['cookie'],
-    cors_credentials=True,
-    # 添加额外的Cloudflare支持
-    allow_upgrades=True,
-    upgrade_logger=True,
-    handle_sigint=False,  # 避免信号处理冲突
-    # 添加额外的安全头
-    headers={
-        'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'SAMEORIGIN',
-        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
-    }
-)
+socketio = SocketIO(app)
 
 # 初始化日志服务的WebSocket
 log_service.init_websocket(websocket_service)

@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-03-11 11:46:01
-# LastEditTime: 2025-03-11 19:52:54
+# LastEditTime: 2025-03-11 21:35:17
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -62,10 +62,6 @@ class SecurityService:
             return False
         return True
         
-    def check_request_method(self):
-        """检查请求方法"""
-        return request.method in SECURITY['cors']['allowed_methods']
-        
     def check_path_injection(self):
         """检查路径注入"""
         return not ('..' in request.path or '//' in request.path)
@@ -99,11 +95,6 @@ class SecurityService:
                 'msg': 'Forbidden'
             }), 403
             
-        if not self.check_request_method():
-            return jsonify({
-                'code': 405,
-                'msg': 'Method Not Allowed'
-            }), 405
             
         if not self.check_path_injection():
             return jsonify({
