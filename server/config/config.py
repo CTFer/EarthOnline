@@ -42,7 +42,8 @@ if ENV == 'local':
     SSL_KEY_FILE = LOCAL_SSL['key_file']
 else:
     # 生产环境使用 Cloudflare 证书
-    SSL_CERT_FILE = os.path.join(SSL_CERT_DIR, 'cloudfare.pem')  # Cloudflare 证书
+    SSL_CERT_FILE = os.path.join(
+        SSL_CERT_DIR, 'cloudfare.pem')  # Cloudflare 证书
     SSL_KEY_FILE = os.path.join(SSL_CERT_DIR, 'domain.key')      # 私钥
 
 # ACME验证目录（用于Let's Encrypt证书续期）
@@ -127,9 +128,24 @@ TASK_TYPE = {
     'BRANCH': '支线任务',
     'SPECIAL': '特殊任务',
 }
+TASK_STATUS = {
+    'ACCEPT': '已接受',  # 任务已被接受
+    'LOCKED': '未解锁',  # 任务未解锁
+    'AVAIL': '可接受',  # 任务可接受
+    'COMPLETED': '已完成',  # 任务已完成
+}
+CURRENT_TASK_STATUS = {
+    'IN_PROGRESS': '进行中',  # 任务进行中
+    'CHECK': '待检查',  # 玩家提交等待管理员检查
+    'REJECT': '已驳回',  # 管理员驳回
+    'UNFINISH': '未完成',  # 超时未完成
+    'ABANDONED': '已放弃',  # 玩家主动放弃
+    'COMPLETED': '已完成',  # 任务已完成
+}
 
 # 安全配置
 SECURITY = {
+    'open': False,
     'rate_limit': {
         'enabled': True if ENV == 'prod' else False,  # 生产环境启用速率限制
         'limit': 300,  # 每个IP每分钟最大请求数
@@ -140,6 +156,9 @@ SECURITY = {
         'X-Content-Type-Options': 'nosniff',
         'X-XSS-Protection': '1; mode=block',
         'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
     },
     'blocked_ips': [
         '0.0.0.0/8',          # 本地网络

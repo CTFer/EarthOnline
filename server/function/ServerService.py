@@ -219,8 +219,8 @@ class ServerService:
             http_app.run(
                 host=SERVER_IP,
                 port=PORT,
-                debug=False,  # HTTP服务器不需要debug模式
-                use_reloader=False  # 禁用reloader以避免与HTTPS服务器冲突
+                debug=True,  # HTTP服务器不需要debug模式
+                use_reloader=True  # 禁用reloader以避免与HTTPS服务器冲突
             )
         except Exception as e:
             logger.error(f"HTTP服务器启动失败: {str(e)}")
@@ -239,9 +239,25 @@ class ServerService:
                 'host': SERVER_IP,
                 'port': PORT,
                 'debug': DEBUG,
-                'use_reloader': False,
-                'log_output': True if ENV == 'local' else False
+                'use_reloader': True,
+                'log_output': True  # 关闭基本日志输出
             }
+
+            # SocketIO配置
+            socketio_config = {
+                'cors_allowed_origins': '*',
+                'async_mode': 'eventlet',
+                'ping_timeout': 20,
+                'ping_interval': 25,
+                'always_connect': True
+            }
+
+            # 如果启用了Cloudflare，添加websocket配置
+            if CLOUDFLARE['enabled'] and CLOUDFLARE['websocket']:
+                socketio_config.update({
+                    'path': CLOUDFLARE['websocket'].get('path', '/socket.io'),
+                    'transports': CLOUDFLARE['websocket'].get('transports', ['websocket', 'polling'])
+                })
 
             # HTTPS模式配置
             if ENV == 'local' and HTTPS_ENABLED:
@@ -258,6 +274,12 @@ class ServerService:
                     server_config['port'] = PORT + 1  # 使用不同的端口避免冲突
 
             logger.info(f"[SocketIO] 服务器配置: {server_config}")
+            logger.info(f"[SocketIO] SocketIO配置: {socketio_config}")
+            
+            # 更新SocketIO配置
+            for key, value in socketio_config.items():
+                if hasattr(socketio, key):
+                    setattr(socketio, key, value)
             
             # 启动服务器
             socketio.run(app, **server_config)

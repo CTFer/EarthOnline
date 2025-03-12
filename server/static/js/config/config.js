@@ -78,19 +78,19 @@ export const TASK_TYPE_MAP = {
   MAIN: {
     // 主线任务
     text: "主线任务",
-    color: "#FFC107", // 金色
+    color: "#2196F3", // 蓝色
     icon: "layui-icon-star",
   },
   BRANCH: {
     // 支线任务
     text: "支线任务",
-    color: "#2196F3", // 蓝色
+    color: "#9C27B0", // 紫色
     icon: "layui-icon-note",
   },
   SPECIAL: {
     // 特殊任务
     text: "特殊任务",
-    color: "#9C27B0", // 紫色
+    color: "#FF9800", // 橙色
     icon: "layui-icon-gift",
   },
   DAILY: {

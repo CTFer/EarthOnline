@@ -33,8 +33,15 @@ class SecurityService:
         if not hasattr(self, 'initialized'):
             self.initialized = True
             
+    def is_security_enabled(self):
+        """检查安全配置是否启用"""
+        return SECURITY.get('open', False)
+            
     def check_suspicious_request(self, path):
         """检查可疑请求"""
+        if not self.is_security_enabled():
+            return False
+            
         suspicious_paths = [
             'wp-', 'wordpress', 'admin', 'setup', 'install',
             'phpmy', 'mysql', 'sql', 'database',
@@ -54,6 +61,9 @@ class SecurityService:
         
     def check_user_agent(self):
         """检查User-Agent"""
+        if not self.is_security_enabled():
+            return True
+            
         user_agent = request.headers.get('User-Agent', '').lower()
         blocked_agents = ['zgrab', 'python-requests', 'curl', 'wget', 'postman']
         
@@ -64,16 +74,28 @@ class SecurityService:
         
     def check_path_injection(self):
         """检查路径注入"""
+        if not self.is_security_enabled():
+            return True
+            
         return not ('..' in request.path or '//' in request.path)
         
     def add_security_headers(self, response):
         """添加安全响应头"""
+        if not self.is_security_enabled():
+            return response
+            
         for header, value in SECURITY['headers'].items():
             response.headers[header] = value
         return response
         
     def handle_404(self, e):
         """处理404错误"""
+        if not self.is_security_enabled():
+            return jsonify(ResponseHandler.error(
+                code=StatusCode.NOT_FOUND,
+                msg="请求的资源不存在"
+            )), 404
+            
         if self.check_suspicious_request(request.path):
             response = jsonify({
                 'code': 403,
@@ -89,12 +111,14 @@ class SecurityService:
         
     def security_check(self):
         """请求安全检查"""
+        if not self.is_security_enabled():
+            return None
+            
         if not self.check_user_agent():
             return jsonify({
                 'code': 403,
                 'msg': 'Forbidden'
             }), 403
-            
             
         if not self.check_path_injection():
             return jsonify({

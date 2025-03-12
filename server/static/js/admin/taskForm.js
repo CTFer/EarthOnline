@@ -1,3 +1,6 @@
+// 导入配置
+import { TASK_TYPE_MAP, TASK_STATUS_MAP } from '../config/config.js';
+
 // 确保函数在全局作用域可用
 (function (window) {
   console.log("TaskForm.js loading");
@@ -8,24 +11,37 @@
     return;
   }
 
-  // 任务类型常量
-  const TASK_TYPES = {
-    DAILY: { name: "日常任务", color: "#4CAF50" },
-    MAIN: { name: "主线任务", color: "#2196F3" },
-    BRANCH: { name: "支线任务", color: "#9C27B0" },
-    SPECIAL: { name: "特殊任务", color: "#FF9800" },
-  };
-
   // 修改任务状态常量
-  const TASK_STATUS = {
-    LOCKED: { name: "未解锁", color: "#9e9e9e" },
-    AVAIL: { name: "可接受", color: "#2196F3" },
-    ACCEPT: { name: "已接受", color: "#FF9800" },
-    COMPLETED: { name: "已完成", color: "#4CAF50" }
-  };
+  const TASK_STATUS = TASK_STATUS_MAP;
 
   // 获取表单内容
   function getTaskFormContent() {
+    // 生成任务类型单选框HTML
+    const taskTypeRadios = Object.entries(TASK_TYPE_MAP)
+      .filter(([key]) => key !== 'UNDEFINED') // 排除未定义类型
+      .map(([value, config]) => `
+        <input type="radio" name="task_type" value="${value}" lay-skin="none">
+        <div lay-radio class="lay-skin-taskcard">
+            <div class="lay-skin-taskcard-detail">
+                <div class="lay-skin-taskcard-header">${config.text}</div>
+            </div>
+        </div>
+      `).join('');
+
+    // 生成任务状态单选框HTML
+    const taskStatusRadios = Object.entries(TASK_STATUS)
+      .map(([value, config]) => `
+        <input type="radio" name="task_status" value="${value}" lay-skin="none" ${value === 'LOCKED' ? 'checked' : ''}>
+        <div lay-radio class="lay-skin-taskcard">
+            <div class="lay-skin-taskcard-detail">
+                <div class="lay-skin-taskcard-header">${config.text}</div>
+                <div class="lay-skin-taskcard-description" style="color: ${config.color}">
+                    ${config.text}
+                </div>
+            </div>
+        </div>
+      `).join('');
+
     return `
         <div class="task-form-scroll" id="taskForm">
             <form class="layui-form" lay-filter="taskForm">
@@ -61,78 +77,14 @@
                 <div class="layui-form-item">
                     <label class="layui-form-label">任务类型</label>
                     <div class="layui-input-block" id="taskTypeRadios">
-                        <input type="radio" name="task_type" value="DAILY" lay-skin="none">
-                        <div lay-radio class="lay-skin-taskcard">
-                            <div class="lay-skin-taskcard-detail">
-                                <div class="lay-skin-taskcard-header">日常任务</div>
-                            </div>
-                        </div>
-                        
-                        <input type="radio" name="task_type" value="MAIN" lay-skin="none">
-                        <div lay-radio class="lay-skin-taskcard">
-                            <div class="lay-skin-taskcard-detail">
-                                <div class="lay-skin-taskcard-header">主线任务</div>
-                            </div>
-                        </div>
-                        
-                        <input type="radio" name="task_type" value="BRANCH" lay-skin="none">
-                        <div lay-radio class="lay-skin-taskcard">
-                            <div class="lay-skin-taskcard-detail">
-                                <div class="lay-skin-taskcard-header">支线任务</div>
-                            </div>
-                        </div>
-                        
-                        <input type="radio" name="task_type" value="SPECIAL" lay-skin="none">
-                        <div lay-radio class="lay-skin-taskcard">
-                            <div class="lay-skin-taskcard-detail">
-                                <div class="lay-skin-taskcard-header">特殊任务</div>
-                            </div>
-                        </div>
+                        ${taskTypeRadios}
                     </div>
                 </div>
                 
                 <div class="layui-form-item">
                     <label class="layui-form-label">任务状态</label>
                     <div class="layui-input-block" id="taskStatusRadios">
-                        <input type="radio" name="task_status" value="LOCKED" lay-skin="none" checked>
-                        <div lay-radio class="lay-skin-taskcard">
-                            <div class="lay-skin-taskcard-detail">
-                                <div class="lay-skin-taskcard-header">未解锁</div>
-                                <div class="lay-skin-taskcard-description" style="color: #9e9e9e">
-                                    未解锁
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <input type="radio" name="task_status" value="AVAIL" lay-skin="none">
-                        <div lay-radio class="lay-skin-taskcard">
-                            <div class="lay-skin-taskcard-detail">
-                                <div class="lay-skin-taskcard-header">可接受</div>
-                                <div class="lay-skin-taskcard-description" style="color: #2196F3">
-                                    可接受
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <input type="radio" name="task_status" value="ACCEPT" lay-skin="none">
-                        <div lay-radio class="lay-skin-taskcard">
-                            <div class="lay-skin-taskcard-detail">
-                                <div class="lay-skin-taskcard-header">已接受</div>
-                                <div class="lay-skin-taskcard-description" style="color: #FF9800">
-                                    已接受
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <input type="radio" name="task_status" value="COMPLETED" lay-skin="none">
-                        <div lay-radio class="lay-skin-taskcard">
-                            <div class="lay-skin-taskcard-detail">
-                                <div class="lay-skin-taskcard-header">已完成</div>
-                                <div class="lay-skin-taskcard-description" style="color: #4CAF50">
-                                    已完成
-                                </div>
-                            </div>
-                        </div>
+                        ${taskStatusRadios}
                     </div>
                 </div>
                 

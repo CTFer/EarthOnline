@@ -2,6 +2,9 @@
 let treeChart = null;
 let taskData = null;
 
+// 导入配置
+import { TASK_TYPE_MAP } from '../config/config.js';
+
 // 初始化
 layui.use(["layer", "form", "jquery"], function () {
   var layer = layui.layer,
@@ -64,14 +67,6 @@ layui.use(["layer", "form", "jquery"], function () {
     });
   };
 });
-
-// 添加任务类型常量
-const TASK_TYPES = {
-  DAILY: { name: "日常任务", color: "#4CAF50" }, // 绿色
-  MAIN: { name: "主线任务", color: "#2196F3" }, // 蓝色
-  BRANCH: { name: "支线任务", color: "#9C27B0" }, // 紫色
-  SPECIAL: { name: "特殊任务", color: "#FF9800" }, // 橙色
-};
 
 // 修改 loadTaskData 函数
 function loadTaskData() {
@@ -166,9 +161,9 @@ function processTaskData(tasks) {
   };
 }
 
-// 获取任务类型对应的颜色
+// 修改 getTaskTypeColor 函数
 function getTaskTypeColor(type) {
-  return TASK_TYPES[type]?.color || "#607D8B"; // 使用可选链操作符，默认为灰色
+  return TASK_TYPE_MAP[type]?.color || "#607D8B"; // 使用可选链操作符，默认为灰色
 }
 
 let currentZoom = 1;
@@ -206,8 +201,8 @@ function initTaskTree(data) {
           formatter: function (params) {
             // 根据节点类型设置颜色
             let color;
-            if (params.data.task_type && TASK_TYPES[params.data.task_type]) {
-              color = TASK_TYPES[params.data.task_type].color;
+            if (params.data.task_type && TASK_TYPE_MAP[params.data.task_type]) {
+              color = TASK_TYPE_MAP[params.data.task_type].color;
             } else if (params.data.isGroup) {
               color = params.data.name === "任务系统" ? "#2c3e50" : "#455a64";
             } else {

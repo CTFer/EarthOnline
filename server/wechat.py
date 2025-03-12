@@ -322,6 +322,7 @@ def qywechat():
     """
     try:
         # 获取通用参数
+        print(request.args)
         msg_signature = request.args.get('msg_signature', '')
         timestamp = request.args.get('timestamp', '')
         nonce = request.args.get('nonce', '')

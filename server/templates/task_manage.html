@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-13 23:30:20
- * @LastEditTime: 2025-02-27 00:05:38
+ * @LastEditTime: 2025-03-12 11:57:41
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -20,7 +20,7 @@
     <script src="/static/js/crypto-js.min.js"></script>
     <script src="/static/js/jquery.min.js"></script>
     <script src="/static/js/echarts.min.js"></script>
-    <script src="/static/js/admin/taskForm.js"></script>
+    <script type="module" src="/static/js/admin/taskForm.js"></script>
   </head>
   <body>
     {% extends "admin_base.html" %} {% block title %}管理{% endblock %} {% block header_title %}管理{% endblock %} {% block content %}
@@ -53,7 +53,7 @@
 
     <!-- 隐藏的 JSON textarea -->
     <textarea id="taskJson" class="layui-textarea" style="display: none" readonly></textarea>
-    <script src="/static/js/admin/task_manage.js"></script>
+    <script type="module" src="/static/js/admin/task_manage.js"></script>
     {% endblock %}
   </body>
 </html>

@@ -57,7 +57,15 @@ from function.RateLimitService import rate_limit_service
 logger = log_service.setup_logging(DEBUG)
 
 app = Flask(__name__, static_folder='static')
-CORS(app)
+# 配置CORS允许所有来源
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "supports_credentials": True
+    }
+})
 
 # 添加Cloudflare代理支持
 if CLOUDFLARE['enabled']:
@@ -93,7 +101,16 @@ app.register_blueprint(wechat_bp, url_prefix='/wechat')  # 注册微信蓝图
 websocket_service.init_app(app)
 
 # 配置 SocketIO
-socketio = SocketIO(app)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode='eventlet',
+    ping_timeout=20,
+    ping_interval=25,
+    max_http_buffer_size=1e8,
+    manage_session=True,
+    transports=['websocket', 'polling']
+)
 
 # 初始化日志服务的WebSocket
 log_service.init_websocket(websocket_service)
@@ -466,9 +483,8 @@ def add_gps():
         print(f"[GPS] 添加GPS记录: {gps_data}")
 
         # 调用 GPS 服务添加记录
-        result = gps_service.add_gps(gps_data)
-        print(f"[GPS] 添加GPS记录结果: {result}")
-        response_data = json.loads(result)
+        response_data = gps_service.add_gps(gps_data)
+        print(f"[GPS] 添加GPS记录结果: {response_data}")
         
         # 只有在新增GPS记录时才发送 WebSocket 通知
         if (response_data['code'] == 0 and 
@@ -497,7 +513,7 @@ def add_gps():
             }
             print(f"[GPS] 仅更新时间，发送电量、速度、更新时间：{socket_data}")
         websocket_service.socketio.emit('gps_update', socket_data, room=f'user_{player_id}')    
-        return result
+        return response_data
 
     except Exception as e:
         logger.error(f"处理GPS数据失败: {str(e)}")

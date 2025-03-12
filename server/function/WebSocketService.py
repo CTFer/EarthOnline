@@ -33,15 +33,11 @@ class WebSocketService:
             config = {
                 'cors_allowed_origins': '*',  # 允许所有来源
                 'async_mode': 'eventlet',
-                'logger': True,
-                'engineio_logger': True,
                 'ping_timeout': 20000,
                 'ping_interval': 25000,
                 'max_http_buffer_size': 1e8,
                 'manage_session': True,
-                'transports': ['websocket', 'polling'],
-                'always_connect': True,
-                **kwargs
+                'transports': ['websocket', 'polling']
             }
             
             logger.info(f"[WebSocket] 使用配置: {config}")

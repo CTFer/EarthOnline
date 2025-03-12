@@ -114,6 +114,8 @@ class QYWeChatAuth:
             
             # 去除补位
             pad = decrypted_data[-1]
+            if not isinstance(pad, int):
+                pad = ord(pad)
             content = decrypted_data[:-pad]
             
             # 获取消息长度
@@ -176,6 +178,7 @@ class QYWeChatAuth:
             signature = self._generate_signature(self.token, timestamp, nonce, echostr)
             logger.info(f"[QYWeChat] 计算的签名: {signature}")
             logger.info(f"[QYWeChat] 接收的签名: {msg_signature}")
+            
             if signature != msg_signature:
                 logger.error("[QYWeChat] URL验证失败：签名不匹配")
                 logger.debug(f"计算的签名: {signature}")
@@ -183,9 +186,13 @@ class QYWeChatAuth:
                 return None
                 
             # 2. 解密echostr
-            decrypted_str = self.decrypt_message(echostr)
-            logger.info("[QYWeChat] URL验证成功")
-            return decrypted_str
+            try:
+                decrypted_str = self.decrypt_message(echostr)
+                logger.info("[QYWeChat] URL验证成功")
+                return decrypted_str
+            except Exception as e:
+                logger.error(f"[QYWeChat] 解密echostr失败: {str(e)}")
+                return None
             
         except Exception as e:
             logger.error(f"[QYWeChat] URL验证异常: {str(e)}")
