@@ -33,7 +33,7 @@ LOCAL_SSL = {
 }
 
 # HTTPS配置
-HTTPS_ENABLED = False  # 是否启用HTTPS
+HTTPS_ENABLED = True  # 是否启用HTTPS
 HTTPS_PORT = 443     # HTTPS端口号
 
 # 根据环境选择证书路径

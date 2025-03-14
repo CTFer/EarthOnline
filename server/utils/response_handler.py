@@ -2,7 +2,7 @@
 统一响应处理模块
 包含状态码定义和统一的响应格式处理
 """
-from flask import jsonify
+from flask import jsonify, redirect, url_for, Response
 from typing import Any, Optional, Union, Dict
 import logging
 
@@ -18,7 +18,8 @@ class StatusCode:
     FORBIDDEN = 403      # 禁止访问
     NOT_FOUND = 404      # 资源不存在
     METHOD_NOT_ALLOWED = 405  # 方法不允许
-    CONFLICT = 409       # 资源冲突
+    REDIRECT = 302       # 临时重定向
+    PERMANENT_REDIRECT = 308  # 永久重定向
     SERVER_ERROR = 500   # 服务器错误
     SERVICE_UNAVAILABLE = 503  # 服务不可用
     
@@ -126,6 +127,8 @@ class StatusCode:
             StatusCode.FORBIDDEN: "禁止访问",
             StatusCode.NOT_FOUND: "资源不存在",
             StatusCode.METHOD_NOT_ALLOWED: "不支持的请求方法",
+            StatusCode.REDIRECT: "临时重定向",
+            StatusCode.PERMANENT_REDIRECT: "永久重定向",
             StatusCode.SERVER_ERROR: "服务器错误",
             
             # 任务相关状态码消息
@@ -157,12 +160,7 @@ class ResponseHandler:
     
     @staticmethod
     def success(data: Any = None, msg: str = "success") -> Dict:
-        """
-        成功响应
-        :param data: 响应数据
-        :param msg: 响应消息
-        :return: 统一格式的响应字典
-        """
+        """成功响应"""
         return {
             "code": StatusCode.SUCCESS,
             "msg": msg,
@@ -175,13 +173,7 @@ class ResponseHandler:
         msg: str = "操作失败",
         data: Any = None
     ) -> Dict:
-        """
-        错误响应
-        :param code: 错误码
-        :param msg: 错误消息
-        :param data: 错误数据
-        :return: 统一格式的响应字典
-        """
+        """错误响应"""
         return {
             "code": code,
             "msg": msg,
@@ -189,20 +181,38 @@ class ResponseHandler:
         }
     
     @staticmethod
+    def redirect(location: str, permanent: bool = False) -> Response:
+        """
+        重定向响应
+        :param location: 重定向目标URL
+        :param permanent: 是否永久重定向
+        :return: Flask Response 对象
+        """
+        # 使用 302 临时重定向或 301 永久重定向
+        status_code = 301 if permanent else 302
+        
+        # 创建重定向响应
+        response = Response(
+            status=status_code,
+            headers={'Location': location}
+        )
+        
+        # 设置响应头，防止浏览器缓存
+        if not permanent:
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+            
+        return response
+
+    @staticmethod
     def response(
         success: bool = True,
         data: Any = None,
         msg: str = None,
         code: int = None
     ) -> Dict:
-        """
-        通用响应
-        :param success: 是否成功
-        :param data: 响应数据
-        :param msg: 响应消息
-        :param code: 状态码
-        :return: 统一格式的响应字典
-        """
+        """通用响应"""
         if success:
             return ResponseHandler.success(data=data, msg=msg or "success")
         else:
@@ -213,18 +223,22 @@ class ResponseHandler:
             )
 
 def api_response(func):
-    """
-    API响应装饰器
-    自动处理异常并包装响应
-    """
+    """API响应装饰器"""
     def wrapper(*args, **kwargs):
         try:
             result = func(*args, **kwargs)
-            # 如果返回的已经是字典格式且包含code字段，直接返回
+            
+            # 处理重定向响应
+            if isinstance(result, Response) and result.status_code in [301, 302, 307, 308]:
+                return result
+                    
+            # 处理普通响应
             if isinstance(result, dict) and "code" in result:
                 return jsonify(result)
-            # 否则包装为成功响应
+            
+            # 包装为成功响应
             return jsonify(ResponseHandler.success(data=result))
+            
         except Exception as e:
             logger.exception(f"API异常: {str(e)}")
             return jsonify(ResponseHandler.error(

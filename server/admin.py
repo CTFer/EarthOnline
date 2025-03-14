@@ -27,7 +27,7 @@ from function.GameCardService import game_card_service
 logger = logging.getLogger(__name__)
 
 # 创建蓝图
-admin_bp = Blueprint('admin', __name__)
+admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 socketio = SocketIO()
 nfc_device = None
 
@@ -87,7 +87,8 @@ def login():
         result = admin_service.login(username, password)
         if result['code'] == 0:
             logger.info(f"管理员 {username} 登录成功")
-            return redirect(url_for('admin.index'))
+            next_url = request.args.get('next') or url_for('admin.index')
+            return redirect(next_url)
         else:
             logger.warning(f"管理员 {username} 登录失败: {result['msg']}")
             flash(result['msg'])
@@ -595,6 +596,14 @@ def admin_cleanup_notifications():
             'code': 1,
             'msg': str(e)
         })
+
+@admin_bp.before_request
+def before_request():
+    """请求预处理：检查认证状态"""
+    # 检查是否需要登录（除了登录页面）
+    if request.endpoint != 'admin.login' and not session.get('is_admin'):
+        return ResponseHandler.redirect(url_for('admin.login'))
+    return None
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

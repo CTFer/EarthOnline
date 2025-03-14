@@ -8,11 +8,11 @@ from flask_socketio import emit
 from datetime import datetime
 import serial
 import serial.tools.list_ports
-from ndef import message, record, UriRecord, TextRecord, message_encoder
 import re
 from utils.response_handler import ResponseHandler, StatusCode
 from config.config import ENV
 if ENV == 'local':
+    from ndef import message, record, UriRecord, TextRecord, message_encoder
     from function.NFC_Device import NFC_Device
 
 logger = logging.getLogger(__name__)

@@ -127,7 +127,7 @@ class AdminService:
 
             # 获取用户信息，包括密码字段
             cursor.execute('''
-                SELECT id, username, password, created_at, status
+                SELECT id, username, password, created_at
                 FROM users 
                 WHERE username = ?
             ''', (username,))
@@ -140,21 +140,7 @@ class AdminService:
                     code=StatusCode.USER_NOT_FOUND,
                     msg="用户不存在"
                 )
-                
-            if user['status'] == 'disabled':
-                logger.warning(f"用户已禁用: {username}")
-                return ResponseHandler.error(
-                    code=StatusCode.ACCOUNT_DISABLED,
-                    msg="账户已被禁用"
-                )
-                
-            if user['status'] == 'locked':
-                logger.warning(f"用户已锁定: {username}")
-                return ResponseHandler.error(
-                    code=StatusCode.ACCOUNT_LOCKED,
-                    msg="账户已被锁定"
-                )
-            
+                            
             if user['password'] == self.encrypt_password(password):
                 logger.info(f"用户验证成功: {username}")
                 return ResponseHandler.success(

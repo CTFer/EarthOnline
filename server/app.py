@@ -898,6 +898,26 @@ def handle_404(e):
 @app.before_request
 def before_request():
     """请求前处理"""
+    # 本地环境不处理
+    if ENV == 'local':
+        return None
+        
+    # 静态文件不处理
+    if request.endpoint and 'static' in request.endpoint:
+        return None
+        
+    # 获取当前协议
+    proto = request.headers.get('X-Forwarded-Proto', request.scheme)
+    
+    # 非HTTPS请求需要重定向（除了Let's Encrypt验证）
+    if proto != 'https' and ENV != 'local':
+        if request.path.startswith('/.well-known/acme-challenge/'):
+            return None
+        return ResponseHandler.redirect(
+            request.url.replace('http://', 'https://', 1),
+            permanent=False
+        )
+        
     # 安全检查
     security_check_result = security_service.security_check()
     if security_check_result is not None:
@@ -907,6 +927,8 @@ def before_request():
     rate_limit_result = rate_limit_service.handle_rate_limit()
     if rate_limit_result is not None:
         return rate_limit_result
+        
+    return None
 
 # 添加安全头
 @app.after_request
