@@ -79,11 +79,15 @@ function loadTaskData() {
     .then((response) => response.json())
     .then((data) => {
       // 保存到全局变量
-      taskData = data;
+      taskData = {
+        code: data.code,
+        msg: data.msg,
+        data: data.data.tasks || []
+      };
       // 更新JSON展示
       updateJsonDisplay();
       // 构建树图数据
-      const treeData = processTaskData(data.data);
+      const treeData = processTaskData(taskData.data);
       console.log(treeData);
       initTaskTree(treeData);
     })

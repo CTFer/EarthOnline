@@ -635,4 +635,657 @@ class TaskService:
         # ... 现有的奖励发放代码 ...
         pass
 
+    # 管理员API方法
+    def get_tasks(self, page=None, limit=None):
+        """获取任务列表，支持分页"""
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+
+            # 获取总记录数
+            cursor.execute("SELECT COUNT(*) as total FROM task")
+            total = cursor.fetchone()['total']
+
+            # 构建基础查询
+            base_query = '''
+                SELECT id, name, description, task_type, task_status, 
+                       task_chain_id, parent_task_id, task_scope, stamina_cost,
+                       limit_time, repeat_time, is_enabled, repeatable, task_rewards
+                FROM task
+            '''
+
+            # 根据是否有分页参数决定查询方式
+            if page is not None and limit is not None:
+                offset = (page - 1) * limit
+                query = base_query + ' LIMIT ? OFFSET ?'
+                cursor.execute(query, (limit, offset))
+            else:
+                cursor.execute(base_query)
+
+            tasks = []
+            for row in cursor.fetchall():
+                task = dict(row)
+                # 处理task_rewards JSON字符串
+                if task['task_rewards'] and isinstance(task['task_rewards'], str):
+                    try:
+                        task['task_rewards'] = json.loads(task['task_rewards'])
+                    except json.JSONDecodeError:
+                        task['task_rewards'] = {}
+                tasks.append(task)
+
+            return ResponseHandler.success(
+                data={
+                    "tasks": tasks,
+                    "total": total,
+                    "page": page,
+                    "limit": limit
+                },
+                msg="获取任务列表成功"
+            )
+
+        except Exception as e:
+            print(f"获取任务列表失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取任务列表失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def get_task(self, task_id):
+        """获取单个任务信息"""
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+
+            # 获取任务信息
+            cursor.execute('''
+                SELECT id, name, description, task_type, task_status, 
+                       task_chain_id, parent_task_id, task_scope, stamina_cost,
+                       limit_time, repeat_time, is_enabled, repeatable, task_rewards
+                FROM task 
+                WHERE id = ?
+            ''', (task_id,))
+            
+            task = cursor.fetchone()
+            if not task:
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在"
+                )
+
+            task_dict = dict(task)
+            # 处理task_rewards JSON字符串
+            if task_dict['task_rewards'] and isinstance(task_dict['task_rewards'], str):
+                try:
+                    task_dict['task_rewards'] = json.loads(task_dict['task_rewards'])
+                except json.JSONDecodeError:
+                    task_dict['task_rewards'] = {}
+
+            return ResponseHandler.success(
+                data=task_dict,
+                msg="获取任务成功"
+            )
+
+        except Exception as e:
+            print(f"获取任务信息失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取任务信息失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def add_task(self, data):
+        """添加新任务"""
+        try:
+            # 验证必要字段
+            required_fields = ['name', 'task_type']
+            for field in required_fields:
+                if not data.get(field):
+                    return ResponseHandler.error(
+                        code=StatusCode.PARAM_ERROR,
+                        msg=f"缺少必要字段: {field}"
+                    )
+
+            conn = self.get_db()
+            cursor = conn.cursor()
+
+            # 处理任务奖励数据
+            task_rewards = {
+                'points_rewards': [],
+                'card_rewards': [],
+                'medal_rewards': [],
+                'real_rewards': []
+            }
+
+            # 处理各类奖励
+            if 'task_rewards' in data:
+                rewards_data = data['task_rewards']
+                
+                # 处理数值奖励
+                if 'points_rewards' in rewards_data:
+                    task_rewards['points_rewards'] = [
+                        {
+                            'type': reward.get('type', 'exp'),
+                            'number': int(reward.get('number', 0))
+                        }
+                        for reward in rewards_data['points_rewards']
+                        if reward.get('number') is not None
+                    ]
+
+                # 处理卡片奖励
+                if 'card_rewards' in rewards_data:
+                    task_rewards['card_rewards'] = [
+                        {
+                            'id': int(reward.get('id', 0)),
+                            'number': int(reward.get('number', 0))
+                        }
+                        for reward in rewards_data['card_rewards']
+                        if reward.get('id') is not None and reward.get('number') is not None
+                    ]
+
+                # 处理成就奖励
+                if 'medal_rewards' in rewards_data:
+                    task_rewards['medal_rewards'] = [
+                        {
+                            'id': int(reward.get('id', 0)),
+                            'number': 1
+                        }
+                        for reward in rewards_data['medal_rewards']
+                        if reward.get('id') is not None
+                    ]
+
+                # 处理实物奖励
+                if 'real_rewards' in rewards_data:
+                    task_rewards['real_rewards'] = [
+                        {
+                            'name': reward.get('name', ''),
+                            'number': int(reward.get('number', 0))
+                        }
+                        for reward in rewards_data['real_rewards']
+                        if reward.get('name') and reward.get('number') is not None
+                    ]
+
+            cursor.execute('''
+                INSERT INTO task (
+                    name, description, task_chain_id, parent_task_id,
+                    task_type, task_status, task_scope, stamina_cost,
+                    limit_time, repeat_time, is_enabled, repeatable,
+                    need_check, task_rewards, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            ''', (
+                data['name'],
+                data.get('description', ''),
+                int(data.get('task_chain_id', 0)),
+                int(data.get('parent_task_id', 0)),
+                data['task_type'],
+                data.get('task_status', 'LOCKED'),
+                int(data.get('task_scope', 0)),
+                int(data.get('stamina_cost', 0)),
+                int(data.get('limit_time', 0)),
+                int(data.get('repeat_time', 1)),
+                bool(data.get('is_enabled', False)),
+                bool(data.get('repeatable', False)),
+                bool(data.get('need_check', False)),
+                json.dumps(task_rewards)
+            ))
+
+            task_id = cursor.lastrowid
+            conn.commit()
+
+            return ResponseHandler.success(
+                data={"id": task_id},
+                msg="添加任务成功"
+            )
+
+        except Exception as e:
+            print(f"添加任务失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"添加任务失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def update_task(self, task_id, data):
+        """更新任务"""
+        try:
+            # 验证必要字段
+            if not data.get('name'):
+                return ResponseHandler.error(
+                    code=StatusCode.PARAM_ERROR,
+                    msg="任务名称不能为空"
+                )
+
+            conn = self.get_db()
+            cursor = conn.cursor()
+
+            # 检查任务是否存在
+            cursor.execute('SELECT id FROM task WHERE id = ?', (task_id,))
+            if not cursor.fetchone():
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在"
+                )
+
+            # 处理任务奖励数据
+            task_rewards = {
+                'points_rewards': [],
+                'card_rewards': [],
+                'medal_rewards': [],
+                'real_rewards': []
+            }
+
+            # 处理各类奖励
+            if 'task_rewards' in data:
+                rewards_data = data['task_rewards']
+                
+                # 处理数值奖励
+                if 'points_rewards' in rewards_data:
+                    task_rewards['points_rewards'] = [
+                        {
+                            'type': reward.get('type', 'exp'),
+                            'number': int(reward.get('number', 0))
+                        }
+                        for reward in rewards_data['points_rewards']
+                        if reward.get('number') is not None
+                    ]
+
+                # 处理卡片奖励
+                if 'card_rewards' in rewards_data:
+                    task_rewards['card_rewards'] = [
+                        {
+                            'id': int(reward.get('id', 0)),
+                            'number': int(reward.get('number', 0))
+                        }
+                        for reward in rewards_data['card_rewards']
+                        if reward.get('id') is not None and reward.get('number') is not None
+                    ]
+
+                # 处理成就奖励
+                if 'medal_rewards' in rewards_data:
+                    task_rewards['medal_rewards'] = [
+                        {
+                            'id': int(reward.get('id', 0)),
+                            'number': 1
+                        }
+                        for reward in rewards_data['medal_rewards']
+                        if reward.get('id') is not None
+                    ]
+
+                # 处理实物奖励
+                if 'real_rewards' in rewards_data:
+                    task_rewards['real_rewards'] = [
+                        {
+                            'name': reward.get('name', ''),
+                            'number': int(reward.get('number', 0))
+                        }
+                        for reward in rewards_data['real_rewards']
+                        if reward.get('name') and reward.get('number') is not None
+                    ]
+
+            cursor.execute('''
+                UPDATE task 
+                SET name = ?, 
+                    description = ?, 
+                    task_chain_id = ?,
+                    parent_task_id = ?,
+                    task_type = ?,
+                    task_status = ?,
+                    task_scope = ?,
+                    stamina_cost = ?,
+                    limit_time = ?,
+                    repeat_time = ?,
+                    is_enabled = ?,
+                    repeatable = ?,
+                    need_check = ?,
+                    task_rewards = ?
+                WHERE id = ?
+            ''', (
+                data['name'],
+                data.get('description', ''),
+                int(data.get('task_chain_id', 0)),
+                int(data.get('parent_task_id', 0)),
+                data['task_type'],
+                data.get('task_status', 'LOCKED'),
+                int(data.get('task_scope', 0)),
+                int(data.get('stamina_cost', 0)),
+                int(data.get('limit_time', 0)),
+                int(data.get('repeat_time', 1)),
+                bool(data.get('is_enabled', False)),
+                bool(data.get('repeatable', False)),
+                bool(data.get('need_check', False)),
+                json.dumps(task_rewards),
+                task_id
+            ))
+
+            conn.commit()
+
+            return ResponseHandler.success(msg="更新任务成功")
+
+        except Exception as e:
+            print(f"更新任务失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"更新任务失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def delete_task(self, task_id):
+        """删除任务"""
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+
+            # 检查任务是否存在
+            cursor.execute('SELECT id FROM task WHERE id = ?', (task_id,))
+            if not cursor.fetchone():
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在"
+                )
+
+            # 删除任务
+            cursor.execute('DELETE FROM task WHERE id = ?', (task_id,))
+            conn.commit()
+
+            return ResponseHandler.success(msg="删除任务成功")
+
+        except Exception as e:
+            print(f"删除任务失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"删除任务失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+
+    # admin接口
+    def get_player_tasks(self, page=1, limit=20):
+        """获取玩家任务列表，支持分页"""
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+
+            # 获取总数
+            cursor.execute('SELECT COUNT(*) FROM player_task')
+            total = cursor.fetchone()[0]
+
+            # 计算偏移量
+            offset = (page - 1) * limit
+
+            # 获取分页数据
+            cursor.execute('''
+                SELECT 
+                    pt.id,
+                    pt.player_id,
+                    pt.task_id,
+                    t.name as task_name,
+                    pt.starttime,
+                    pt.endtime,
+                    pt.status,
+                    pt.complete_time,
+                    pt.comment
+                FROM player_task pt 
+                LEFT JOIN task t ON pt.task_id = t.id 
+                ORDER BY pt.id DESC 
+                LIMIT ? OFFSET ?
+            ''', (limit, offset))
+
+            tasks = []
+            for row in cursor.fetchall():
+                tasks.append({
+                    'id': row['id'],
+                    'player_id': row['player_id'],
+                    'task_id': row['task_id'],
+                    'task_name': row['task_name'],
+                    'starttime': row['starttime'],
+                    'endtime': row['endtime'],
+                    'status': row['status'],
+                    'complete_time': row['complete_time'],
+                    'comment': row['comment']
+                })
+
+            return ResponseHandler.success(
+                data={
+                    'tasks': tasks,
+                    'total': total,
+                    'page': page,
+                    'limit': limit
+                },
+                msg="获取玩家任务列表成功"
+            )
+
+        except Exception as e:
+            print(f"获取玩家任务列表失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取玩家任务列表失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def get_player_task(self, task_id):
+        """获取单个玩家任务详情"""
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+
+            # 明确指定字段顺序
+            cursor.execute('''
+                SELECT 
+                    pt.id,
+                    pt.player_id,
+                    pt.task_id,
+                    t.name as task_name,
+                    pt.starttime,
+                    pt.endtime,
+                    pt.status,
+                    pt.complete_time,
+                    pt.comment
+                FROM player_task pt 
+                LEFT JOIN task t ON pt.task_id = t.id 
+                WHERE pt.id = ?
+            ''', (task_id,))
+
+            row = cursor.fetchone()
+            if not row:
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在"
+                )
+
+            # 使用字典构造确保字段顺序
+            task = {
+                'id': row['id'],
+                'player_id': row['player_id'],
+                'task_id': row['task_id'],
+                'task_name': row['task_name'],
+                'starttime': row['starttime'],
+                'endtime': row['endtime'],
+                'status': row['status'],
+                'complete_time': row['complete_time'],
+                'comment': row['comment']
+            }
+
+            return ResponseHandler.success(
+                data=task,
+                msg="获取玩家任务详情成功"
+            )
+
+        except Exception as e:
+            print(f"获取玩家任务详情失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取玩家任务详情失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def create_player_task(self, data):
+        """创建玩家任务"""
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+
+            # 验证必要字段
+            required_fields = ['player_id', 'task_id']
+            for field in required_fields:
+                if field not in data:
+                    return ResponseHandler.error(
+                        code=StatusCode.PARAM_ERROR,
+                        msg=f"缺少必要字段: {field}"
+                    )
+
+            # 设置默认值
+            starttime = data.get('starttime', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            status = data.get('status', 'available')
+
+            cursor.execute('''
+                INSERT INTO player_task (
+                    player_id, task_id, starttime, endtime,
+                    status, complete_time, comment
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data['player_id'],
+                data['task_id'],
+                starttime,
+                data.get('endtime'),
+                status,
+                data.get('complete_time'),
+                data.get('comment')
+            ))
+
+            task_id = cursor.lastrowid
+            conn.commit()
+
+            return ResponseHandler.success(
+                data={'id': task_id},
+                msg="创建玩家任务成功"
+            )
+
+        except Exception as e:
+            print(f"创建玩家任务失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"创建玩家任务失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def update_player_task(self, task_id, data):
+        """更新玩家任务"""
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+
+            # 检查任务是否存在
+            cursor.execute('SELECT id FROM player_task WHERE id = ?', (task_id,))
+            if not cursor.fetchone():
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在"
+                )
+
+            # 明确指定更新字段的顺序
+            update_query = '''
+                UPDATE player_task
+                SET player_id = ?,
+                    task_id = ?,
+                    starttime = ?,
+                    endtime = ?,
+                    status = ?,
+                    complete_time = ?,
+                    comment = ?
+                WHERE id = ?
+            '''
+
+            # 确保参数顺序与SQL字段顺序一致
+            params = (
+                data.get('player_id'),
+                data.get('task_id'),
+                data.get('starttime'),
+                data.get('endtime'),
+                data.get('status'),
+                data.get('complete_time'),
+                data.get('comment'),
+                task_id
+            )
+
+            cursor.execute(update_query, params)
+            conn.commit()
+
+            # 获取更新后的数据
+            cursor.execute('''
+                SELECT 
+                    pt.id,
+                    pt.player_id,
+                    pt.task_id,
+                    t.name as task_name,
+                    pt.starttime,
+                    pt.endtime,
+                    pt.status,
+                    pt.complete_time,
+                    pt.comment
+                FROM player_task pt 
+                LEFT JOIN task t ON pt.task_id = t.id 
+                WHERE pt.id = ?
+            ''', (task_id,))
+
+            row = cursor.fetchone()
+            updated_data = {
+                'id': row['id'],
+                'player_id': row['player_id'],
+                'task_id': row['task_id'],
+                'task_name': row['task_name'],
+                'starttime': row['starttime'],
+                'endtime': row['endtime'],
+                'status': row['status'],
+                'complete_time': row['complete_time'],
+                'comment': row['comment']
+            }
+
+            return ResponseHandler.success(
+                data=updated_data,
+                msg="更新玩家任务成功"
+            )
+
+        except Exception as e:
+            print(f"更新玩家任务失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"更新玩家任务失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def delete_player_task(self, task_id):
+        """删除玩家任务"""
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+
+            cursor.execute('DELETE FROM player_task WHERE id = ?', (task_id,))
+            
+            if cursor.rowcount == 0:
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在"
+                )
+
+            conn.commit()
+            return ResponseHandler.success(msg="删除玩家任务成功")
+
+        except Exception as e:
+            print(f"删除玩家任务失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"删除玩家任务失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
 task_service = TaskService() 

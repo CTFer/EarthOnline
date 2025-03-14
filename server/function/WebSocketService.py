@@ -1,6 +1,6 @@
 """
 WebSocket服务模块
-处理WebSocket连接和实时消息推送
+处理WebSocket连接和实时通信
 """
 import logging
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -22,32 +22,31 @@ class WebSocketService:
     def __init__(self):
         """初始化WebSocket服务"""
         if not hasattr(self, 'initialized'):
-            self.socketio = None
-            self.initialized = True
-            
-    def init_app(self, app, **kwargs) -> None:
-        """初始化SocketIO"""
-        logger.info("[WebSocket] 开始初始化WebSocket服务")
-        try:
-            # 简化的基础配置
-            config = {
-                'cors_allowed_origins': '*',  # 允许所有来源
+            # 优化的WebSocket配置
+            socketio_config = {
+                'cors_allowed_origins': '*',
                 'async_mode': 'eventlet',
-                'ping_timeout': 20000,
-                'ping_interval': 25000,
-                'max_http_buffer_size': 1e8,
-                'manage_session': True,
-                'transports': ['websocket', 'polling']
+                'ping_timeout': 10,  # 减少ping超时时间
+                'ping_interval': 25,  # 适当增加ping间隔
+                'max_http_buffer_size': 10e6,  # 限制缓冲区大小为10MB
+                'manage_session': False,  # 禁用会话管理以提高性能
+                'transports': ['websocket'],  # 只使用websocket传输
+                'always_connect': True,  # 保持连接
+                'async_handlers': True,  # 异步处理
+                'message_queue_maxsize': 10000,  # 消息队列最大大小
+                'engineio_logger': False  # 关闭引擎日志
             }
             
-            logger.info(f"[WebSocket] 使用配置: {config}")
+            logger.info("[WebSocket] 开始初始化WebSocket服务")
+            logger.info(f"[WebSocket] 使用配置: {socketio_config}")
             
-            self.socketio = SocketIO(app, **config)
-            self._register_handlers()
+            self.socketio = SocketIO(**socketio_config)
+            self.initialized = True
             logger.info("[WebSocket] WebSocket服务初始化完成")
-        except Exception as e:
-            logger.error(f"[WebSocket] 初始化WebSocket服务失败: {str(e)}", exc_info=True)
-            raise
+            
+    def init_app(self, app):
+        """将WebSocket服务与Flask应用关联"""
+        self.socketio.init_app(app)
         
     def _register_handlers(self) -> None:
         """注册WebSocket事件处理器"""
@@ -106,16 +105,12 @@ class WebSocketService:
             logger.debug(f"[WebSocket] 收到ping: {request.sid}")
             emit('pong', {'timestamp': time.time()})
 
-    def emit(self, event: str, data: Dict[str, Any], **kwargs) -> None:
-        """发送WebSocket消息"""
+    def emit(self, event, data, room=None):
+        """发送WebSocket事件"""
         try:
-            if self.socketio:
-                logger.debug(f"[WebSocket] 发送消息: event={event}, data={data}, kwargs={kwargs}")
-                self.socketio.emit(event, data, **kwargs)
-            else:
-                logger.error("[WebSocket] SocketIO未初始化")
+            self.socketio.emit(event, data, room=room)
         except Exception as e:
-            logger.error(f"[WebSocket] 发送消息失败: {str(e)}", exc_info=True)
+            logger.error(f"[WebSocket] 发送事件失败: {str(e)}")
 
     def broadcast_task_update(self, player_id: int, task_data: Dict[str, Any]) -> None:
         """向指定用户广播任务更新"""

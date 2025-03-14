@@ -10,12 +10,16 @@ import serial
 import serial.tools.list_ports
 from ndef import message, record, UriRecord, TextRecord, message_encoder
 import re
-
+from utils.response_handler import ResponseHandler, StatusCode
+from config.config import ENV
+if ENV == 'local':
+    from function.NFC_Device import NFC_Device
 
 logger = logging.getLogger(__name__)
 
 class NFCService:
     _instance = None
+    _nfc_device = None
     
     def __new__(cls):
         if cls._instance is None:
@@ -29,14 +33,486 @@ class NFCService:
                 'database', 
                 'game.db'
             )
-            self.serial_port = None
-            self.initialized = False
-  
+            self.initialized = True
+            
     def get_db(self):
         """获取数据库连接"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
+
+    def get_nfc_device(self):
+        """获取或创建NFC设备实例"""
+        try:
+            if self._nfc_device is None and ENV == 'local':
+                print("[NFC] 创建新的NFC设备实例")
+                self._nfc_device = NFC_Device()
+            
+            # 确保设备已初始化
+            if self._nfc_device and not self._nfc_device.initialized:
+                print("[NFC] 尝试初始化设备")
+                if not self._nfc_device.auto_detect_device():
+                    print("[NFC] 设备初始化失败")
+                    return None
+            else:
+                print("[NFC] 设备已初始化") 
+            return self._nfc_device
+            
+        except Exception as e:
+            print(f"[NFC] 获取设备实例失败: {str(e)}")
+            return None
+
+    def get_nfc_cards(self):
+        """获取NFC卡片列表"""
+        try:
+            print("[NFC] 获取NFC卡片列表")
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 获取最大的card_id
+            cursor.execute('SELECT MAX(card_id) FROM NFC_card')
+            max_id = cursor.fetchone()[0] or 0
+            print(f"[NFC] 当前最大card_id: {max_id}")
+            
+            # 获取所有卡片数据
+            cursor.execute('''
+                SELECT 
+                    card_id, type, id, value, addtime,
+                    status, description, device
+                FROM NFC_card
+                ORDER BY addtime DESC
+            ''')
+            
+            cards = []
+            for row in cursor.fetchall():
+                card = {
+                    'card_id': row[0],
+                    'type': row[1],
+                    'id': row[2],
+                    'value': row[3],
+                    'addtime': row[4],
+                    'status': row[5],
+                    'description': row[6],
+                    'device': row[7]
+                }
+                print(f"[NFC] 获取到卡片: {card}")
+                cards.append(card)
+                
+            print(f"[NFC] 成功获取 {len(cards)} 张卡片")
+            
+            return ResponseHandler.success(
+                data={
+                    'cards': cards,
+                    'next_card_id': max_id  # 添加next_card_id字段
+                },
+                msg="获取NFC卡片列表成功"
+            )
+            
+        except Exception as e:
+            print(f"[NFC] 获取卡片列表失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取卡片列表失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def create_nfc_card(self, data):
+        """创建新NFC卡片"""
+        try:
+            print(f"接收到的NFC卡片创建数据: {data}")
+            current_time = int(time.time())
+            
+            # 验证必填字段
+            required_fields = ['type', 'id', 'value']
+            for field in required_fields:
+                if field not in data:
+                    print(f"缺少必填字段: {field}")
+                    return ResponseHandler.error(
+                        code=StatusCode.PARAM_ERROR,
+                        msg=f"缺少必填字段: {field}"
+                    )
+            
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 获取最大的 card_id
+            cursor.execute('SELECT MAX(card_id) FROM NFC_card')
+            result = cursor.fetchone()
+            next_card_id = 1 if result[0] is None else result[0] + 1
+            print(f"生成的新card_id: {next_card_id}")
+            
+            # 准备插入数据
+            insert_data = {
+                'card_id': next_card_id,
+                'type': data['type'],
+                'id': data['id'],
+                'value': data['value'],
+                'addtime': current_time,
+                'status': 'UNLINK',
+                'description': data.get('description', ''),
+                'device': data.get('device', '')
+            }
+            print(f"准备插入的数据: {insert_data}")
+            
+            cursor.execute('''
+                INSERT INTO NFC_card (
+                    card_id, type, id, value, addtime, 
+                    status, description, device
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                insert_data['card_id'],
+                insert_data['type'],
+                insert_data['id'],
+                insert_data['value'],
+                insert_data['addtime'],
+                insert_data['status'],
+                insert_data['description'],
+                insert_data['device']
+            ))
+            
+            conn.commit()
+            
+            # 验证插入是否成功
+            cursor.execute('SELECT * FROM NFC_card WHERE card_id = ?', (next_card_id,))
+            inserted_data = cursor.fetchone()
+            print(f"插入后的数据验证: {dict(inserted_data) if inserted_data else None}")
+            
+            return ResponseHandler.success(
+                data={'card_id': next_card_id},
+                msg="创建NFC卡片成功"
+            )
+            
+        except Exception as e:
+            print(f"创建NFC卡片失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"创建NFC卡片失败: {str(e)}"
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    def update_nfc_card(self, card_id, data):
+        """更新NFC卡片"""
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            update_fields = []
+            params = []
+            
+            # 构建更新字段
+            if 'status' in data:
+                update_fields.append('status = ?')
+                params.append(data['status'])
+            if 'description' in data:
+                update_fields.append('description = ?')
+                params.append(data['description'])
+            if 'device' in data:
+                update_fields.append('device = ?')
+                params.append(data['device'])
+                
+            if not update_fields:
+                return ResponseHandler.error(
+                    code=StatusCode.PARAM_ERROR,
+                    msg="没有要更新的字段"
+                )
+                
+            params.append(card_id)
+            
+            cursor.execute(f'''
+                UPDATE NFC_card 
+                SET {', '.join(update_fields)}
+                WHERE card_id = ?
+            ''', params)
+            
+            if cursor.rowcount == 0:
+                return ResponseHandler.error(
+                    code=StatusCode.NOT_FOUND,
+                    msg="卡片不存在"
+                )
+                
+            conn.commit()
+            
+            return ResponseHandler.success(msg="更新NFC卡片成功")
+            
+        except Exception as e:
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"更新NFC卡片失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def delete_nfc_card(self, card_id):
+        """删除NFC卡片"""
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            cursor.execute('DELETE FROM NFC_card WHERE card_id = ?', (card_id,))
+            
+            if cursor.rowcount == 0:
+                return ResponseHandler.error(
+                    code=StatusCode.NOT_FOUND,
+                    msg="卡片不存在"
+                )
+                
+            conn.commit()
+            
+            return ResponseHandler.success(msg="删除NFC卡片成功")
+            
+        except Exception as e:
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"删除NFC卡片失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def get_next_card_id(self):
+        """获取下一个可用的NFC卡片ID"""
+        try:
+            print("[NFC] 获取下一个可用卡片ID")
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 获取最大的card_id
+            cursor.execute('SELECT MAX(card_id) FROM NFC_card')
+            result = cursor.fetchone()
+            next_id = 1 if result[0] is None else result[0] + 1
+            
+            print(f"[NFC] 下一个可用ID: {next_id}")
+            return ResponseHandler.success(
+                data={'next_id': next_id},
+                msg="获取下一个可用卡片ID成功"
+            )
+            
+        except Exception as e:
+            print(f"[NFC] 获取下一个卡片ID失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取下一个卡片ID失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def get_card_status(self, card_id):
+        """获取指定NFC卡片的状态"""
+        try:
+            print(f"[NFC] 获取卡片状态: {card_id}")
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT status FROM NFC_card WHERE card_id = ?', (card_id,))
+            result = cursor.fetchone()
+            
+            if result:
+                print(f"[NFC] 卡片状态: {result['status']}")
+                return ResponseHandler.success(
+                    data={'status': result['status']},
+                    msg="获取卡片状态成功"
+                )
+            else:
+                print(f"[NFC] 卡片不存在: {card_id}")
+                return ResponseHandler.error(
+                    code=StatusCode.NOT_FOUND,
+                    msg="卡片不存在"
+                )
+                
+        except Exception as e:
+            print(f"[NFC] 获取卡片状态失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取卡片状态失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def get_hardware_status(self):
+        """获取NFC硬件设备状态"""
+        if ENV == 'prod':
+            return ResponseHandler.success(
+                msg='NFC功能已关闭',
+                data=None
+            )
+        try:
+            print("[NFC] 检查设备状态")
+            nfc_device = self.get_nfc_device()
+            
+            # 自动检测设备
+            is_connected = nfc_device.auto_detect_device()
+            print(f"[NFC Hardware] 设备连接状态: {'已连接' if is_connected else '未连接'}")
+            
+            # 获取端口信息
+            port_info = ""
+            if is_connected and nfc_device.serial_port:
+                port_info = nfc_device.serial_port.port
+                print(f"[NFC Hardware] 当前使用端口: {port_info}")
+            
+            # 构建状态信息
+            status = {
+                'device_connected': is_connected,
+                'port': port_info,
+                'card_present': False,  # 默认无卡
+                'card_id': None  # 添加card_id字段
+            }
+            
+            # 如果设备已连接，检查卡片状态
+            if is_connected:
+                try:
+                    card_id = nfc_device.read_card_id()
+                    print(f"[NFC Hardware] 读取到卡片ID: {card_id}")
+                    if card_id and isinstance(card_id, str):  # 确保card_id是有效的字符串
+                        status['card_present'] = True
+                        status['card_id'] = card_id
+                        print(f"[NFC Hardware] 卡片状态: 已检测到卡片 (ID: {card_id})")
+                    else:
+                        print("[NFC Hardware] 卡片状态: 未检测到卡片")
+                except Exception as e:
+                    print(f"[NFC Hardware] 读取卡片ID失败: {str(e)}")
+                    status['card_present'] = False
+                    status['card_id'] = None
+                
+            return ResponseHandler.success(
+                data=status,
+                msg="获取设备状态成功"
+            )
+            
+        except Exception as e:
+            print(f"[NFC Hardware] 获取设备状态失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取设备状态失败: {str(e)}"
+            )
+
+    def read_hardware(self):
+        """读取NFC实体卡片"""
+        if ENV == 'prod':
+            return ResponseHandler.success(
+                msg='NFC功能已关闭',
+                data=None
+            )
+        print("[NFC] 开始读取卡片数据")
+        
+        nfc_device = self.get_nfc_device()
+        if nfc_device is None:
+            return ResponseHandler.error(
+                code=StatusCode.DEVICE_ERROR,
+                msg='NFC设备未初始化'
+            )
+
+        try:
+            # 读取卡片数据
+            card_data = nfc_device.read_all_card_data()
+            if not card_data:
+                return ResponseHandler.error(
+                    code=StatusCode.DEVICE_ERROR,
+                    msg='未检测到卡片或读取失败'
+                )
+                
+            print(f"[NFC] 读取到数据: {card_data}")
+            
+            # 解析数据
+            parsed_data = nfc_device.parse_nfc_data(card_data)
+            print(f"[NFC] 解析数据: {parsed_data}")
+            if not parsed_data:
+                return ResponseHandler.error(
+                    code=StatusCode.DEVICE_ERROR,
+                    msg='数据解析失败'
+                )
+                
+            return ResponseHandler.success(
+                data={
+                    'raw_data': card_data.upper(),
+                    'url': parsed_data['url'],
+                    'params': parsed_data['params'],
+                    'raw_ascii': parsed_data['ascii'],
+                },
+                msg="读取卡片成功"
+            )
+            
+        except Exception as e:
+            print(f"[NFC] 读取错误: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.DEVICE_ERROR,
+                msg=f'读卡错误: {str(e)}'
+            )
+
+    def write_hardware(self, data):
+        """写入NFC实体卡片"""
+        if ENV == 'prod':
+            return ResponseHandler.success(
+                msg='NFC功能已关闭',
+                data=None
+            )
+        print("[NFC] 开始写入卡片数据")
+        
+        nfc_device = self.get_nfc_device()
+        if nfc_device is None:
+            print("[NFC Write] 无法获取设备实例")
+            return ResponseHandler.error(
+                code=StatusCode.DEVICE_ERROR,
+                msg='NFC设备未初始化'
+            )
+
+        if not data or 'data' not in data:
+            return ResponseHandler.error(
+                code=StatusCode.PARAM_ERROR,
+                msg='写入数据不能为空'
+            )
+
+        try:
+            # 写入前检查卡片状态
+            card_id = nfc_device.read_card_id()
+            if not card_id:
+                return ResponseHandler.error(
+                    code=StatusCode.DEVICE_ERROR,
+                    msg='未检测到卡片'
+                )
+
+            print(f"[NFC] 写入数据: {data}")
+            hex_data = nfc_device.format_ascii_to_hex(data['data'])
+            
+            # 写入数据
+            if nfc_device._write_ntag_data(hex_data):
+                print(f"[NFC] 写入成功: {hex_data}")
+                
+                # 写入后立即读取验证
+                read_data = nfc_device.read_card_data_by_page()
+                if not read_data:
+                    return ResponseHandler.error(
+                        code=StatusCode.DEVICE_ERROR,
+                        msg='写入后验证失败：无法读取数据'
+                    )
+                    
+                # 验证写入的数据
+                if hex_data.rstrip('0').upper() in read_data.upper():
+                    return ResponseHandler.success(
+                        data={
+                            'hex_data': hex_data,
+                            'verified': True
+                        },
+                        msg="写入成功"
+                    )
+                else:
+                    return ResponseHandler.error(
+                        code=StatusCode.DEVICE_ERROR,
+                        msg='写入验证失败：数据不匹配'
+                    )
+            else:
+                print("[NFC] 写入失败")
+                return ResponseHandler.error(
+                    code=StatusCode.DEVICE_ERROR,
+                    msg='写入失败'
+                )
+        except Exception as e:
+            print(f"[NFC] 写入错误: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f'写入异常: {str(e)}'
+            )
 
     def handle_nfc_card(self, card_id, player_id, socketio):
         """处理NFC卡片扫描"""
@@ -615,8 +1091,5 @@ class NFCService:
             }), 500
         finally:
             conn.close()
-
-
-
 
 nfc_service = NFCService()

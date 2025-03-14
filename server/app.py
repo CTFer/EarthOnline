@@ -7,9 +7,9 @@ from eventlet import wsgi
 from eventlet import listen
 
 # 配置wsgi参数
-wsgi.MAX_HEADER_LINE = 32768  # 增加最大请求头大小
-wsgi.MINIMUM_CHUNK_SIZE = 8192  # 优化块大小
-wsgi.MAX_REQUEST_LINE = 8192  # 优化请求行大小
+wsgi.MAX_HEADER_LINE = 65536  # 增加最大请求头大小
+wsgi.MINIMUM_CHUNK_SIZE = 16384  # 优化块大小
+wsgi.MAX_REQUEST_LINE = 16384  # 优化请求行大小
 
 import traceback
 import uuid
@@ -32,7 +32,7 @@ from function.TaskService import task_service
 from function.GPSService import gps_service
 from function.RoadmapService import roadmap_service
 from function.WeChatService import wechat_service
-from function.LogService import log_service  # 导入日志服务
+from utils.LogService import log_service  # 导入日志服务
 from function.SchedulerService import scheduler_service  # 导入调度器服务
 from function.ServerService import server_service  # 导入服务器管理服务
 from function.WebSocketService import websocket_service
@@ -66,13 +66,27 @@ from function.RateLimitService import rate_limit_service
 logger = log_service.setup_logging(DEBUG)
 
 app = Flask(__name__, static_folder='static')
+
+# 优化应用配置
+app.config.update(
+    SEND_FILE_MAX_AGE_DEFAULT=31536000,  # 静态文件缓存1年
+    MAX_CONTENT_LENGTH=50 * 1024 * 1024,  # 最大请求体大小50MB
+    JSONIFY_PRETTYPRINT_REGULAR=False,  # 禁用JSON美化
+    JSON_SORT_KEYS=False,  # 禁用JSON键排序
+    PROPAGATE_EXCEPTIONS=True,  # 传播异常
+    TRAP_HTTP_EXCEPTIONS=True,  # 捕获HTTP异常
+    TRAP_BAD_REQUEST_ERRORS=True,  # 捕获错误请求
+    PREFERRED_URL_SCHEME='https' if HTTPS_ENABLED else 'http'  # 首选URL方案
+)
+
 # 配置CORS允许所有来源
 CORS(app, resources={
     r"/*": {
         "origins": "*",
         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "supports_credentials": True
+        "supports_credentials": True,
+        "max_age": 3600  # 预检请求缓存1小时
     }
 })
 
@@ -114,13 +128,17 @@ socketio = SocketIO(
     app,
     cors_allowed_origins="*",
     async_mode='eventlet',
-    ping_timeout=5,  # 减少ping超时时间
-    ping_interval=10,  # 减少ping间隔
-    max_http_buffer_size=1e6,  # 限制缓冲区大小为1MB
+    ping_timeout=10,  # 减少ping超时时间
+    ping_interval=25,  # 适当增加ping间隔
+    max_http_buffer_size=10e6,  # 限制缓冲区大小为10MB
     manage_session=False,  # 禁用会话管理以提高性能
     transports=['websocket'],  # 只使用websocket传输
     http_compression=True,  # 启用HTTP压缩
-    websocket_compression=True  # 启用WebSocket压缩
+    websocket_compression=True,  # 启用WebSocket压缩
+    always_connect=True,  # 保持连接
+    async_handlers=True,  # 异步处理
+    message_queue_maxsize=10000,  # 消息队列最大大小
+    engineio_logger=False  # 关闭引擎日志
 )
 
 # 初始化日志服务的WebSocket
@@ -915,6 +933,8 @@ if __name__ == '__main__':
         def check_port(port):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)  # 启用keepalive
+                s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # 启用TCP_NODELAY
                 try:
                     s.bind((SERVER_IP, port))
                     return True

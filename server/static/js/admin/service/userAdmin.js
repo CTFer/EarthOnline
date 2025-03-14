@@ -126,6 +126,9 @@ class UserAdmin {
    * 显示添加用户表单
    */
   showAddUserForm() {
+    // 重置表单
+    $("#userForm form")[0].reset();
+    
     this.layer.open({
       type: 1,
       title: "添加用户",
@@ -141,7 +144,7 @@ class UserAdmin {
           return;
         }
 
-        fetch("/admin/api/users", {
+        fetch("/admin/api/adduser", {  // 修改为正确的API路径
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -153,8 +156,8 @@ class UserAdmin {
         })
           .then((response) => response.json())
           .then((result) => {
-            if (result.error) {
-              throw new Error(result.error);
+            if (result.code !== 0) {  // 修改错误判断逻辑
+              throw new Error(result.msg || "添加失败");
             }
             this.layer.msg("添加成功");
             this.layer.close(index);
@@ -247,11 +250,20 @@ class UserAdmin {
   }
   // 编辑用户
   editUser(id) {
+    // 重置表单
+    $("#userForm form")[0].reset();
+    
     fetch(`/admin/api/users/${id}`)
       .then((response) => response.json())
-      .then((user) => {
+      .then((result) => {
+        if (result.code !== 0) {
+          throw new Error(result.msg || "获取用户信息失败");
+        }
+        
+        const user = result.data;
+        // 填充表单数据
         $('input[name="username"]').val(user.username);
-        $('input[name="password"]').val("");
+        $('input[name="password"]').val(""); // 密码框置空
 
         this.layer.open({
           type: 1,
@@ -262,8 +274,13 @@ class UserAdmin {
           yes: (index) => {
             const formData = {
               username: $('input[name="username"]').val(),
-              password: $('input[name="password"]').val(),
             };
+            
+            // 如果输入了新密码，则添加到请求数据中
+            const newPassword = $('input[name="password"]').val();
+            if (newPassword) {
+              formData.password = newPassword;
+            }
 
             fetch(`/admin/api/users/${id}`, {
               method: "PUT",
@@ -274,8 +291,8 @@ class UserAdmin {
             })
               .then((response) => response.json())
               .then((result) => {
-                if (result.error) {
-                  throw new Error(result.error);
+                if (result.code !== 0) {  // 修改错误判断逻辑
+                  throw new Error(result.msg || "更新失败");
                 }
                 this.layer.close(index);
                 this.layer.msg("更新成功");
@@ -286,6 +303,9 @@ class UserAdmin {
               });
           },
         });
+      })
+      .catch((error) => {
+        this.layer.msg("获取用户信息失败: " + error.message);
       });
   }
   /**

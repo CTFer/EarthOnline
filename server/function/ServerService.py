@@ -50,10 +50,10 @@ class ServerService:
             
             # 配置eventlet
             eventlet.monkey_patch()
-            # 设置wsgi参数
-            wsgi.MAX_HEADER_LINE = 32768
-            wsgi.MINIMUM_CHUNK_SIZE = 8192
-            wsgi.MAX_REQUEST_LINE = 8192
+            # 优化wsgi参数
+            wsgi.MAX_HEADER_LINE = 65536  # 增加最大请求头大小
+            wsgi.MINIMUM_CHUNK_SIZE = 16384  # 优化块大小
+            wsgi.MAX_REQUEST_LINE = 16384  # 优化请求行大小
 
     def setup_ssl(self, ssl_dir: str) -> Tuple[bool, Optional[ssl.SSLContext]]:
         """配置SSL上下文"""
@@ -202,7 +202,7 @@ class ServerService:
                 host=SERVER_IP,
                 port=PORT,
                 debug=True,  # HTTP服务器不需要debug模式
-                use_reloader=False  # 禁用reloader以避免与HTTPS服务器冲突
+                use_reloader=True  # 禁用reloader以避免与HTTPS服务器冲突
             )
         except Exception as e:
             logger.error(f"HTTP服务器启动失败: {str(e)}")
@@ -222,13 +222,13 @@ class ServerService:
                 'host': SERVER_IP,
                 'port': PORT,
                 'debug': DEBUG,
-                'use_reloader': False,
-                'log_output': False,
-                'max_connections': 1000,
-                'backlog': 2048,
-                'worker_connections': 10000,
-                'keepalive_timeout': 60,
-                'client_max_body_size': '10M'
+                'use_reloader': False,  # 禁用reloader提高性能
+                'log_output': True,
+                'max_connections': 5000,  # 增加最大连接数
+                'backlog': 4096,  # 增加等待队列
+                'worker_connections': 20000,  # 增加工作连接数
+                'keepalive_timeout': 30,  # 减少keepalive超时
+                'client_max_body_size': '50M'  # 增加最大请求体大小
             }
             
             # 更新配置
@@ -239,9 +239,9 @@ class ServerService:
             socketio_config = {
                 'cors_allowed_origins': '*',
                 'async_mode': 'eventlet',
-                'ping_timeout': 5,
-                'ping_interval': 10,
-                'max_http_buffer_size': 1e6,
+                'ping_timeout': 10,
+                'ping_interval': 25,
+                'max_http_buffer_size': 10e6,
                 'manage_session': False,
                 'transports': ['websocket'],
                 'http_compression': True,
@@ -256,21 +256,20 @@ class ServerService:
                     'path': CLOUDFLARE['websocket'].get('path', '/socket.io'),
                     'transports': ['websocket']
                 })
-
             # HTTPS模式配置
-            if ENV == 'local' and HTTPS_ENABLED:
-                # 本地开发环境使用自签名证书
-                ssl_success, ssl_context = self.setup_ssl(SSL_CERT_DIR)
-                if ssl_success:
-                    server_config.update({
-                        'port': HTTPS_PORT,
-                        'ssl_context': ssl_context,
-                        'ssl_version': ssl.PROTOCOL_TLSv1_2,  # 使用TLS 1.2
-                        'ciphers': 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384'  # 高性能密码套件
-                    })
-                else:
-                    logger.warning("SSL配置失败，回退到HTTP模式")
-                    server_config['port'] = PORT + 1
+            # if ENV == 'local' and HTTPS_ENABLED:
+            #     # 本地开发环境使用自签名证书
+            #     ssl_success, ssl_context = self.setup_ssl(SSL_CERT_DIR)
+            #     if ssl_success:
+            #         server_config.update({
+            #             'port': HTTPS_PORT,
+            #             'ssl_context': ssl_context,
+            #             'ssl_version': ssl.PROTOCOL_TLSv1_2,  # 使用TLS 1.2
+            #             'ciphers': 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384'  # 高性能密码套件
+            #         })
+            #     else:
+            #         logger.warning("SSL配置失败，回退到HTTP模式")
+            #         server_config['port'] = PORT + 1
 
             logger.info(f"[SocketIO] 服务器配置: {server_config}")
             logger.info(f"[SocketIO] SocketIO配置: {socketio_config}")
@@ -280,11 +279,14 @@ class ServerService:
                 if hasattr(socketio, key):
                     setattr(socketio, key, value)
             
-            # 创建eventlet工作线程池
-            pool = eventlet.GreenPool(1000)
+            # 创建更大的eventlet工作线程池
+            pool = eventlet.GreenPool(2000)
             
             # 启动服务器
-            sock = listen((server_config['host'], server_config['port']), backlog=server_config['backlog'])
+            sock = listen(
+                (server_config['host'], server_config['port']), 
+                backlog=server_config['backlog']
+            )
             
             # 如果是HTTPS模式，包装socket
             if 'ssl_context' in server_config:
@@ -302,7 +304,8 @@ class ServerService:
                 custom_pool=pool,
                 log_output=server_config['log_output'],
                 max_size=server_config['worker_connections'],
-                keepalive=server_config['keepalive_timeout']
+                keepalive=server_config['keepalive_timeout'],
+                socket_timeout=30  # 设置socket超时
             )
 
         except Exception as e:
@@ -327,12 +330,12 @@ class ServerService:
                         'port': HTTPS_PORT,
                         'debug': DEBUG,
                         'use_reloader': False,
-                        'log_output': False,
-                        'max_connections': 1000,
-                        'backlog': 2048,
-                        'worker_connections': 10000,
-                        'keepalive_timeout': 60,
-                        'client_max_body_size': '10M',
+                        'log_output': True,
+                        'max_connections': 5000,
+                        'backlog': 4096,
+                        'worker_connections': 20000,
+                        'keepalive_timeout': 30,
+                        'client_max_body_size': '50M',
                         'ssl_context': ssl_context
                     }
                     
@@ -342,6 +345,8 @@ class ServerService:
                         import socket
                         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                        s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)  # 启用keepalive
+                        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # 启用TCP_NODELAY
                         try:
                             s.bind((SERVER_IP, HTTPS_PORT))
                             s.close()
@@ -370,6 +375,8 @@ class ServerService:
                     import socket
                     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)  # 启用keepalive
+                    s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # 启用TCP_NODELAY
                     try:
                         s.bind((SERVER_IP, PORT))
                         s.close()

@@ -1,6 +1,6 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
- * @LastEditTime: 2025-02-25 14:49:41
+ * @LastEditTime: 2025-03-14 21:23:57
  * @LastEditors: 一根鱼骨棒
  * @Description: 管理后台主文件
  */
@@ -46,7 +46,6 @@ layui.use(["layer", "form", "element", "table"], function () {
     window.showAddSkillForm = skillAdmin.showAddSkillForm.bind(skillAdmin);
 
     // 初始化其他功能
-    loadApiDocs();
     initTaskPanel();
     initNFCOperations();
     initNFCStatusPanel();
@@ -63,30 +62,6 @@ layui.use(["layer", "form", "element", "table"], function () {
   });
 
 
-
-  // 加载API文档
-  async function loadApiDocs() {
-    try {
-      const response = await fetch("/admin/api/docs");
-      const result = await response.json();
-
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      const adminApis = result.data.filter((api) => api.path.startsWith("/admin"));
-      const gameApis = result.data.filter((api) => !api.path.startsWith("/admin"));
-
-      // 渲染管理API
-      document.getElementById("adminApiList").innerHTML = renderApiList(adminApis);
-
-      // 渲染游戏API
-      document.getElementById("gameApiList").innerHTML = renderApiList(gameApis);
-    } catch (error) {
-      console.error("加载API文档失败:", error);
-      layer.msg("加载API文档失败: " + error.message);
-    }
-  }
 
   function renderApiList(apis) {
     return apis
@@ -299,8 +274,8 @@ layui.use(["layer", "form", "element", "table"], function () {
         return {
           code: res.code,
           msg: res.msg,
-          count: res.count,
-          data: res.data,
+          count: res.data.total,
+          data: res.data.tasks
         };
       },
       done: function () {

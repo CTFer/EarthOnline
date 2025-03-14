@@ -230,32 +230,46 @@
         ],
       ],
       parseData: function (res) {
-        console.log("Parsing response data:", res);
+        console.log("原始响应数据:", res);
+        // 适配后端统一的响应格式
+        if (res.code === 0 && res.data && Array.isArray(res.data.tasks)) {
+          return {
+            code: res.code,
+            msg: res.msg,
+            count: res.data.total || 0,
+            data: res.data.tasks.map(function (item) {
+              return {
+                id: item.id,
+                player_id: item.player_id,
+                task_id: item.task_id,
+                task_name: item.task_name,
+                starttime: item.starttime,
+                endtime: item.endtime,
+                status: item.status,
+                complete_time: item.complete_time,
+                comment: item.comment || ''
+              };
+            })
+          };
+        }
+        // 如果数据格式不符合预期，返回空数据
         return {
-          code: res.code,
-          msg: res.msg,
-          count: res.count,
-          data: res.data.map(function (item) {
-            return {
-              id: item.id,
-              player_id: item.player_id,
-              task_id: item.task_id,
-              task_name: item.task_name,
-              starttime: item.starttime,
-              endtime: item.endtime,
-              status: item.status,
-              complete_time: item.complete_time,
-              comment: item.comment,
-            };
-          }),
+          code: res.code || -1,
+          msg: res.msg || '数据格式错误',
+          count: 0,
+          data: []
         };
       },
       page: true,
       limit: 20,
       limits: [10, 20, 50, 100],
       done: function (res) {
-        console.log("Table rendered:", res);
-        updateDebugInfo({ total: res.count, page: this.page });
+        console.log("表格渲染完成，数据:", res);
+        updateDebugInfo({ 
+          total: res.count, 
+          page: this.page,
+          dataLength: res.data ? res.data.length : 0 
+        });
         $(".layui-table-cell").css("height", "auto"); // 允许内容自动换行
       },
     });
@@ -388,7 +402,7 @@
 
     // 监听表单提交
     form.on("submit(saveEdit)", function (data) {
-      console.log("Form submit triggered:", data.field);
+      console.log("表单提交数据:", data.field);
       var formData = {
         id: data.field.id,
         player_id: parseInt(data.field.player_id),
@@ -400,7 +414,7 @@
         comment: data.field.comment,
       };
 
-      console.log("Submitting data:", formData);
+      console.log("处理后的提交数据:", formData);
 
       $.ajax({
         url: "/admin/api/player_tasks/" + formData.id,
@@ -408,10 +422,10 @@
         contentType: "application/json",
         data: JSON.stringify(formData),
         success: function (res) {
-          console.log("API response:", res);
+          console.log("API响应:", res);
           if (res.code === 0) {
             layer.closeAll();
-            layer.msg("保存成功");
+            layer.msg(res.msg || "保存成功");
             // 强制刷新表格数据
             table.reload("player-task-table", {
               url: "/admin/api/player_tasks?_t=" + new Date().getTime(),
@@ -420,11 +434,11 @@
               },
             });
           } else {
-            layer.msg("保存失败：" + res.msg);
+            layer.msg(res.msg || "保存失败");
           }
         },
         error: function (xhr) {
-          console.error("API error:", xhr);
+          console.error("API错误:", xhr);
           layer.msg("保存失败：" + (xhr.responseJSON?.msg || "未知错误"));
         },
       });
