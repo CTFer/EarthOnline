@@ -775,32 +775,6 @@ def delete_task(task_id):
     finally:
         conn.close()
 
-# 添加API文档路由
-
-
-@admin_bp.route('/api/docs', methods=['GET'])
-@admin_required
-def get_api_docs():
-    """获取API文档"""
-    try:
-        endpoints = api_registry.get_all_endpoints()
-        return json.dumps({
-            "data": [
-                {
-                    "path": endpoint.path,
-                    "method": endpoint.method,
-                    "description": endpoint.description,
-                    "auth_required": endpoint.auth_required,
-                    "parameters": endpoint.parameters,
-                    "response": endpoint.response
-                }
-                for endpoint in endpoints
-            ]
-        })
-    except Exception as e:
-        print(f"Error in get_api_docs: {str(e)}")
-        return json.dumps({'error': str(e)}), 500
-
 # 添加任务管理页面路由
 
 

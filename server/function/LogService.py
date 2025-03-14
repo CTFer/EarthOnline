@@ -11,6 +11,8 @@ from functools import wraps
 from typing import Dict, List, Optional, Callable
 from flask import request, jsonify
 from utils.response_handler import ResponseHandler, StatusCode
+import logging.handlers
+import queue
 
 class LogService:
     _instance = None
@@ -77,6 +79,10 @@ class LogService:
         
         # 清除现有的处理器
         logger.handlers = []
+        
+        # 使用内存队列处理日志
+        memory_handler = logging.handlers.QueueHandler(queue.Queue(-1))
+        logger.addHandler(memory_handler)
         
         # 添加处理器
         logger.addHandler(file_handler)

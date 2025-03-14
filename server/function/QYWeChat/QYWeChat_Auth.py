@@ -16,6 +16,7 @@ import base64
 import struct
 import random
 import string
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -84,15 +85,9 @@ class QYWeChatAuth:
         key = base64.b64decode(self.encoding_aes_key + '=')
         return AES.new(key, AES.MODE_CBC, iv=key[:16])
 
+    @lru_cache(maxsize=1000)
     def _generate_signature(self, token, timestamp, nonce, encrypt):
-        """
-        生成签名
-        :param token: 配置的Token
-        :param timestamp: 时间戳
-        :param nonce: 随机字符串
-        :param encrypt: 加密的消息体
-        :return: 签名字符串
-        """
+        """使用缓存优化签名生成"""
         sign_list = [token, timestamp, nonce]
         if encrypt:
             sign_list.append(encrypt)
@@ -101,40 +96,66 @@ class QYWeChatAuth:
         return hashlib.sha1(sign_str.encode('utf-8')).hexdigest()
         
     def decrypt_message(self, encrypted_msg):
-        """解密消息"""
+        """解密消息
+        解密后的格式：random(16B) + msg_len(4B) + msg + receiveid
+        返回msg字段的明文内容
+        """
         try:
-            # Base64解码
+            # 1. Base64解码
             encrypted_data = base64.b64decode(encrypted_msg)
+            logger.info(f"[QYWeChat] ============ 解密过程开始 ============")
+            logger.info(f"[QYWeChat] Base64解码后数据长度: {len(encrypted_data)} 字节")
             
-            # 创建解密器
-            cipher = self._create_cipher()
-            
-            # AES解密
+            # 2. AES解密
+            key = base64.b64decode(self.encoding_aes_key + '=')
+            cipher = AES.new(key, AES.MODE_CBC, iv=key[:16])
             decrypted_data = cipher.decrypt(encrypted_data)
+            logger.info(f"[QYWeChat] AES解密后数据长度: {len(decrypted_data)} 字节")
             
-            # 去除补位
+            # 3. 处理PKCS7填充
             pad = decrypted_data[-1]
             if not isinstance(pad, int):
                 pad = ord(pad)
             content = decrypted_data[:-pad]
+            logger.info(f"[QYWeChat] 去除PKCS7填充后数据长度: {len(content)} 字节")
             
-            # 获取消息长度
-            msg_len = struct.unpack('!I', content[16:20])[0]
+            # 4. 解析数据结构
+            logger.info(f"[QYWeChat] -------- 解密后数据结构 --------")
             
-            # 获取消息内容
+            # a) 16字节随机字符串(random)
+            random_str = content[:16]
+            logger.info(f"[QYWeChat] [字段1] random (16字节): {random_str.hex()}")
+            
+            # b) 4字节消息长度(msg_len)
+            msg_len = struct.unpack('>I', content[16:20])[0]
+            logger.info(f"[QYWeChat] [字段2] msg_len (4字节): {msg_len}")
+            
+            # c) 消息内容(msg)
             msg_content = content[20:20+msg_len]
+            try:
+                msg_text = msg_content.decode('utf-8')
+                logger.info(f"[QYWeChat] [字段3] msg (消息内容): {msg_text}")
+            except UnicodeDecodeError:
+                logger.info(f"[QYWeChat] [字段3] msg (消息内容,hex): {msg_content.hex()}")
             
-            # 获取企业ID
-            received_corp_id = content[20+msg_len:].decode('utf-8')
+            # d) 企业ID(receiveid)
+            receiveid = content[20+msg_len:].decode('utf-8')
+            logger.info(f"[QYWeChat] [字段4] receiveid (企业ID): {receiveid}")
+            logger.info(f"[QYWeChat] --------------------------------")
             
-            # 验证企业ID
-            if received_corp_id != self.corp_id:
-                raise ValueError("企业ID不匹配")
+            # 5. 验证企业ID
+            if receiveid != self.corp_id:
+                logger.error(f"[QYWeChat] 企业ID不匹配: 接收到 {receiveid}，期望 {self.corp_id}")
+                raise ValueError(f"企业ID不匹配: {receiveid} != {self.corp_id}")
+            
+            # 6. 直接返回消息内容(msg字段)，不做任何额外处理
+            logger.info(f"[QYWeChat] 解密成功，返回消息内容: {msg_text}")
+            logger.info(f"[QYWeChat] ============ 解密过程结束 ============")
+            return msg_text
                 
-            return msg_content.decode('utf-8')
-            
         except Exception as e:
-            logger.error(f"[QYWeChat] 消息解密失败: {str(e)}")
+            logger.error(f"[QYWeChat] 消息解密失败: {str(e)}", exc_info=True)
+            logger.info(f"[QYWeChat] ============ 解密过程异常结束 ============")
             raise
             
     def encrypt_message(self, reply_msg):
@@ -171,31 +192,45 @@ class QYWeChatAuth:
         :param timestamp: 时间戳
         :param nonce: 随机数
         :param echostr: 加密的随机字符串
-        :return: 解密后的echostr或None
+        :return: 解密后的echostr明文
         """
         try:
+            # 参数完整性检查
+            if not all([msg_signature, timestamp, nonce, echostr]):
+                logger.error("[QYWeChat] URL验证失败：缺少必要参数")
+                return None
+
             # 1. 验证签名
             signature = self._generate_signature(self.token, timestamp, nonce, echostr)
-            logger.info(f"[QYWeChat] 计算的签名: {signature}")
-            logger.info(f"[QYWeChat] 接收的签名: {msg_signature}")
+            logger.info(f"[QYWeChat] URL验证 - 接收参数:")
+            logger.info(f"[QYWeChat] - msg_signature: {msg_signature}")
+            logger.info(f"[QYWeChat] - timestamp: {timestamp}")
+            logger.info(f"[QYWeChat] - nonce: {nonce}")
+            logger.info(f"[QYWeChat] - echostr: {echostr}")
+            logger.info(f"[QYWeChat] - 计算得到的签名: {signature}")
             
-            if signature != msg_signature:
-                logger.error("[QYWeChat] URL验证失败：签名不匹配")
-                logger.debug(f"计算的签名: {signature}")
-                logger.debug(f"接收的签名: {msg_signature}")
+            if signature.lower() != msg_signature.lower():
+                logger.error(f"[QYWeChat] URL验证失败：签名不匹配 (计算值: {signature}, 接收值: {msg_signature})")
                 return None
                 
             # 2. 解密echostr
             try:
+                logger.info("[QYWeChat] 开始解密echostr...")
                 decrypted_str = self.decrypt_message(echostr)
-                logger.info("[QYWeChat] URL验证成功")
-                return decrypted_str
+                if not decrypted_str:
+                    logger.error("[QYWeChat] 解密结果为空")
+                    return None
+                    
+                logger.info(f"[QYWeChat] URL验证成功，解密后的echostr明文: {decrypted_str}")
+                # 确保返回的是字符串类型
+                return str(decrypted_str).strip()
+                
             except Exception as e:
-                logger.error(f"[QYWeChat] 解密echostr失败: {str(e)}")
+                logger.error(f"[QYWeChat] 解密echostr失败: {str(e)}", exc_info=True)
                 return None
-            
+                
         except Exception as e:
-            logger.error(f"[QYWeChat] URL验证异常: {str(e)}")
+            logger.error(f"[QYWeChat] URL验证异常: {str(e)}", exc_info=True)
             return None
 
     def get_encrypted_response(self, reply_msg, timestamp, nonce):

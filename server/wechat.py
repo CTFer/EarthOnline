@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from flask import Blueprint, request
+from flask import Blueprint, request, make_response
 import logging
 from function.WeChatService import wechat_service
 from function.QYWeChatService import qywechat_service
@@ -322,7 +322,6 @@ def qywechat():
     """
     try:
         # 获取通用参数
-        print(request.args)
         msg_signature = request.args.get('msg_signature', '')
         timestamp = request.args.get('timestamp', '')
         nonce = request.args.get('nonce', '')
@@ -334,17 +333,17 @@ def qywechat():
             logger.info(
                 f"[QYWeChat] 收到URL验证请求: msg_signature={msg_signature}, timestamp={timestamp}, nonce={nonce}, echostr={echostr}")
 
-            # 检查参数完整性
-            if not all([msg_signature, timestamp, nonce, echostr]):
-                logger.error("[QYWeChat] 缺少必要的请求参数")
-                return 'Missing parameters', 400
-
             # 验证URL
             decrypted_str = qywechat_service.verify_url(
                 msg_signature, timestamp, nonce, echostr)
             if decrypted_str:
                 logger.info("[QYWeChat] URL验证成功")
-                return decrypted_str
+                logger.info(f"[QYWeChat] 解密后的echostr明文: {decrypted_str}")
+                # 设置正确的响应头
+                response = make_response(decrypted_str)
+                response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+                response.headers['Cache-Control'] = 'no-cache'
+                return response
             else:
                 logger.warning("[QYWeChat] URL验证失败")
                 return 'Invalid signature', 403
@@ -355,9 +354,12 @@ def qywechat():
             logger.info(f"[QYWeChat] 收到消息推送: {xml_data}")
             
             # 使用企业微信服务处理加密消息
-            # 传入消息签名、时间戳和随机数用于验证和解密
             response = qywechat_service.handle_message(xml_data, msg_signature, timestamp, nonce)
-            return response
+            # 设置正确的响应头
+            resp = make_response(response)
+            resp.headers['Content-Type'] = 'application/xml; charset=utf-8'
+            resp.headers['Cache-Control'] = 'no-cache'
+            return resp
 
     except Exception as e:
         logger.error(f"[QYWeChat] 处理请求失败: {str(e)}", exc_info=True)

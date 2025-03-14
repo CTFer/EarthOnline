@@ -2,6 +2,15 @@
 import eventlet
 eventlet.monkey_patch()
 
+# 正确导入wsgi模块
+from eventlet import wsgi
+from eventlet import listen
+
+# 配置wsgi参数
+wsgi.MAX_HEADER_LINE = 32768  # 增加最大请求头大小
+wsgi.MINIMUM_CHUNK_SIZE = 8192  # 优化块大小
+wsgi.MAX_REQUEST_LINE = 8192  # 优化请求行大小
+
 import traceback
 import uuid
 import json
@@ -105,11 +114,13 @@ socketio = SocketIO(
     app,
     cors_allowed_origins="*",
     async_mode='eventlet',
-    ping_timeout=20,
-    ping_interval=25,
-    max_http_buffer_size=1e8,
-    manage_session=True,
-    transports=['websocket', 'polling']
+    ping_timeout=5,  # 减少ping超时时间
+    ping_interval=10,  # 减少ping间隔
+    max_http_buffer_size=1e6,  # 限制缓冲区大小为1MB
+    manage_session=False,  # 禁用会话管理以提高性能
+    transports=['websocket'],  # 只使用websocket传输
+    http_compression=True,  # 启用HTTP压缩
+    websocket_compression=True  # 启用WebSocket压缩
 )
 
 # 初始化日志服务的WebSocket
@@ -894,16 +905,42 @@ if __name__ == '__main__':
         logger.info("调度器服务启动成功")
     except Exception as e:
         logger.error(f"调度器服务启动失败: {str(e)}", exc_info=True)
+        sys.exit(1)
     
-    logger.info(f"服务器配置 - IP: {SERVER_IP}, 端口: {PORT}, 调试模式: {DEBUG}")
+    logger.info(f"服务器配置 - IP: {SERVER_IP}, 端口: {'%d(HTTPS)' % HTTPS_PORT if HTTPS_ENABLED else '%d(HTTP)' % PORT}, 调试模式: {DEBUG}")
     
     try:
+        # 确保没有其他进程占用端口
+        import socket
+        def check_port(port):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                try:
+                    s.bind((SERVER_IP, port))
+                    return True
+                except:
+                    return False
+        
+        # 检查需要使用的端口
+        target_port = HTTPS_PORT if HTTPS_ENABLED else PORT
+        if not check_port(target_port):
+            logger.error(f"{'HTTPS' if HTTPS_ENABLED else 'HTTP'}端口 {target_port} 已被占用")
+            sys.exit(1)
+            
         # 使用服务器管理服务启动服务器
-        server_service.start_server(app, websocket_service.socketio)
+        server_service.start_server(app, socketio)
+        
+    except KeyboardInterrupt:
+        logger.info("收到停止信号，正在关闭服务器...")
     except Exception as e:
-        logger.error(f"服务器启动失败: {str(e)}")
+        logger.error(f"服务器启动失败: {str(e)}", exc_info=True)
+        sys.exit(1)
     finally:
-        # 停止服务
-        scheduler_service.stop()
-        server_service.stop()
-        logger.info("服务器关闭完成")
+        try:
+            # 停止服务
+            scheduler_service.stop()
+            server_service.stop()
+            logger.info("服务器关闭完成")
+        except Exception as e:
+            logger.error(f"服务器关闭时发生错误: {str(e)}", exc_info=True)
+        sys.exit(0)
