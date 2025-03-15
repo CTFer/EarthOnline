@@ -6,12 +6,13 @@ import sqlite3
 import os
 import logging
 import time
+import math
 from config.config import *
 from datetime import datetime, timedelta
 import numpy as np
 from flask import request
 import json
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from utils.response_handler import ResponseHandler, StatusCode
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,78 @@ class GPSService:
             'database',
             'game.db'
         )
+
+    # 添加坐标转换相关方法
+    def _transformlat(self, lng: float, lat: float) -> float:
+        """WGS84 to GCJ02 纬度转换"""
+        ret = -100.0 + 2.0 * lng + 3.0 * lat + 0.2 * lat * lat + \
+            0.1 * lng * lat + 0.2 * math.sqrt(abs(lng))
+        ret += (20.0 * math.sin(6.0 * lng * math.pi) + 20.0 *
+                math.sin(2.0 * lng * math.pi)) * 2.0 / 3.0
+        ret += (20.0 * math.sin(lat * math.pi) + 40.0 *
+                math.sin(lat / 3.0 * math.pi)) * 2.0 / 3.0
+        ret += (160.0 * math.sin(lat / 12.0 * math.pi) + 320 *
+                math.sin(lat * math.pi / 30.0)) * 2.0 / 3.0
+        return ret
+
+    def _transformlng(self, lng: float, lat: float) -> float:
+        """WGS84 to GCJ02 经度转换"""
+        ret = 300.0 + lng + 2.0 * lat + 0.1 * lng * lng + \
+            0.1 * lng * lat + 0.1 * math.sqrt(abs(lng))
+        ret += (20.0 * math.sin(6.0 * lng * math.pi) + 20.0 *
+                math.sin(2.0 * lng * math.pi)) * 2.0 / 3.0
+        ret += (20.0 * math.sin(lng * math.pi) + 40.0 *
+                math.sin(lng / 3.0 * math.pi)) * 2.0 / 3.0
+        ret += (150.0 * math.sin(lng / 12.0 * math.pi) + 300.0 *
+                math.sin(lng / 30.0 * math.pi)) * 2.0 / 3.0
+        return ret
+
+    def out_of_china(self, lng: float, lat: float) -> bool:
+        """
+        判断是否在中国境内
+        
+        Args:
+            lng: 经度
+            lat: 纬度
+        Returns:
+            布尔值，True表示不在中国境内，False表示在中国境内
+        """
+        if lng < 72.004 or lng > 137.8347:
+            return True
+        if lat < 0.8293 or lat > 55.8271:
+            return True
+        return False
+
+    def wgs84_to_gcj02(self, lng: float, lat: float) -> Tuple[float, float]:
+        """
+        WGS84坐标系转GCJ02坐标系(火星坐标系)
+        
+        Args:
+            lng: WGS84坐标系的经度
+            lat: WGS84坐标系的纬度
+        Returns:
+            转换后的GCJ02坐标系的经度、纬度
+        """
+        # 定义常量
+        PI = 3.1415926535897932384626  # π
+        a = 6378245.0  # 长半轴
+        ee = 0.00669342162296594323  # 偏心率平方
+        
+        # 判断是否在中国境内
+        if self.out_of_china(lng, lat):
+            return lng, lat
+            
+        dlat = self._transformlat(lng - 105.0, lat - 35.0)
+        dlng = self._transformlng(lng - 105.0, lat - 35.0)
+        radlat = lat / 180.0 * PI
+        magic = math.sin(radlat)
+        magic = 1 - ee * magic * magic
+        sqrtmagic = math.sqrt(magic)
+        dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * PI)
+        dlng = (dlng * 180.0) / (a / sqrtmagic * math.cos(radlat) * PI)
+        mglat = lat + dlat
+        mglng = lng + dlng
+        return mglng, mglat
 
     def get_db(self):
         """获取数据库连接"""

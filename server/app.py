@@ -50,7 +50,8 @@ from config.config import (
     SSL_CERT_FILE,
     SSL_KEY_FILE,
     CLOUDFLARE,
-    SECURITY
+    SECURITY,
+    DOMAIN
 )
 from config.private import AMAP_SECURITY_JS_CODE, WECHAT_TOKEN, WECHAT_ENCODING_AES_KEY, WECHAT_APP_ID
 import requests
@@ -67,6 +68,28 @@ logger = log_service.setup_logging(DEBUG)
 
 app = Flask(__name__, static_folder='static')
 
+# 添加Cloudflare代理支持
+if CLOUDFLARE['enabled']:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=CLOUDFLARE['headers']['X-Forwarded-For'],
+        x_proto=CLOUDFLARE['headers']['X-Forwarded-Proto'],
+        x_host=CLOUDFLARE['headers']['X-Forwarded-Host'],
+        x_port=CLOUDFLARE['headers']['X-Forwarded-Port'],
+        x_prefix=CLOUDFLARE['headers']['X-Forwarded-Prefix']
+    )
+    # 强制设置 URL scheme 为 HTTPS
+    class SchemeEnforcingMiddleware:
+        def __init__(self, app):
+            self.app = app
+
+        def __call__(self, environ, start_response):
+            environ['wsgi.url_scheme'] = 'https'
+            return self.app(environ, start_response)
+
+    app.wsgi_app = SchemeEnforcingMiddleware(app.wsgi_app)
+
 # 优化应用配置
 app.config.update(
     SEND_FILE_MAX_AGE_DEFAULT=31536000,  # 静态文件缓存1年
@@ -76,7 +99,10 @@ app.config.update(
     PROPAGATE_EXCEPTIONS=True,  # 传播异常
     TRAP_HTTP_EXCEPTIONS=True,  # 捕获HTTP异常
     TRAP_BAD_REQUEST_ERRORS=True,  # 捕获错误请求
-    PREFERRED_URL_SCHEME='https' if HTTPS_ENABLED else 'http'  # 首选URL方案
+    PREFERRED_URL_SCHEME='https',  # 强制使用HTTPS
+    SESSION_COOKIE_SECURE=True,  # 只在HTTPS下发送cookie
+    SESSION_COOKIE_HTTPONLY=True,  # 防止JavaScript访问cookie
+    SESSION_COOKIE_SAMESITE='Lax'  # 设置SameSite属性
 )
 
 # 配置CORS允许所有来源
@@ -89,18 +115,6 @@ CORS(app, resources={
         "max_age": 3600  # 预检请求缓存1小时
     }
 })
-
-# 添加Cloudflare代理支持
-if CLOUDFLARE['enabled']:
-    from werkzeug.middleware.proxy_fix import ProxyFix
-    app.wsgi_app = ProxyFix(
-        app.wsgi_app,
-        x_for=CLOUDFLARE['headers']['X-Forwarded-For'],
-        x_proto=CLOUDFLARE['headers']['X-Forwarded-Proto'],
-        x_host=CLOUDFLARE['headers']['X-Forwarded-Host'],
-        x_port=CLOUDFLARE['headers']['X-Forwarded-Port'],
-        x_prefix=1
-    )
 
 # 获取项目根目录
 if getattr(sys, 'frozen', False):
@@ -124,22 +138,7 @@ app.register_blueprint(wechat_bp, url_prefix='/wechat')  # 注册微信蓝图
 websocket_service.init_app(app)
 
 # 配置 SocketIO
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    async_mode='eventlet',
-    ping_timeout=10,  # 减少ping超时时间
-    ping_interval=25,  # 适当增加ping间隔
-    max_http_buffer_size=10e6,  # 限制缓冲区大小为10MB
-    manage_session=False,  # 禁用会话管理以提高性能
-    transports=['websocket'],  # 只使用websocket传输
-    http_compression=True,  # 启用HTTP压缩
-    websocket_compression=True,  # 启用WebSocket压缩
-    always_connect=True,  # 保持连接
-    async_handlers=True,  # 异步处理
-    message_queue_maxsize=10000,  # 消息队列最大大小
-    engineio_logger=False  # 关闭引擎日志
-)
+socketio = websocket_service.socketio
 
 # 初始化日志服务的WebSocket
 log_service.init_websocket(websocket_service)
@@ -153,33 +152,8 @@ app.view_functions = {
 # 添加模板目录配置
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
 
-# WebSocket连接处理
-@websocket_service.socketio.on('connect')
-def handle_connect():
-    """处理WebSocket连接"""
-    print("Client connected")
-    emit('connected', {'status': 'success'})
-
-@websocket_service.socketio.on('subscribe_tasks')
-def handle_task_subscription(data):
-    """处理任务订阅"""
-    print(f"[WebSocket] Received subscription request: {data}")
-    player_id = data.get('player_id')
-    if player_id:
-        room = f'user_{player_id}'
-        join_room(room)
-        print(f"[WebSocket] User {player_id} joined room: {room}")
-        # 发送确认消息
-        emit('subscription_confirmed', {
-            'status': 'success',
-            'room': room
-        }, room=room)
-    else:
-        print(f"[WebSocket] Warning: Received subscribe_tasks without player_id")
-
-def broadcast_task_update(player_id, task_data):
-    """向指定用户广播任务更新"""
-    websocket_service.socketio.emit('task_update', task_data, room=f'user_{player_id}')
+# 注意：不再需要重复定义WebSocket事件处理器，因为它们已经在WebSocketService中定义
+# 以下是其他API路由
 
 @app.route('/api/player/<int:player_id>', methods=['GET'])
 @api_response
@@ -429,7 +403,7 @@ def handle_nfc_card():
         # 调用 NFC 服务处理
         from function.NFC_service import NFCService
         nfc_service = NFCService()
-        response, status_code = nfc_service.handle_nfc_card(card_id, player_id, websocket_service.socketio)
+        response, status_code = nfc_service.handle_nfc_card(card_id, player_id, socketio)
 
         print(f"[NFC API Debug] 处理结果: {json.dumps(response, ensure_ascii=False)}")
         print("[NFC API] ====== NFC卡片请求处理完成 ======\n")
@@ -442,7 +416,7 @@ def handle_nfc_card():
         print(f"[NFC API] 详细错误信息: ", traceback.format_exc())
 
         if 'player_id' in locals():
-            websocket_service.socketio.emit('nfc_task_update', {
+            socketio.emit('nfc_task_update', {
                 'type': 'ERROR',
                 'message': error_msg
             }, room=f'user_{player_id}')
@@ -470,7 +444,7 @@ def sync_gps_records():
 @app.route('/api/gps', methods=['POST'])
 @api_response
 def add_gps():
-    """添加GPS记录"""
+    """添加GPS记录,针对macroDroid"""
     try:
         data = json.loads(request.data)
         print(f"[GPS] 获取到数据: {data}") 
@@ -485,6 +459,15 @@ def add_gps():
                 code=StatusCode.GPS_DATA_INVALID,
                 msg='无效的位置数据格式'
             )
+            
+        # 将WGS84坐标转换为GCJ02坐标（高德地图坐标系）
+        try:
+            longitude, latitude = gps_service.wgs84_to_gcj02(longitude, latitude)
+            print(f"[GPS] 坐标转换结果 - 经度: {longitude}, 纬度: {latitude}")
+        except Exception as e:
+            print(f"[GPS] 坐标转换失败: {str(e)}")
+            # 即使转换失败也继续使用原始坐标
+            pass
 
         # 处理时间戳
         try:
@@ -519,7 +502,7 @@ def add_gps():
         if (response_data['code'] == 0 and 
             response_data['msg'] == '添加GPS记录成功' and 
             player_id):
-            # 添加速度和时间信息到推送数据中
+            # 添加完整的GPS数据到推送数据中
             socket_data = {
                 'x': longitude,
                 'y': latitude,
@@ -529,19 +512,23 @@ def add_gps():
                 'speed': gps_data['speed'],
                 'battery': data.get('battery', 0),
                 'timestamp': timestamp,
-                'accuracy': gps_data['accuracy']
+                'accuracy': gps_data['accuracy'],
+                'id': response_data['data']['id']  # 添加记录ID
             }
             
             print(f"[GPS] 发送新GPS点位更新通知: {socket_data}")
+            socketio.emit('gps_update', socket_data, room=f'user_{player_id}')
         else:
+            # 更新时间的情况
             socket_data = {
                 'speed': gps_data['speed'],
                 'battery': data.get('battery', 0),
                 'timestamp': timestamp,
-                'accuracy': gps_data['accuracy']
+                'accuracy': gps_data['accuracy'],
+                'id': response_data['data']['id']  # 添加记录ID
             }
             print(f"[GPS] 仅更新时间，发送电量、速度、更新时间：{socket_data}")
-        websocket_service.socketio.emit('gps_update', socket_data, room=f'user_{player_id}')    
+            socketio.emit('gps_update', socket_data, room=f'user_{player_id}')
         return response_data
 
     except Exception as e:
@@ -673,6 +660,13 @@ def sync_roadmap_data():
     """提供数据同步接口（仅在生产环境可用）"""
     return roadmap_service.sync_data()
 
+# 在生产环境添加批量同步数据接口
+@app.route('/api/roadmap/batch_sync', methods=['POST'])
+def batch_sync_roadmap_data():
+    """批量同步数据接口（仅在生产环境可用）"""
+    data = request.get_json()
+    return roadmap_service.batch_sync(data.get('updates', []))
+
 # 添加NFC接口测试页面路由
 @app.route('/nfc_test')
 def nfc_test():
@@ -763,7 +757,7 @@ def get_unread_notifications_count():
         )
 
 # WebSocket通知事件
-@websocket_service.socketio.on('notification:read')
+@socketio.on('notification:read')
 def handle_notification_read(data):
     """处理通知已读事件"""
     try:
@@ -906,18 +900,20 @@ def before_request():
     if request.endpoint and 'static' in request.endpoint:
         return None
         
-    # 获取当前协议
-    proto = request.headers.get('X-Forwarded-Proto', request.scheme)
-    
-    # 非HTTPS请求需要重定向（除了Let's Encrypt验证）
-    if proto != 'https' and ENV != 'local':
-        if request.path.startswith('/.well-known/acme-challenge/'):
-            return None
-        return ResponseHandler.redirect(
-            request.url.replace('http://', 'https://', 1),
-            permanent=False
-        )
+    # Let's Encrypt 验证不处理
+    if request.path.startswith('/.well-known/acme-challenge/'):
+        return None
         
+    # 在 Cloudflare 灵活 SSL 模式下，检查是否是域名访问
+    if CLOUDFLARE['enabled']:
+        host = request.headers.get('Host', '').lower()
+        # 只对域名访问进行HTTPS重定向
+        if DOMAIN.lower() in host:
+            proto = request.headers.get('X-Forwarded-Proto', 'http')
+            if proto != 'https':
+                url = request.url.replace('http://', 'https://', 1)
+                return ResponseHandler.redirect(url, permanent=False)
+            
     # 安全检查
     security_check_result = security_service.security_check()
     if security_check_result is not None:

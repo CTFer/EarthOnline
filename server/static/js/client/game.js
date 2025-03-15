@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-03-11 10:50:17
+ * @LastEditTime: 2025-03-15 21:44:15
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -233,11 +233,26 @@ class GameManager {
         // await this.playerService.loadPlayerInfo();
         // Logger.info("GameManager", "[initializeApplication:198]", "玩家信息加载完成");
 
-        // 2. 设置WebSocket订阅
+        // 2. 设置WebSocket订阅 - 确保在玩家信息加载后
         const playerId = this.playerService.getPlayerId();
         if (playerId && this.websocketService && this.mapService) {
-          this.websocketService.subscribeToPlayerEvents(playerId);
-          this.mapService.setWebSocketManager(this.websocketService.getWSManager());
+            // 确保WebSocket已连接
+            if (!this.websocketService.socket?.connected) {
+                Logger.info("GameManager", "[initializeApplication]", "等待WebSocket连接...");
+                await new Promise((resolve) => {
+                    this.websocketService.socket.once('connect', resolve);
+                });
+            }
+            
+            Logger.info("GameManager", "[initializeApplication]", `为玩家 ${playerId} 设置WebSocket订阅`);
+            this.websocketService.subscribeToPlayerEvents(playerId);
+            this.mapService.setWebSocketManager(this.websocketService.getWSManager());
+        } else {
+            Logger.warn("GameManager", "[initializeApplication]", "无法设置WebSocket订阅：", {
+                playerId: playerId,
+                hasWebSocket: !!this.websocketService,
+                hasMapService: !!this.mapService
+            });
         }
 
         // 3. 加载任务数据

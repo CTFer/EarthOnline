@@ -319,40 +319,59 @@ class AMapRenderer {
   }
 
   async createMarker(gpsData, index) {
-    // Logger.debug('AMapRenderer', 'createMarker:321', '创建标记点:', { gpsData, index });
+    Logger.debug('AMapRenderer', 'createMarker', '创建标记点:', { gpsData, index });
 
-    // 创建标记点
-    const marker = new AMap.Marker({
-      map: this.mapInstance,
-      position: [parseFloat(gpsData.x), parseFloat(gpsData.y)],
-      content: "",
-      offset: new AMap.Pixel(-13, -30)
-    });
+    try {
+      // 创建标记点
+      const marker = new AMap.Marker({
+        map: this.mapInstance,
+        position: [parseFloat(gpsData.x), parseFloat(gpsData.y)],
+        content: "",
+        offset: new AMap.Pixel(-13, -30)
+      });
 
-    // 创建信息窗体内容
-    const infoContent = this.createInfoWindowContent(gpsData, index);
-    // Logger.debug('AMapRenderer', 'createMarker:333', '信息窗体内容:', infoContent);
+      // 设置扩展数据
+      const extData = {
+        id: gpsData.id,
+        speed: gpsData.speed || 0,
+        battery: gpsData.battery,
+        timestamp: gpsData.addtime || gpsData.timestamp || Date.now() / 1000,
+        accuracy: gpsData.accuracy || 0,
+        device: gpsData.device || 'unknown',
+        remark: gpsData.remark || `位置 ${index}`
+      };
+      marker.setExtData(extData);
 
-    // 添加信息窗体
-    const infoWindow = new AMap.InfoWindow({
-      isCustom: true, // 使用自定义窗体
-      content: infoContent,
-      offset: new AMap.Pixel(0, -30),
-      autoMove: true,
-      closeWhenClickMap: true
-    });
+      // 创建信息窗体内容
+      const infoContent = this.createInfoWindowContent(extData, index);
 
-    // 绑定点击事件
-    marker.on("click", () => {
-      Logger.debug('AMapRenderer', 'createMarker:346', '点击标记点，打开信息窗口');
-      infoWindow.open(this.mapInstance, marker.getPosition());
-    });
+      // 添加信息窗体
+      const infoWindow = new AMap.InfoWindow({
+        isCustom: true,
+        content: infoContent,
+        offset: new AMap.Pixel(0, -30),
+        autoMove: true,
+        closeWhenClickMap: true
+      });
 
-    // 保存到标记集合
-    const pointId = Date.now().toString();
-    this.markers.set(pointId, marker);
+      // 保存信息窗口引用
+      marker.infoWindow = infoWindow;
 
-    return marker;
+      // 绑定点击事件
+      marker.on("click", () => {
+        Logger.debug('AMapRenderer', 'createMarker', '点击标记点，打开信息窗口');
+        infoWindow.open(this.mapInstance, marker.getPosition());
+      });
+
+      // 保存到标记集合 - 使用GPS点位ID作为key
+      const markerId = gpsData.id || Date.now().toString();  // 如果没有ID才使用时间戳
+      this.markers.set(markerId, marker);
+
+      return marker;
+    } catch (error) {
+      Logger.error('AMapRenderer', 'createMarker', '创建标记点失败:', error);
+      throw error;
+    }
   }
 
   createMarkerContent(index) {
@@ -379,29 +398,39 @@ class AMapRenderer {
   }
 
   createInfoWindowContent(gpsData, index) {
-    // Logger.debug('AMapRenderer', 'createInfoWindowContent:366', '创建信息窗口内容，参数:', { gpsData, index });
+    Logger.debug('AMapRenderer', 'createInfoWindowContent', '创建信息窗口内容，参数:', { gpsData, index });
     
-    if (!gpsData || !gpsData.addtime) {
-      Logger.error('AMapRenderer', 'createInfoWindowContent:369', '无效的GPS数据');
+    if (!gpsData) {
+      Logger.error('AMapRenderer', 'createInfoWindowContent', '无效的GPS数据');
       return '';
     }
 
     try {
-      const time = new Date(gpsData.addtime * 1000).toLocaleString();
+      // 获取时间戳，优先使用 addtime，然后是 timestamp
+      const timestamp = gpsData.addtime || gpsData.timestamp || Date.now() / 1000;
+      const time = new Date(timestamp * 1000).toLocaleString();
+
+      // 获取坐标
+      const x = gpsData.x || gpsData.longitude || 0;
+      const y = gpsData.y || gpsData.latitude || 0;
+
       const content = `
         <div class="amap-info-window" style="padding: 10px; min-width: 180px; background-color: white; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
           <h4 style="margin: 0 0 10px 0; color: #333; font-size: 14px;">${gpsData.remark || `位置 ${index}`}</h4>
           <p style="margin: 5px 0; color: #666; font-size: 12px;"><span style="color: #333;">序号:</span> ${index}</p>
-          <p style="margin: 5px 0; color: #666; font-size: 12px;"><span style="color: #333;">经度:</span> ${gpsData.x}</p>
-          <p style="margin: 5px 0; color: #666; font-size: 12px;"><span style="color: #333;">纬度:</span> ${gpsData.y}</p>
+          <p style="margin: 5px 0; color: #666; font-size: 12px;"><span style="color: #333;">经度:</span> ${x}</p>
+          <p style="margin: 5px 0; color: #666; font-size: 12px;"><span style="color: #333;">纬度:</span> ${y}</p>
           <p style="margin: 5px 0; color: #666; font-size: 12px;"><span style="color: #333;">时间:</span> ${time}</p>
           ${gpsData.device ? `<p style="margin: 5px 0; color: #666; font-size: 12px;"><span style="color: #333;">设备:</span> ${gpsData.device}</p>` : ""}
+          ${gpsData.speed !== undefined ? `<p style="margin: 5px 0; color: #666; font-size: 12px;"><span style="color: #333;">速度:</span> ${gpsData.speed.toFixed(1)} km/h</p>` : ""}
+          ${gpsData.battery !== undefined ? `<p style="margin: 5px 0; color: #666; font-size: 12px;"><span style="color: #333;">电量:</span> ${gpsData.battery}%</p>` : ""}
+          ${gpsData.accuracy !== undefined ? `<p style="margin: 5px 0; color: #666; font-size: 12px;"><span style="color: #333;">精度:</span> ${gpsData.accuracy}m</p>` : ""}
         </div>
       `;
-      // Logger.debug('AMapRenderer', 'createInfoWindowContent:385', '生成的内容:', content);
+      Logger.debug('AMapRenderer', 'createInfoWindowContent', '生成的内容:', content);
       return content;
     } catch (error) {
-      Logger.error('AMapRenderer', 'createInfoWindowContent:388', '创建信息窗口内容失败:', error);
+      Logger.error('AMapRenderer', 'createInfoWindowContent', '创建信息窗口内容失败:', error);
       return '';
     }
   }
@@ -649,6 +678,90 @@ class AMapRenderer {
             });
         });
     });
+  }
+
+  /**
+   * 更新GPS点位属性
+   * @param {Object} data - GPS数据
+   */
+  updateGPSPointProperties(data) {
+    Logger.debug('AMapRenderer', 'updateGPSPointProperties', '更新GPS点位属性:', data);
+    try {
+      if (!data.id) {
+        Logger.warn('AMapRenderer', 'updateGPSPointProperties', '无效的GPS数据: 缺少ID');
+        return;
+      }
+
+      const targetMarker = this.markers.get(data.id);
+      if (!targetMarker) {
+        Logger.warn('AMapRenderer', 'updateGPSPointProperties', `找不到ID为 ${data.id} 的GPS点位`);
+        return;
+      }
+
+      // 更新点位的扩展数据
+      const extData = targetMarker.getExtData() || {};
+      Object.assign(extData, {
+        id: data.id,
+        speed: data.speed !== undefined ? data.speed : extData.speed,
+        battery: data.battery !== undefined ? data.battery : extData.battery,
+        timestamp: data.timestamp || data.addtime || extData.timestamp,
+        accuracy: data.accuracy !== undefined ? data.accuracy : extData.accuracy,
+        device: data.device || extData.device,
+        remark: data.remark || extData.remark
+      });
+      targetMarker.setExtData(extData);
+
+      // 如果有新的坐标，更新位置
+      if (data.x !== undefined && data.y !== undefined) {
+        targetMarker.setPosition([data.x, data.y]);
+      }
+
+      // 更新信息窗口内容
+      if (targetMarker.infoWindow) {
+        const content = this.createInfoWindowContent(extData, this.markers.size);
+        targetMarker.infoWindow.setContent(content);
+      }
+
+      // 更新GPS信息显示
+      this.updateGPSInfo(extData);
+
+      Logger.debug('AMapRenderer', 'updateGPSPointProperties', 'GPS点位属性更新成功');
+    } catch (error) {
+      Logger.error('AMapRenderer', 'updateGPSPointProperties', '更新GPS点位属性失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 添加新的GPS点位
+   * @param {Object} data - GPS数据
+   */
+  async addGPSPoint(data) {
+    Logger.debug('AMapRenderer', 'addGPSPoint', '添加新GPS点位:', data);
+    try {
+      // 如果点位已存在，只更新属性
+      if (data.id && this.markers.has(data.id)) {
+        this.updateGPSPointProperties(data);
+        return;
+      }
+
+      // 创建新点位
+      const marker = await this.createMarker(data, this.markers.size + 1);
+      if (data.id) {
+        this.markers.set(data.id, marker);
+      }
+
+      // 如果是轨迹模式，更新路径
+      if (this.displayMode === 'path' && this.gpsData.length > 0) {
+        this.gpsData.push(data);
+        await this.updatePathMode(this.gpsData);
+      }
+
+      Logger.debug('AMapRenderer', '新GPS点位添加成功');
+    } catch (error) {
+      Logger.error('AMapRenderer', '添加GPS点位失败:', error);
+      throw error;
+    }
   }
 }
 

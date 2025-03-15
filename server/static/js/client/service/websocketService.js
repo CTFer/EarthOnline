@@ -332,16 +332,15 @@ class WebSocketService {
             return;
         }
 
-        // 事件监听器已迁移到EventManager.js
         // GPS更新事件
-        // this.socket.on(WS_EVENT_TYPES.BUSINESS.GPS_UPDATE, (data) => {
-        //     Logger.debug('WebSocketService', '收到GPS更新:', data);
-        //     if (data && typeof data === 'object') {
-        //         this.eventBus.emit(MAP_EVENTS.GPS_UPDATE, data);
-        //     } else {
-        //         Logger.warn('WebSocketService', '收到无效的GPS数据:', data);
-        //     }
-        // });
+        this.socket.on(WS_EVENT_TYPES.BUSINESS.GPS_UPDATE, (data) => {
+            Logger.debug('WebSocketService', '收到GPS更新:', data);
+            if (data && typeof data === 'object') {
+                this.eventBus.emit(MAP_EVENTS.GPS_UPDATE, data);
+            } else {
+                Logger.warn('WebSocketService', '收到无效的GPS数据:', data);
+            }
+        });
 
         // 系统事件监听
         this.socket.on(WS_EVENT_TYPES.SYSTEM.CONNECT, () => {

@@ -145,7 +145,7 @@ layui.use(["jquery", "layer", "form", "laytpl"], function () {
     $.get("/api/roadmap/check_login", function (res) {
       try {
         const data = typeof res === "string" ? JSON.parse(res) : res;
-        if (data.code === 1 && data.data) {
+        if (data.code == 0 && data.data) {
           // 已登录
           $("#currentUser").text(data.data.username);
           loadTasks();

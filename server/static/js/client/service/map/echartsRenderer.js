@@ -324,41 +324,34 @@ class EchartsRenderer {
     }
 
     updateGPSInfo(point) {
-        Logger.debug('EchartsRenderer', '更新GPS信息:', point);
-        
-        const speedElement = document.getElementById('currentSpeed');
-        const timeElement = document.getElementById('lastUpdateTime');
-        const batteryElement = document.getElementById('batteryLevel');
-        
-        if (speedElement && typeof point.speed !== 'undefined') {
-            const speed = point.speed || 0;
-            Logger.debug('EchartsRenderer', '更新速度:', speed);
-            speedElement.textContent = `${speed.toFixed(1)} km/h`;
+        Logger.debug("EchartsRenderer", "更新GPS信息:", point);
+
+        const speedElement = document.getElementById("currentSpeed");
+        const timeElement = document.getElementById("lastUpdateTime");
+        const batteryElement = document.getElementById("batteryLevel");
+
+        // 只在值发生变化时更新，避免重复触发
+        if (speedElement && typeof point.speed !== "undefined" && 
+            speedElement.textContent !== `${point.speed.toFixed(1)} km/h`) {
+            speedElement.textContent = `${point.speed.toFixed(1)} km/h`;
         }
-        
-        if (timeElement) {
-            const timestamp = point.timestamp || point.addtime;
-            if (timestamp) {
-                const time = new Date(timestamp * 1000);
-                Logger.debug('EchartsRenderer', '更新时间:', time.toLocaleString());
-                timeElement.textContent = time.toLocaleString();
+
+        if (timeElement && point.timestamp) {
+            const timeStr = new Date(point.timestamp * 1000).toLocaleString();
+            if (timeElement.textContent !== timeStr) {
+                timeElement.textContent = timeStr;
             }
         }
 
-        if (batteryElement && typeof point.battery !== 'undefined') {
+        if (batteryElement && typeof point.battery !== "undefined" && 
+            this.batteryLevel !== point.battery) {
             this.batteryLevel = point.battery;
             Logger.debug('EchartsRenderer', '更新电量:', this.batteryLevel);
             batteryElement.textContent = `${this.batteryLevel}%`;
-            
+
             const batteryIcon = batteryElement.previousElementSibling;
             if (batteryIcon) {
-                if (this.batteryLevel <= 20) {
-                    batteryIcon.style.color = 'var(--danger-color)';
-                } else if (this.batteryLevel <= 50) {
-                    batteryIcon.style.color = 'var(--warning-color)';
-                } else {
-                    batteryIcon.style.color = 'var(--theme-color)';
-                }
+                this.updateBatteryIcon(batteryIcon);
             }
         }
     }
@@ -551,6 +544,103 @@ class EchartsRenderer {
         else zoom = 13;                   // 最详细级别
         
         return zoom;
+    }
+
+    /**
+     * 更新GPS点位属性
+     * @param {Object} data - GPS数据
+     */
+    updateGPSPointProperties(data) {
+        Logger.debug('EchartsRenderer', 'updateGPSPointProperties', '更新GPS点位属性:', data);
+        try {
+            // 查找对应的点位数据
+            Logger.debug('EchartsRenderer', 'updateGPSPointProperties', 'gpsData:', this.gpsData);
+            const pointIndex = this.gpsData.findIndex(point => point.id === data.id);
+            if (pointIndex === -1) {
+                Logger.warn('EchartsRenderer', '找不到要更新的GPS点位:', data.id);
+                return;
+            }
+
+            // 更新点位数据
+            const point = this.gpsData[pointIndex];
+            Object.assign(point, {
+                speed: data.speed !== undefined ? data.speed : point.speed,
+                battery: data.battery !== undefined ? data.battery : point.battery,
+                timestamp: data.timestamp !== undefined ? data.timestamp : point.timestamp,
+                accuracy: data.accuracy !== undefined ? data.accuracy : point.accuracy
+            });
+
+            // 更新地图显示
+            this.updateGPSInfo(point);
+
+            Logger.debug('EchartsRenderer', 'GPS点位属性更新成功');
+        } catch (error) {
+            Logger.error('EchartsRenderer', '更新GPS点位属性失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 添加新的GPS点位
+     * @param {Object} data - GPS数据
+     */
+    async addGPSPoint(data) {
+        Logger.debug('EchartsRenderer', 'addGPSPoint', '添加新GPS点位:', data);
+        try {
+            // 如果点位已存在，只更新属性
+            const existingPointIndex = this.gpsData.findIndex(point => point.id === data.id);
+            if (existingPointIndex !== -1) {
+                this.updateGPSPointProperties(data);
+                return;
+            }
+
+            // 格式化新点位数据
+            const newPoint = {
+                id: data.id,
+                x: data.x,
+                y: data.y,
+                speed: data.speed || 0,
+                battery: data.battery || 0,
+                timestamp: data.timestamp || Date.now() / 1000,
+                accuracy: data.accuracy || 0,
+                device: data.device || 'unknown',
+                remark: data.remark || ''
+            };
+
+            // 添加到数据数组
+            this.gpsData.push(newPoint);
+
+            // 更新地图显示
+            const series = this.displayMode === 'path' ? 
+                this.createPathSeries() : 
+                this.createPointSeries();
+
+            const option = {
+                ...this.getInitialOption(),
+                series: series
+            };
+
+            this.mapChart.setOption(option);
+
+            // 更新GPS信息显示
+            this.updateGPSInfo(newPoint);
+
+            Logger.debug('EchartsRenderer', '新GPS点位添加成功');
+        } catch (error) {
+            Logger.error('EchartsRenderer', '添加GPS点位失败:', error);
+            throw error;
+        }
+    }
+
+    // 添加电池图标更新方法
+    updateBatteryIcon(icon) {
+        const newColor = this.batteryLevel <= 20 ? 'var(--danger-color)' :
+                        this.batteryLevel <= 50 ? 'var(--warning-color)' :
+                        'var(--theme-color)';
+                        
+        if (icon.style.color !== newColor) {
+            icon.style.color = newColor;
+        }
     }
 }
 

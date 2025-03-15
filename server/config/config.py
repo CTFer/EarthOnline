@@ -10,7 +10,7 @@ import os
 
 # 服务器配置
 SERVER_IP = '0.0.0.0'
-DOMAIN = 'dev.earthonline.com'
+DOMAIN = 'duonline.top'
 DOMAIN_IP = '1.95.11.164'
 PORT = 80
 # 环境配置 本地开发环境 local 生产环境 prod 生产环境中NFC读写卡功能关闭
@@ -33,7 +33,7 @@ LOCAL_SSL = {
 }
 
 # HTTPS配置
-HTTPS_ENABLED = True  # 是否启用HTTPS
+HTTPS_ENABLED = False  # 是否启用HTTPS
 HTTPS_PORT = 443     # HTTPS端口号
 
 # 根据环境选择证书路径
@@ -52,7 +52,7 @@ ACME_CHALLENGE_DIR = os.path.join('static', '.well-known', 'acme-challenge')
 # Cloudflare配置
 CLOUDFLARE = {
     'enabled': True,  # 启用Cloudflare
-    'flexible_ssl': False,  # 使用Full SSL模式（不是Flexible）
+    'flexible_ssl': True,  # 使用Flexible SSL模式
     'proxy_fix': True,  # 启用代理修复
     'websocket': {
         'enabled': True,
@@ -67,12 +67,14 @@ CLOUDFLARE = {
         'always_connect': True
     },
     'headers': {
-        'X-Forwarded-For': 2,
+        'X-Forwarded-For': 1,
         'X-Forwarded-Proto': 1,
         'X-Forwarded-Host': 1,
         'X-Forwarded-Port': 1,
+        'X-Forwarded-Prefix': 1,
         'X-Real-IP': 1
-    }
+    },
+    'domain_only_ssl': True  # 只对域名访问启用SSL重定向
 }
 
 # 数据库配置
@@ -108,7 +110,7 @@ WAITRESS_CONFIG = {
 
 # 生产环境配置 用于同步数据库
 PROD_SERVER = {
-    'URL': DOMAIN,  # 生产环境服务器地址
+    'URL': 'http://1.95.11.164',  # 生产环境服务器地址
     'API_KEY': '95279527',    # API认证密钥 用于同步数据库
     'TIMEOUT': 5,                      # 请求超时时间（秒）
     'RETRY': 3                         # 失败重试次数

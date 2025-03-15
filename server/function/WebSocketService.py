@@ -3,6 +3,7 @@ WebSocket服务模块
 处理WebSocket连接和实时通信
 """
 import logging
+from flask import request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from typing import Dict, Any, Optional
 from config.config import CLOUDFLARE, ENV, DOMAIN
@@ -47,18 +48,20 @@ class WebSocketService:
     def init_app(self, app):
         """将WebSocket服务与Flask应用关联"""
         self.socketio.init_app(app)
+        self._register_handlers()  # 注册所有事件处理器
         
     def _register_handlers(self) -> None:
         """注册WebSocket事件处理器"""
         @self.socketio.on('connect')
-        def handle_connect():
+        def handle_connect(auth=None):
             """处理WebSocket连接"""
+            sid = request.sid if hasattr(request, 'sid') else 'unknown'
             client_info = {
-                'sid': request.sid,
-                'remote_addr': request.remote_addr,
-                'headers': dict(request.headers),
-                'transport': request.args.get('transport', 'unknown'),
-                'protocol': request.args.get('protocol', 'unknown')
+                'sid': sid,
+                'remote_addr': request.remote_addr if hasattr(request, 'remote_addr') else 'unknown',
+                'headers': dict(request.headers) if hasattr(request, 'headers') else {},
+                'transport': request.args.get('transport', 'unknown') if hasattr(request, 'args') else 'unknown',
+                'protocol': request.args.get('protocol', 'unknown') if hasattr(request, 'args') else 'unknown'
             }
             logger.info(f"[WebSocket] 客户端连接成功: {client_info}")
             emit('connected', {'status': 'success', 'client_info': client_info})
@@ -66,15 +69,18 @@ class WebSocketService:
         @self.socketio.on('disconnect')
         def handle_disconnect():
             """处理WebSocket断开连接"""
-            logger.info(f"[WebSocket] 客户端断开连接: {request.sid}")
+            sid = request.sid if hasattr(request, 'sid') else 'unknown'
+            logger.info(f"[WebSocket] 客户端断开连接: {sid}")
 
         @self.socketio.on_error()
         def handle_error(e):
             """处理WebSocket错误"""
+            sid = request.sid if hasattr(request, 'sid') else 'unknown'
+            event = request.event.get('message', 'unknown') if hasattr(request, 'event') else 'unknown'
             error_info = {
-                'sid': request.sid if hasattr(request, 'sid') else 'unknown',
+                'sid': sid,
                 'error': str(e),
-                'event': request.event.get('message', 'unknown') if hasattr(request, 'event') else 'unknown'
+                'event': event
             }
             logger.error(f"[WebSocket] 发生错误: {error_info}", exc_info=True)
 
@@ -98,6 +104,67 @@ class WebSocketService:
                     logger.warning(f"[WebSocket] 警告: 收到无玩家ID的订阅请求")
             except Exception as e:
                 logger.error(f"[WebSocket] 处理任务订阅失败: {str(e)}", exc_info=True)
+
+        @self.socketio.on('subscribe_gps')
+        def handle_gps_subscription(data: Dict[str, Any]):
+            """处理GPS订阅"""
+            try:
+                logger.info(f"[WebSocket] 收到GPS订阅请求: {data}")
+                player_id = data.get('player_id')
+                if player_id:
+                    room = f'user_{player_id}'
+                    join_room(room)
+                    logger.info(f"[WebSocket] 用户 {player_id} 加入GPS房间: {room}")
+                    # 发送确认消息
+                    emit('gps_subscription_confirmed', {
+                        'status': 'success',
+                        'room': room,
+                        'timestamp': time.time()
+                    }, room=room)
+                else:
+                    logger.warning("[WebSocket] 警告: 收到无玩家ID的GPS订阅请求")
+            except Exception as e:
+                logger.error(f"[WebSocket] 处理GPS订阅失败: {str(e)}", exc_info=True)
+
+        @self.socketio.on('join')
+        def handle_join(data: Dict[str, Any]):
+            """处理加入房间请求"""
+            try:
+                logger.info(f"[WebSocket] 收到房间加入请求: {data}")
+                room = data.get('room')
+                if room:
+                    join_room(room)
+                    logger.info(f"[WebSocket] 客户端加入房间: {room}")
+                    # 发送确认消息
+                    emit('join_confirmed', {
+                        'status': 'success',
+                        'room': room,
+                        'timestamp': time.time()
+                    }, room=room)
+                else:
+                    logger.warning("[WebSocket] 警告: 收到无房间名的加入请求")
+            except Exception as e:
+                logger.error(f"[WebSocket] 处理房间加入请求失败: {str(e)}", exc_info=True)
+
+        @self.socketio.on('leave')
+        def handle_leave(data: Dict[str, Any]):
+            """处理离开房间请求"""
+            try:
+                logger.info(f"[WebSocket] 收到房间离开请求: {data}")
+                room = data.get('room')
+                if room:
+                    leave_room(room)
+                    logger.info(f"[WebSocket] 客户端离开房间: {room}")
+                    # 发送确认消息
+                    emit('leave_confirmed', {
+                        'status': 'success',
+                        'room': room,
+                        'timestamp': time.time()
+                    })
+                else:
+                    logger.warning("[WebSocket] 警告: 收到无房间名的离开请求")
+            except Exception as e:
+                logger.error(f"[WebSocket] 处理房间离开请求失败: {str(e)}", exc_info=True)
 
         @self.socketio.on('ping')
         def handle_ping():
@@ -159,6 +226,49 @@ class WebSocketService:
         except Exception as e:
             logger.error(f"[WebSocket] 运行服务器失败: {str(e)}", exc_info=True)
             raise
+
+    def emit_to_room(self, room: str, event: str, data: Dict[str, Any]) -> None:
+        """向指定房间发送事件
+        
+        Args:
+            room: 房间名称
+            event: 事件名称
+            data: 事件数据
+        """
+        try:
+            logger.debug(f"[WebSocket] 向房间 {room} 发送事件 {event}: {data}")
+            self.socketio.emit(event, data, room=room)
+        except Exception as e:
+            logger.error(f"[WebSocket] 发送事件失败: {str(e)}", exc_info=True)
+
+    def broadcast(self, event: str, data: Dict[str, Any], include_self: bool = True) -> None:
+        """广播事件给所有连接的客户端
+        
+        Args:
+            event: 事件名称
+            data: 事件数据
+            include_self: 是否包含发送者
+        """
+        try:
+            logger.debug(f"[WebSocket] 广播事件 {event}: {data}")
+            self.socketio.emit(event, data, broadcast=True, include_self=include_self)
+        except Exception as e:
+            logger.error(f"[WebSocket] 广播事件失败: {str(e)}", exc_info=True)
+
+    def get_room_count(self, room: str) -> int:
+        """获取房间内的连接数量
+        
+        Args:
+            room: 房间名称
+            
+        Returns:
+            int: 房间内的连接数量
+        """
+        try:
+            return len(self.socketio.server.manager.get_participants(room, None))
+        except Exception as e:
+            logger.error(f"[WebSocket] 获取房间 {room} 连接数量失败: {str(e)}", exc_info=True)
+            return 0
 
 # 创建WebSocket服务实例
 websocket_service = WebSocketService() 

@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:42
- * @LastEditTime: 2025-02-27 23:16:31
+ * @LastEditTime: 2025-03-15 22:04:12
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -74,6 +74,11 @@ class MapService {
     this.handleMapSwitch = this.handleMapSwitch.bind(this);
     this.handleTimeRangeChange = this.handleTimeRangeChange.bind(this);
     this.handleGPSUpdate = this.handleGPSUpdate.bind(this);
+
+    // 添加防抖动相关属性
+    this._lastUpdateTime = 0;
+    this._updateThrottle = 100; // 100ms 节流时间
+    this._pendingUpdate = null;
 
     Logger.info("MapService", "constructor:70", "地图服务初始化完成");
   }
@@ -569,9 +574,9 @@ class MapService {
     this.wsManager = wsManager;
 
     try {
-      // 使用新的订阅方法
+      // 使用新的订阅方法，直接处理 GPS 更新，不触发额外事件
       this.wsManager.subscribe(WS_EVENT_TYPES.BUSINESS.GPS_UPDATE, (data) => {
-        Logger.debug("MapService", "handleGPSUpdate:505", "处理GPS更新:", data);
+        Logger.debug("MapService", "收到GPS更新:", data);
         this.handleGPSUpdate(data);
       });
 
@@ -592,15 +597,68 @@ class MapService {
     }
 
     try {
-      // 更新地图上的GPS点位
-      this.currentRenderer?.updateGPSPoint(data);
+      // 检查渲染器是否存在
+      if (!this.currentRenderer) {
+        Logger.warn("MapService", "渲染器未初始化，无法更新GPS点位");
+        return;
+      }
 
-      // 触发GPS更新事件
-      this.eventBus.emit(MAP_EVENTS.GPS_UPDATED, data);
+      // 节流控制，避免过于频繁的更新
+      const now = Date.now();
+      if (now - this._lastUpdateTime < this._updateThrottle) {
+        // 如果已经有等待的更新，就取消它
+        if (this._pendingUpdate) {
+          clearTimeout(this._pendingUpdate);
+        }
+        
+        // 设置新的延迟更新
+        this._pendingUpdate = setTimeout(() => {
+          this._pendingUpdate = null;
+          this.handleGPSUpdate(data);
+        }, this._updateThrottle);
+        return;
+      }
+      this._lastUpdateTime = now;
+
+      // 检查是否是增量更新数据
+      if (data.id && (data.speed !== undefined || data.battery !== undefined || data.timestamp !== undefined)) {
+        // 增量更新 - 只更新现有点位的属性
+        if (typeof this.currentRenderer.updateGPSPointProperties === 'function') {
+          this.currentRenderer.updateGPSPointProperties(data);
+          Logger.debug("MapService", "GPS点位属性更新成功");
+        }
+      } else if (data.x !== undefined && data.y !== undefined) {
+        // 完整的GPS数据 - 添加新点位
+        if (typeof this.currentRenderer.addGPSPoint === 'function') {
+          this.currentRenderer.addGPSPoint({
+            x: data.x,
+            y: data.y,
+            id: data.id,
+            speed: data.speed || 0,
+            battery: data.battery || 0,
+            timestamp: data.timestamp || Date.now() / 1000,
+            accuracy: data.accuracy || 0,
+            device: data.device || 'unknown',
+            remark: data.remark || ''
+          });
+          Logger.debug("MapService", "新GPS点位添加成功");
+        }
+      } else {
+        Logger.warn("MapService", "无效的GPS数据格式:", data);
+        return;
+      }
+
+      // 不再触发 gps:update 事件，避免死循环
+      // this.eventBus.emit(MAP_EVENTS.GPS_UPDATED, data);
 
       Logger.debug("MapService", "GPS数据更新成功");
     } catch (error) {
       Logger.error("MapService", "handleGPSUpdate:534", "处理GPS更新失败:", error);
+      this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+        type: "ERROR",
+        message: `GPS数据更新失败: ${error.message}`,
+        duration: 3000
+      });
     }
   }
 

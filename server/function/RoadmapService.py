@@ -48,8 +48,14 @@ class RoadmapService:
             # 验证密码
             if user and user['password'] == self.encrypt_password(password):
                 # 登录成功，设置session
+                session.clear()  # 清除旧的session
                 session['user_id'] = user['id']
                 session['username'] = user['username']
+                session.permanent = True  # 设置session为永久性
+                session.modified = True   # 确保session被保存
+                
+                print(f"[Roadmap] 登录成功 - 设置用户: {username} (ID: {user['id']}) 的 session")
+                print(f"[Roadmap] 当前 session: {dict(session)}")  # 打印当前session内容
                 
                 return json.dumps({
                     'code': 0,
@@ -60,23 +66,34 @@ class RoadmapService:
                     }
                 })
             else:
+                print(f"[Roadmap] 登录失败 - 用户: {username} 的凭证无效")
                 return json.dumps({'code': 1, 'msg': '用户名或密码错误'})
                 
         except Exception as e:
-            print(f"Login error: {str(e)}")
-            return json.dumps({'code': 1, 'msg': '登录失败'})
+            print(f"[Roadmap] 登录失败: {str(e)}")
+            return json.dumps({'code': 1, 'msg': f'登录失败: {str(e)}'})
         finally:
             if conn:
                 conn.close()
 
     def roadmap_logout(self):
         """开发计划登出"""
-        session.clear()
-        return json.dumps({
-            'code': 0,
-            'msg': '登出成功',
-            'data': None
-        })
+        try:
+            username = session.get('username')
+            print(f"[Roadmap] 登出用户: {username}")
+            session.clear()
+            return json.dumps({
+                'code': 0,
+                'msg': '登出成功',
+                'data': None
+            })
+        except Exception as e:
+            print(f"[Roadmap] 登出失败: {str(e)}")
+            return json.dumps({
+                'code': 1,
+                'msg': f'登出失败: {str(e)}',
+                'data': None
+            })
 
     # 以下的方法需要登录后才能使用
     def check_login(self):
@@ -88,7 +105,7 @@ class RoadmapService:
                 print("[Roadmap] API key authentication successful")
                 # API密钥验证通过，返回默认用户信息
                 return json.dumps({
-                    'code': 1,  # 1 表示已登录
+                    'code': 0,  # 修改为0，表示成功
                     'msg': 'API密钥验证通过',
                     'data': {
                         'username': 'emanon',
@@ -97,51 +114,62 @@ class RoadmapService:
                 })
             
             # 检查session登录
-            if not session.get('username'):
-                print("[Roadmap] Session authentication failed")
+            user_id = session.get('user_id')
+            username = session.get('username')
+            
+            print(f"[Roadmap] 检查 session - user_id: {user_id}, username: {username}")
+            print(f"[Roadmap] 当前 session 数据: {dict(session)}")
+            
+            if not username or not user_id:
+                print("[Roadmap] 会话认证失败 - 缺少 user_id 或 username")
                 return json.dumps({
-                    'code': 0,  # 0 表示未登录
+                    'code': 1,  # 1 表示未登录
                     'msg': '未登录',
                     'data': None
                 })
             
-            print(f"[Roadmap] Session authentication successful for user: {session.get('username')}")
+            print(f"[Roadmap] 会话认证成功 - 用户: {username}")
             return json.dumps({
-                'code': 1,  # 1 表示已登录
+                'code': 0,  # 修改为0，表示成功
                 'msg': '已登录',
                 'data': {
-                    'username': session.get('username'),
-                    'user_id': session.get('user_id')
+                    'username': username,
+                    'user_id': user_id
                 }
             })
         except Exception as e:
-            print(f"[Roadmap] Login check error: {str(e)}")
+            print(f"[Roadmap] 登录检查失败: {str(e)}")
             return json.dumps({
-                'code': 0,
+                'code': 1,
                 'msg': f'登录检查失败: {str(e)}',
                 'data': None
             })
 
     def sync_from_prod(self):
-        """从生产环境同步数据到本地
+        """从生产环境同步数据到本地，并将本地独有数据同步到生产环境
         
         同步流程：
         1. 环境检查：确保只在本地环境运行
         2. 准备同步：构建请求头，包含API密钥和上次同步时间
         3. 获取数据：从生产环境获取增量更新数据
         4. 处理数据：将获取的数据更新到本地数据库
-        5. 更新时间：记录本次同步时间
+        5. 同步本地：将本地独有数据同步到生产环境
+        6. 更新时间：记录本次同步时间
         
         同步规则：
         - 根据edittime判断数据是否需要更新
         - is_deleted标记用于处理已删除的记录
         - 使用事务确保数据一致性
+        - 本地独有数据会被同步到生产环境
         
         返回格式：
         {
             'code': 0/500,  # 0表示成功，其他表示失败
             'msg': '处理结果说明',
-            'data': [] # 同步的数据列表
+            'data': {
+                'from_prod': [], # 从生产环境同步的数据
+                'to_prod': []    # 同步到生产环境的数据
+            }
         }
         """
         # 初始化数据库连接为 None
@@ -157,7 +185,7 @@ class RoadmapService:
             })
 
         try:
-            print("[Sync] 开始从生产环境同步数据...")
+            print("[Sync] 开始双向同步数据...")
             
             # 2. 准备同步请求
             headers = {
@@ -167,99 +195,138 @@ class RoadmapService:
             
             # 3. 从生产环境获取数据
             sync_url = f"{PROD_SERVER['URL']}/api/roadmap/sync"
-            print(f"[Sync] Requesting updates since: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_sync_time))}")
-            print(f"[Sync] Target URL: {sync_url}")
+            print(f"[Sync] 从生产环境获取更新 - 上次同步时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_sync_time))}")
+            print(f"[Sync] 目标URL: {sync_url}")
             
             response = requests.get(sync_url, headers=headers, timeout=PROD_SERVER['TIMEOUT'])
             
             if response.status_code != 200:
-                print(f"[Sync] Failed to get data from production: {response.text}")
+                print(f"[Sync] 从生产环境获取数据失败: {response.text}")
                 return json.dumps({
                     'code': 500,
                     'msg': f'同步失败: {response.text}',
                     'data': None
                 })
             
-            updates = response.json()
-            if not updates.get('data'):
-                print("[Sync] 没有新的更新")
-                return json.dumps({
-                    'code': 0,
-                    'msg': '没有新的更新',
-                    'data': None
-                })
-
-            print(f"[Sync] Received {len(updates['data'])} updates")
+            updates_from_prod = response.json()
             
             # 4. 处理数据更新
             conn = self.get_db()
             cursor = conn.cursor()
             
-            update_count = 0
-            delete_count = 0
+            # 记录同步统计
+            stats = {
+                'from_prod': {'updates': 0, 'deletes': 0},
+                'to_prod': {'updates': 0, 'deletes': 0}
+            }
             
-            for item in updates['data']:
-                # 检查记录是否存在
-                cursor.execute('SELECT id FROM roadmap WHERE id = ?', (item['id'],))
-                exists = cursor.fetchone()
+            # 4.1 处理从生产环境获取的更新
+            if updates_from_prod.get('data'):
+                print(f"[Sync] 收到 {len(updates_from_prod['data'])} 条生产环境更新")
                 
-                # 确保user_id有值
-                user_id = item.get('user_id')
-                if not user_id:
-                    # 如果没有user_id，使用默认用户ID(比如系统用户)
-                    user_id = 1  # 假设1是系统用户ID
-                    print(f"[Sync] 记录 {item['id']} 没有user_id，使用默认值: {user_id}")
+                for item in updates_from_prod['data']:
+                    # 检查记录是否存在
+                    cursor.execute('SELECT id FROM roadmap WHERE id = ?', (item['id'],))
+                    exists = cursor.fetchone()
+                    
+                    # 确保user_id有值
+                    user_id = item.get('user_id', 1)  # 默认使用ID 1
+                    
+                    if exists:
+                        # 更新现有记录
+                        cursor.execute('''
+                            UPDATE roadmap 
+                            SET name = ?, 
+                                description = ?, 
+                                status = ?, 
+                                color = ?,
+                                addtime = ?,
+                                edittime = ?,
+                                "order" = ?,
+                                user_id = ?,
+                                is_deleted = ?
+                            WHERE id = ?
+                        ''', (
+                            item['name'],
+                            item['description'],
+                            item['status'],
+                            item.get('color', '#ffffff'),
+                            item['addtime'],
+                            item['edittime'],
+                            item.get('order', 0),
+                            user_id,
+                            item.get('is_deleted', 0),
+                            item['id']
+                        ))
+                    else:
+                        # 插入新记录
+                        cursor.execute('''
+                            INSERT INTO roadmap (
+                                id, name, description, status, color,
+                                addtime, edittime, "order", user_id, is_deleted
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            item['id'],
+                            item['name'],
+                            item['description'],
+                            item['status'],
+                            item.get('color', '#ffffff'),
+                            item['addtime'],
+                            item['edittime'],
+                            item.get('order', 0),
+                            user_id,
+                            item.get('is_deleted', 0)
+                        ))
+                    
+                    if item.get('is_deleted', 0):
+                        stats['from_prod']['deletes'] += 1
+                    else:
+                        stats['from_prod']['updates'] += 1
+            
+            # 4.2 获取本地独有的数据
+            cursor.execute('''
+                SELECT r.*, 
+                    CASE 
+                        WHEN r.edittime > ? THEN 0 
+                        ELSE 1 
+                    END as is_deleted
+                FROM roadmap r
+                WHERE r.edittime > ?
+                ORDER BY r.edittime ASC
+            ''', (self.last_sync_time, self.last_sync_time))
+            
+            local_updates = []
+            for row in cursor.fetchall():
+                item = dict(row)
+                # 确保所有必需字段都有值
+                item['color'] = item.get('color', '#ffffff')
+                item['order'] = item.get('order', 0)
+                item['is_deleted'] = item.get('is_deleted', 0)
+                local_updates.append(item)
+            
+            # 4.3 将本地更新同步到生产环境
+            if local_updates:
+                print(f"[Sync] 发现 {len(local_updates)} 条本地更新需要同步到生产环境")
                 
-                if exists:
-                    # 更新现有记录
-                    cursor.execute('''
-                        UPDATE roadmap 
-                        SET name = ?, 
-                            description = ?, 
-                            status = ?, 
-                            color = ?,
-                            addtime = ?,
-                            edittime = ?,
-                            "order" = ?,
-                            user_id = ?,
-                            is_deleted = ?
-                        WHERE id = ?
-                    ''', (
-                        item['name'],
-                        item['description'],
-                        item['status'],
-                        item.get('color', '#ffffff'),  # 使用默认颜色
-                        item['addtime'],
-                        item['edittime'],
-                        item.get('order', 0),  # 使用默认顺序
-                        user_id,
-                        item.get('is_deleted', 0),
-                        item['id']
-                    ))
+                sync_url = f"{PROD_SERVER['URL']}/api/roadmap/batch_sync"
+                response = requests.post(
+                    sync_url,
+                    headers=headers,
+                    json={'updates': local_updates},
+                    timeout=PROD_SERVER['TIMEOUT']
+                )
+                
+                if response.status_code != 200:
+                    print(f"[Sync] 同步到生产环境失败: {response.text}")
+                    raise Exception("同步到生产环境失败")
+                    
+                result = response.json()
+                if result.get('code') == 0:
+                    stats['to_prod']['updates'] = result.get('data', {}).get('updated', 0)
+                    stats['to_prod']['deletes'] = result.get('data', {}).get('deleted', 0)
+                    print(f"[Sync] 成功同步到生产环境: {stats['to_prod']['updates']} 更新, {stats['to_prod']['deletes']} 删除")
                 else:
-                    # 插入新记录
-                    cursor.execute('''
-                        INSERT INTO roadmap (
-                            id, name, description, status, color,
-                            addtime, edittime, "order", user_id, is_deleted
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        item['id'],
-                        item['name'],
-                        item['description'],
-                        item['status'],
-                        item.get('color', '#ffffff'),  # 使用默认颜色
-                        item['addtime'],
-                        item['edittime'],
-                        item.get('order', 0),  # 使用默认顺序
-                        user_id,
-                        item.get('is_deleted', 0)
-                    ))
-                
-                if item['is_deleted']:
-                    delete_count += 1
-                else:
-                    update_count += 1
+                    raise Exception(f"同步到生产环境失败: {result.get('msg')}")
             
             # 提交事务
             conn.commit()
@@ -267,15 +334,22 @@ class RoadmapService:
             # 5. 更新同步时间
             self.last_sync_time = int(time.time())
             
-            print(f"[Sync] 同步完成: {update_count} 更新, {delete_count} 删除")
+            print(f"[Sync] 双向同步完成:")
+            print(f"从生产环境: {stats['from_prod']['updates']} 更新, {stats['from_prod']['deletes']} 删除")
+            print(f"到生产环境: {stats['to_prod']['updates']} 更新, {stats['to_prod']['deletes']} 删除")
+            
             return json.dumps({
                 'code': 0,
-                'msg': f'同步成功: {update_count} 更新, {delete_count} 删除',
-                'data': updates['data']
+                'msg': '双向同步成功',
+                'data': {
+                    'from_prod': updates_from_prod.get('data', []),
+                    'to_prod': local_updates,
+                    'stats': stats
+                }
             })
             
         except Exception as e:
-            print(f"[Sync] Error during sync: {str(e)}")
+            print(f"[Sync] 同步过程出错: {str(e)}")
             if conn:
                 conn.rollback()
             return json.dumps({
@@ -289,6 +363,7 @@ class RoadmapService:
     
     def sync_data(self):
         """提供数据同步接口（仅在生产环境可用）"""
+        conn = None
         if ENV != 'prod':
             return json.dumps({
                 'code': 403,
@@ -371,12 +446,18 @@ class RoadmapService:
     def get_roadmap(self):
         """获取所有未删除的开发计划"""
         # 在获取数据前先尝试同步
+        conn = None
         if ENV == 'local':
-            self.auto_sync()
+            sync_result = self.auto_sync()
+            print(f"[Roadmap] 同步结果: {sync_result}")
         
+        # 检查登录状态
         login_result = json.loads(self.check_login())
-        if login_result['code'] == 0:
-            return login_result
+        print(f"[Roadmap] 登录检查结果: {login_result}")
+        
+        if login_result['code'] != 0:  # 修改为检查code不等于0
+            print("[Roadmap] 用户未登录，返回登录检查结果")
+            return json.dumps(login_result)
         
         try:
             conn = self.get_db()
@@ -384,23 +465,30 @@ class RoadmapService:
             
             # 计算一年前的时间戳
             one_year_ago = int(time.time()) - (365 * 24 * 60 * 60)
+            
+            # 获取用户ID（从登录结果中获取）
+            user_id = login_result['data']['user_id']
+            print(f"[Roadmap] 获取用户 {user_id} 的开发计划")
+            
             # 只获取未删除的记录
             cursor.execute('''
                 SELECT * FROM roadmap 
-                WHERE is_deleted = 0  AND edittime > ? AND user_id = ?
+                WHERE is_deleted = 0 AND edittime > ? AND user_id = ?
                 ORDER BY "order" ASC, edittime DESC
-            ''', (one_year_ago,session.get('user_id')))
+            ''', (one_year_ago, user_id))
             
             roadmaps = [dict(row) for row in cursor.fetchall()]
+            print(f"[Roadmap] 获取到 {len(roadmaps)} 条记录")
+            
             return json.dumps({
                 'code': 0,
                 'msg': '获取成功',
                 'data': roadmaps
             })
         except Exception as e:
-            print(f"获取开发计划失败: {str(e)}")
+            print(f"[Roadmap] 获取开发计划失败: {str(e)}")
             return json.dumps({
-                'code': 500,
+                'code': 1,
                 'msg': f'获取失败: {str(e)}',
                 'data': None
             })
@@ -410,10 +498,15 @@ class RoadmapService:
 
     def add_roadmap(self, data):
         """添加开发计划"""
+        conn = None
         try:
+            # 检查登录状态
             login_result = json.loads(self.check_login())
-            if login_result['code'] == 0:
+            if login_result['code'] != 0:  # 修改判断条件
+                print("[Roadmap] 用户未登录")
                 return login_result
+            
+            # 获取数据库连接
             conn = self.get_db()
             cursor = conn.cursor()
             
@@ -422,6 +515,10 @@ class RoadmapService:
             max_order = cursor.fetchone()[0] or 0
             
             current_time = int(time.time())
+            
+            # 获取用户ID（从登录结果中获取）
+            user_id = login_result['data']['user_id']
+            print(f"[Roadmap] 添加开发计划 - 用户: {user_id}")
             
             cursor.execute('''
                 INSERT INTO roadmap (
@@ -439,16 +536,18 @@ class RoadmapService:
                 session.get('user_id')
             ))
             
+            new_id = cursor.lastrowid
             conn.commit()
             
+            print(f"[Roadmap] 添加成功 - ID: {new_id}")
             return json.dumps({
                 'code': 0,
                 'msg': '添加成功',
-                'data': cursor.lastrowid
+                'data': new_id
             })
             
         except Exception as e:
-            print(f"添加开发计划失败: {str(e)}")
+            print(f"[Roadmap] 添加开发计划失败: {str(e)}")
             if conn:
                 conn.rollback()
             return json.dumps({
@@ -462,10 +561,15 @@ class RoadmapService:
 
     def update_roadmap(self, roadmap_id, data):
         """更新开发计划"""
+        conn = None
         try:
+            # 检查登录状态
             login_result = json.loads(self.check_login())
-            if login_result['code'] == 0:
+            if login_result['code'] != 0:  # 修改判断条件
+                print("[Roadmap] 用户未登录")
                 return login_result
+            
+            # 获取数据库连接
             conn = self.get_db()
             cursor = conn.cursor()
             
@@ -475,6 +579,7 @@ class RoadmapService:
             update_fields = []
             params = []
             
+            # 处理各个字段的更新
             if 'name' in data:
                 update_fields.append('name = ?')
                 params.append(data['name'])
@@ -488,23 +593,39 @@ class RoadmapService:
                 update_fields.append('color = ?')
                 params.append(data['color'])
             if 'order' in data:
+                print(f"[Roadmap] Updating order to: {data['order']}")
                 update_fields.append('"order" = ?')
-                params.append(data['order'])
+                params.append(int(data['order']))  # 确保order是整数
                 
+            # 添加更新时间
             update_fields.append('edittime = ?')
             params.append(current_time)
             
             # 添加ID到参数列表
             params.append(roadmap_id)
             
+            # 构建并执行更新查询
             query = f'''
                 UPDATE roadmap 
                 SET {', '.join(update_fields)}
                 WHERE id = ?
             '''
             
+            print(f"[Roadmap] Executing update query: {query}")
+            print(f"[Roadmap] Query parameters: {params}")
+            
             cursor.execute(query, params)
+            
+            if cursor.rowcount == 0:
+                print(f"[Roadmap] No rows updated for ID: {roadmap_id}")
+                return json.dumps({
+                    'code': 404,
+                    'msg': '任务不存在或无权限更新',
+                    'data': None
+                })
+            
             conn.commit()
+            print(f"[Roadmap] Successfully updated task {roadmap_id}")
             
             return json.dumps({
                 'code': 0,
@@ -513,7 +634,7 @@ class RoadmapService:
             })
             
         except Exception as e:
-            print(f"更新开发计划失败: {str(e)}")
+            print(f"[Roadmap] Error updating task: {str(e)}")
             if conn:
                 conn.rollback()
             return json.dumps({
@@ -552,6 +673,108 @@ class RoadmapService:
             return json.dumps({
                 'code': 500,
                 'msg': f'删除失败: {str(e)}',
+                'data': None
+            })
+        finally:
+            if conn:
+                conn.close()
+
+    def batch_sync(self, updates):
+        """批量同步数据（仅在生产环境可用）
+        
+        Args:
+            updates: 要同步的数据列表
+            
+        Returns:
+            同步结果
+        """
+        if ENV != 'prod':
+            return json.dumps({
+                'code': 403,
+                'msg': '只能在生产环境使用批量同步',
+                'data': None
+            })
+        
+        conn = None
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            stats = {'updated': 0, 'deleted': 0}
+            
+            for item in updates:
+                # 检查记录是否存在
+                cursor.execute('SELECT id FROM roadmap WHERE id = ?', (item['id'],))
+                exists = cursor.fetchone()
+                
+                # 确保user_id有值
+                user_id = item.get('user_id', 1)
+                
+                if exists:
+                    # 更新现有记录
+                    cursor.execute('''
+                        UPDATE roadmap 
+                        SET name = ?, 
+                            description = ?, 
+                            status = ?, 
+                            color = ?,
+                            addtime = ?,
+                            edittime = ?,
+                            "order" = ?,
+                            user_id = ?,
+                            is_deleted = ?
+                        WHERE id = ?
+                    ''', (
+                        item['name'],
+                        item['description'],
+                        item['status'],
+                        item.get('color', '#ffffff'),
+                        item['addtime'],
+                        item['edittime'],
+                        item.get('order', 0),
+                        user_id,
+                        item.get('is_deleted', 0),
+                        item['id']
+                    ))
+                else:
+                    # 插入新记录
+                    cursor.execute('''
+                        INSERT INTO roadmap (
+                            id, name, description, status, color,
+                            addtime, edittime, "order", user_id, is_deleted
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        item['id'],
+                        item['name'],
+                        item['description'],
+                        item['status'],
+                        item.get('color', '#ffffff'),
+                        item['addtime'],
+                        item['edittime'],
+                        item.get('order', 0),
+                        user_id,
+                        item.get('is_deleted', 0)
+                    ))
+                
+                if item.get('is_deleted', 0):
+                    stats['deleted'] += 1
+                else:
+                    stats['updated'] += 1
+            
+            conn.commit()
+            return json.dumps({
+                'code': 0,
+                'msg': '批量同步成功',
+                'data': stats
+            })
+            
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            print(f"[Sync] 批量同步失败: {str(e)}")
+            return json.dumps({
+                'code': 500,
+                'msg': f'批量同步失败: {str(e)}',
                 'data': None
             })
         finally:
