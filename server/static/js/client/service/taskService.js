@@ -114,7 +114,29 @@ class TaskService {
       throw error;
     }
   }
+  async handleTaskSubmit(data) {
+    const playerId = this.playerService.getPlayerId();
+    Logger.info("TaskService", `提交任务: ${data.taskId} 玩家ID: ${playerId}`);
 
+    try {
+      const response = await this.api.submitTask(data.taskId, playerId);
+      Logger.debug("TaskService", "提交任务响应:", response);
+      if (response.code === 0) {
+        // 更新任务状态
+        const taskStatus = {
+          id: data.taskId,
+          status: response.data.status,
+        };
+
+        await this.updateTaskStatus(taskStatus);
+        await this.loadCurrentTasks();
+      }
+      return response;
+    } catch (error) {
+      Logger.error("TaskService", "提交任务失败:", error);
+      throw error;
+    }
+  }
   async handleTaskComplete(taskId) {
     Logger.info("TaskService", "处理任务完成:", taskId);
     try {
@@ -308,6 +330,18 @@ class TaskService {
             currentTasks.splice(abandonedTaskIndex, 1);
           }
           break;
+        case "CHECK":
+          // 将任务从当前任务列表中移除，添加到可用任务列表
+          if (taskData.need_check) {
+            // 需要审核，修改任务状态为CHECK
+            
+          } else {
+            // 不需要审核，修改任务状态为COMPLETED
+            await this.updateTaskStatus({
+              id: taskId,
+              status: "COMPLETED",
+            });
+          }
         default:
           // 更新当前任务状态
           const currentTaskIndex = currentTasks.findIndex((t) => t.id === taskId);

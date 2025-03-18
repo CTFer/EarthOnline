@@ -77,38 +77,53 @@
   }
 }
 
-// 任务列表轮播
-.task-list-swiper() {
-  height: 100%;
-  max-height: calc(100vh - 200px); // 调整合适的高度
+// 任务列表容器样式调整
+.task-list-container() {
+    height: calc(100vh - 500px); // 调整合适的高度
+    min-height: 300px;
+    position: relative;
+    overflow: hidden;
 
-  .swiper-wrapper {
-    // 允许内容自然增长
-    height: auto;
-  }
-
-  .swiper-slide {
-    height: auto; // 允许每个slide根据内容自适应高度
-
-    // 确保最后一个slide有底部间距
-    &:last-child {
-      margin-bottom: 20px;
+    .swiper {
+        height: 100%;
+        
+        .swiper-wrapper {
+            height: auto;
+            min-height: 100%;
+        }
+        
+        .swiper-slide {
+            height: auto;
+            margin-bottom: 10px;
+            
+            &:last-child {
+                margin-bottom: 20px;
+            }
+        }
     }
-  }
-      
-  .swiper-scrollbar {
-    width: 4px;
-    right: 2px;
-    opacity: 1;
-    background: rgba(0, 0, 0, 0.1);
     
-    &-drag {
-        background: #ffc447;
-        border-radius: 2px;
-        cursor: pointer;
+    // 调整滚动条样式
+    .swiper-scrollbar-task-list {
+        width: 4px;
+        right: 2px;
+        opacity: 0.8;
+        transition: width 0.3s ease;
+        
+        &:hover {
+            width: 6px;
+        }
+        
+        .swiper-scrollbar-drag {
+            background: @primary-color;
+            border-radius: 2px;
+            
+            &:hover, &:active {
+                background: darken(@primary-color, 10%);
+            }
+        }
     }
 }
-}
+
 // 自定义滚动条样式
 .swiper-scrollbar {
   right: 2px;

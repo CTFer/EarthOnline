@@ -575,7 +575,7 @@ class TemplateService {
                             ` : ''}
                         </div>
                         <div class="task-actions">
-                            <button class="submit-btn" data-task-id="${taskData.id}">
+                            <button class="submit-btn submit-task" data-task-id="${taskData.id}">
                                 <i class="layui-icon layui-icon-ok"></i>
                                 提交任务
                             </button>

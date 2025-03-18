@@ -1,0 +1,135 @@
+{% extends "admin/admin_base.html" %} {% block title %}任务审核{% endblock %} {% block content %}
+<link rel="stylesheet" href="/static/css/admin/task_check.css" />
+<div class="layui-container">
+  <div class="layui-row">
+    <div class="layui-col-md12">
+      <div class="layui-card">
+        <div class="layui-card-header">
+          <span>待审核任务列表</span>
+          <div class="layui-btn-group">
+            <button class="layui-btn layui-btn-sm" onclick="refreshTable()"><i class="layui-icon">&#xe669;</i> 刷新</button>
+          </div>
+        </div>
+        <div class="layui-card-body">
+          <table id="taskCheckTable" lay-filter="taskCheckTable"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 任务详情模板 -->
+<div id="taskDetailTpl" style="display: none;">
+  <div class="task-detail-container">
+    <div class="layui-form">
+      <div class="layui-form-item">
+        <label class="layui-form-label">任务名称</label>
+        <div class="layui-input-block">
+          <input type="text" name="task_name" class="layui-input" readonly>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">任务描述</label>
+        <div class="layui-input-block">
+          <textarea name="description" class="layui-textarea" readonly></textarea>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">提交说明</label>
+        <div class="layui-input-block">
+          <textarea name="comment" class="layui-textarea" readonly></textarea>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">提交时间</label>
+        <div class="layui-input-block">
+          <input type="text" name="submit_time" class="layui-input" readonly>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">玩家信息</label>
+        <div class="layui-input-block">
+          <input type="text" name="player_info" class="layui-input" readonly>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 驳回原因模板 -->
+<div id="rejectFormTpl" style="display: none;">
+  <div class="reject-form-container">
+    <form class="layui-form" lay-filter="rejectForm">
+      <div class="layui-form-item layui-form-text">
+        <label class="layui-form-label">驳回原因</label>
+        <div class="layui-input-block">
+          <textarea name="reject_reason" placeholder="请输入驳回原因" class="layui-textarea" lay-verify="required"></textarea>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <div class="layui-input-block">
+          <button class="layui-btn" lay-submit lay-filter="rejectSubmit">提交</button>
+          <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="/static/js/admin/task_check.js"></script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .task-detail-container {
+    padding: 20px;
+  }
+  
+  .task-detail-container .layui-form-label {
+    width: 100px;
+  }
+  
+  .task-detail-container .layui-input-block {
+    margin-left: 130px;
+  }
+  
+  .task-detail-container .layui-textarea {
+    min-height: 100px;
+  }
+  
+  .reject-form-container {
+    padding: 20px;
+  }
+  
+  .reject-form-container .layui-form-label {
+    width: 100px;
+  }
+  
+  .reject-form-container .layui-input-block {
+    margin-left: 130px;
+  }
+  
+  .reject-form-container .layui-textarea {
+    min-height: 150px;
+  }
+  
+  .layui-btn-group .layui-btn {
+    margin-right: 5px;
+  }
+  
+  .layui-card {
+    margin-bottom: 15px;
+  }
+  
+  .layui-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .layui-table-cell {
+    height: auto;
+    line-height: 28px;
+  }
+</style>
+{% endblock %} 

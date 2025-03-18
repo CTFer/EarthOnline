@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-03-05 15:37:59
+ * @LastEditTime: 2025-03-18 13:38:53
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -804,14 +804,17 @@ class UIService {
     try {
       // 移除所有任务卡片的事件监听
       document.querySelectorAll(".task-card").forEach((taskCard) => {
-        const acceptBtn = taskCard.querySelector(".accept-task-btn");
+        const acceptBtn = taskCard.querySelector(".accept-task");
         const abandonBtn = taskCard.querySelector(".abandon-task");
-
+        const submitBtn = taskCard.querySelector(".submit-task");
         if (acceptBtn) {
           acceptBtn.removeEventListener("click", this.handleTaskAccept);
         }
         if (abandonBtn) {
           abandonBtn.removeEventListener("click", this.handleTaskAbandon);
+        }
+        if (submitBtn) {
+          submitBtn.removeEventListener("click", this.handleTaskSubmit);
         }
         taskCard.removeEventListener("click", this.handleTaskClick);
       });
@@ -909,6 +912,44 @@ class UIService {
     }
   }
 
+  /**
+   * 处理任务提交事件
+   * @param {string} taskId 任务ID
+   */
+  async handleTaskSubmit(taskId) {
+    Logger.info("UIService", "处理提交任务:", taskId);
+    try {
+      // 显示确认对话框
+      layer.confirm(
+        "确定要提交这个任务吗？",
+        {
+          title: "提交任务",
+          btn: ["确定", "取消"],
+          icon: 3,
+        },
+        () => {
+          try {
+            // 用户点击确定后触发任务提交事件
+            this.eventBus.emit(TASK_EVENTS.SUBMIT, {
+              taskId: taskId,
+              playerId: this.playerService.getPlayerId(),
+            });
+            layer.closeAll();
+          } catch (error) {
+            Logger.error("UIService", "提交任务失败:", error);
+            this.showErrorMessage("提交任务失败: " + error.message);
+          }
+        }
+      );
+    } catch (error) {
+      Logger.error("UIService", "提交任务失败:", error);
+      this.showNotification({
+        type: "ERROR",
+        message: "提交任务失败",
+      });
+      this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
+    }
+  }
   // ... 其他UI相关方法
   // 优化地图渲染器变更处理方法
   updatePlayerInfo(playerData) {
@@ -1071,6 +1112,14 @@ class UIService {
       Logger.debug("UIService", "处理放弃任务按钮点击::, taskId ", taskId);
       if (taskId) {
         this.handleTaskAbandon(taskId);
+      }
+    }
+    // 处理提交任务按钮点击
+    if (target.classList.contains('submit-task')) {
+      const taskId = target.dataset.taskId;
+      Logger.debug("UIService", "处理提交任务按钮点击::, taskId ", taskId);
+      if (taskId) {
+        this.handleTaskSubmit(taskId);
       }
     }
   }

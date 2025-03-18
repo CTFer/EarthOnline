@@ -1,0 +1,165 @@
+{% extends "admin/admin_base.html" %} {% block title %}任务历史{% endblock %} {% block content %}
+<link rel="stylesheet" href="/static/css/admin/task_history.css" />
+<div class="layui-container">
+  <div class="layui-row">
+    <div class="layui-col-md12">
+      <div class="layui-card">
+        <div class="layui-card-header">
+          <span>任务历史记录</span>
+          <div class="layui-btn-group">
+            <button class="layui-btn layui-btn-sm" onclick="refreshTable()"><i class="layui-icon">&#xe669;</i> 刷新</button>
+          </div>
+        </div>
+        <div class="layui-card-body">
+          <!-- 搜索表单 -->
+          <form class="layui-form layui-form-pane" lay-filter="searchForm">
+            <div class="layui-form-item">
+              <div class="layui-inline">
+                <label class="layui-form-label">任务ID</label>
+                <div class="layui-input-inline">
+                  <input type="text" name="task_id" placeholder="请输入任务ID" autocomplete="off" class="layui-input">
+                </div>
+              </div>
+              <div class="layui-inline">
+                <label class="layui-form-label">玩家ID</label>
+                <div class="layui-input-inline">
+                  <input type="text" name="player_id" placeholder="请输入玩家ID" autocomplete="off" class="layui-input">
+                </div>
+              </div>
+              <div class="layui-inline">
+                <label class="layui-form-label">状态</label>
+                <div class="layui-input-inline">
+                  <select name="status">
+                    <option value="">全部</option>
+                    <option value="IN_PROGRESS">进行中</option>
+                    <option value="CHECK">待审核</option>
+                    <option value="COMPLETED">已完成</option>
+                    <option value="REJECT">已驳回</option>
+                    <option value="ABANDONED">已放弃</option>
+                  </select>
+                </div>
+              </div>
+              <div class="layui-inline">
+                <button class="layui-btn" lay-submit lay-filter="searchSubmit">
+                  <i class="layui-icon">&#xe615;</i> 搜索
+                </button>
+                <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+              </div>
+            </div>
+          </form>
+          
+          <table id="taskHistoryTable" lay-filter="taskHistoryTable"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 任务详情模板 -->
+<div id="taskDetailTpl" style="display: none;">
+  <div class="task-detail-container">
+    <div class="layui-form">
+      <div class="layui-form-item">
+        <label class="layui-form-label">任务名称</label>
+        <div class="layui-input-block">
+          <input type="text" name="task_name" class="layui-input" readonly>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">任务描述</label>
+        <div class="layui-input-block">
+          <textarea name="description" class="layui-textarea" readonly></textarea>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">玩家信息</label>
+        <div class="layui-input-block">
+          <input type="text" name="player_info" class="layui-input" readonly>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">当前状态</label>
+        <div class="layui-input-block">
+          <input type="text" name="status" class="layui-input" readonly>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">开始时间</label>
+        <div class="layui-input-block">
+          <input type="text" name="starttime" class="layui-input" readonly>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">提交时间</label>
+        <div class="layui-input-block">
+          <input type="text" name="submit_time" class="layui-input" readonly>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">完成时间</label>
+        <div class="layui-input-block">
+          <input type="text" name="complete_time" class="layui-input" readonly>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">提交说明</label>
+        <div class="layui-input-block">
+          <textarea name="comment" class="layui-textarea" readonly></textarea>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">驳回原因</label>
+        <div class="layui-input-block">
+          <textarea name="reject_reason" class="layui-textarea" readonly></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/admin/task_history.js"></script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .task-detail-container {
+    padding: 20px;
+  }
+  
+  .task-detail-container .layui-form-label {
+    width: 100px;
+  }
+  
+  .task-detail-container .layui-input-block {
+    margin-left: 130px;
+  }
+  
+  .task-detail-container .layui-textarea {
+    min-height: 100px;
+  }
+  
+  .layui-form-pane {
+    margin-bottom: 15px;
+  }
+  
+  .layui-card {
+    margin-bottom: 15px;
+  }
+  
+  .layui-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .layui-table-cell {
+    height: auto;
+    line-height: 28px;
+  }
+  
+  .layui-badge {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+</style>
+{% endblock %} 

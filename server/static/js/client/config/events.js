@@ -54,6 +54,8 @@ export const TASK_EVENTS = {
   LIST_UPDATED: "task:list:updated",
   // 当前任务更新
   CURRENT_UPDATED: "task:current:updated",
+  // 当前任务提交
+  SUBMITT: "task:current:submit ",
   // 任务错误
   ERROR: "task:error",
   // 任务点击

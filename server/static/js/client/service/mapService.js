@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:42
- * @LastEditTime: 2025-03-15 22:04:12
+ * @LastEditTime: 2025-03-17 11:55:05
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -26,7 +26,7 @@ import AMapRenderer from "./map/amapRenderer.js";
 
 import EchartsRenderer from "./map/echartsRenderer.js";
 import { MAP_EVENTS, UI_EVENTS } from "../config/events.js";
-import { WS_EVENT_TYPES } from "../config/wsConfig.js";
+import { WS_EVENT_TYPES, WS_TOPICS, WS_ROOMS } from "../config/wsConfig.js";
 class MapService {
   constructor(api, eventBus, uiService, playerService, store) {
     Logger.info("MapService", "constructor:23", "开始初始化地图服务");

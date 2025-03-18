@@ -130,12 +130,14 @@ TASK_TYPE = {
     'BRANCH': '支线任务',
     'SPECIAL': '特殊任务',
 }
+# 任务池中的任务状态
 TASK_STATUS = {
     'ACCEPT': '已接受',  # 任务已被接受
     'LOCKED': '未解锁',  # 任务未解锁
     'AVAIL': '可接受',  # 任务可接受
     'COMPLETED': '已完成',  # 任务已完成
 }
+# 玩家任务状态
 CURRENT_TASK_STATUS = {
     'IN_PROGRESS': '进行中',  # 任务进行中
     'CHECK': '待检查',  # 玩家提交等待管理员检查

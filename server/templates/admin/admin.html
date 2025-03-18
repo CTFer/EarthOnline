@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-12 19:09:10
- * @LastEditTime: 2025-03-10 22:26:41
+ * @LastEditTime: 2025-03-17 17:30:28
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -15,9 +15,9 @@
 
     <link rel="stylesheet" href="/static/css/mobile.min.css" />
     <script src="/static/js/crypto-js.min.js"></script>
-    <script type="module" src="/static/js/config/config.js"></script>
     <script src="/static/layui/layui.js"></script>
     <script src="/static/js/socket.io.js"></script>
+    <script type="module" src="/static/js/config/config.js"></script>
     <script type="module" src="/static/js/admin/admin.js"></script>
     <script type="module" src="/static/js/admin/taskForm.js"></script>
   </head>
@@ -25,7 +25,7 @@
     <div class="admin-container">
       <h1>游戏管理后台</h1>
 
-      {% extends "admin_base.html" %} {% block title %}管理{% endblock %} {% block header_title %}管理{% endblock %} {% block content %}
+      {% extends "admin/admin_base.html" %} {% block title %}管理{% endblock %} {% block header_title %}管理{% endblock %} {% block content %}
       <!-- 用户管理面板 -->
       <div class="panel">
         <h2>用户管理</h2>
@@ -179,8 +179,6 @@
       <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
       <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
     </script>
-
-    <script src="/static/js/admin/admin.js"></script>
 
     <script>
       // 确保 layui 正确初始化

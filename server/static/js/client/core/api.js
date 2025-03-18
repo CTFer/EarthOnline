@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:01
- * @LastEditTime: 2025-03-09 14:47:43
+ * @LastEditTime: 2025-03-18 13:31:15
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -110,7 +110,13 @@ class APIClient {
             })
         });
     }
-
+    async submitTask(taskId, playerId) {
+        Logger.info('API', '提交任务:', taskId, 'for player:', playerId);
+        return this.request(`/api/tasks/submit`, {
+            method: 'POST',
+            body: JSON.stringify({ player_id: playerId, task_id: taskId })
+        });
+    }
     async completeTask(taskId, playerId) {
         Logger.info('API', '完成任务:', taskId, 'for player:', playerId);
         return this.request(`/api/tasks/complete`, {

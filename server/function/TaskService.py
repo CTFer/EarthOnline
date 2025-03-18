@@ -37,89 +37,252 @@ class TaskService:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def get_task_by_id(self, task_id: int) -> Dict:
-        """获取任务详情"""
+    def _get_task_base_query(self):
+        """获取基础任务查询SQL"""
+        return '''
+            SELECT t.*, 
+                   p.player_name,
+                   COALESCE(pt.status, 'AVAIL') as current_status,
+                   pt.starttime,
+                   pt.submit_time,
+                   pt.complete_time,
+                   pt.comment,
+                   pt.reject_reason
+            FROM task t
+            LEFT JOIN player_task pt ON t.id = pt.task_id 
+            LEFT JOIN player_data p ON pt.player_id = p.player_id
+        '''
+
+    def _get_task_by_id_base(self, task_id: int, player_id: int = None) -> Dict:
+        """基础的任务查询函数
+        
+        Args:
+            task_id: 任务ID
+            player_id: 玩家ID（可选）
+            
+        Returns:
+            任务信息字典
+        """
         try:
             conn = self.get_db()
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM task WHERE id = ?', (task_id,))
+            
+            query = self._get_task_base_query()
+            params = [task_id]
+            
+            if player_id:
+                query += ' WHERE t.id = ? AND pt.player_id = ?'
+                params.append(player_id)
+            else:
+                query += ' WHERE t.id = ?'
+            
+            cursor.execute(query, params)
             task = cursor.fetchone()
+            
+            if task:
+                return ResponseHandler.success(
+                    data=dict(task),
+                    msg="获取任务成功"
+                )
+            return ResponseHandler.error(
+                code=StatusCode.TASK_NOT_FOUND,
+                msg="任务不存在"
+            )
+        except Exception as e:
+            logger.error(f"获取任务失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取任务失败: {str(e)}"
+            )
+        finally:
+            conn.close()
 
+    def _get_tasks_base(self, conditions: str = "", params: list = None, 
+                       page: int = None, limit: int = None) -> Dict:
+        """基础的任务列表查询函数
+        
+        Args:
+            conditions: WHERE条件语句
+            params: 查询参数列表
+            page: 页码
+            limit: 每页数量
+            
+        Returns:
+            任务列表字典
+        """
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 构建基础查询
+            query = self._get_task_base_query()
+            if conditions:
+                query += f" WHERE {conditions}"
+            
+            # 获取总数
+            count_query = f"SELECT COUNT(*) FROM ({query})"
+            cursor.execute(count_query, params or [])
+            total = cursor.fetchone()[0]
+            
+            # 添加分页
+            if page is not None and limit is not None:
+                offset = (page - 1) * limit
+                query += f" LIMIT {limit} OFFSET {offset}"
+            
+            cursor.execute(query, params or [])
+            tasks = [dict(row) for row in cursor.fetchall()]
+            
+            return ResponseHandler.success(
+                data={
+                    "total": total,
+                    "tasks": tasks
+                },
+                msg="获取任务列表成功"
+            )
+        except Exception as e:
+            logger.error(f"获取任务列表失败: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取任务列表失败: {str(e)}"
+            )
+        finally:
+            conn.close()
+
+    def _update_task_status(self, task_id: int, player_id: int, 
+                           new_status: str, extra_data: Dict = None) -> Dict:
+        """更新任务状态
+        
+        Args:
+            task_id: 任务ID
+            player_id: 玩家ID 
+            new_status: 新状态
+            extra_data: 额外更新的数据
+            
+        Returns:
+            更新结果字典
+        """
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 检查任务是否存在
+            cursor.execute('''
+                SELECT * FROM player_task 
+                WHERE id = ? AND player_id = ?
+            ''', (task_id, player_id))
+            task = cursor.fetchone()
+            
             if not task:
                 return ResponseHandler.error(
                     code=StatusCode.TASK_NOT_FOUND,
                     msg="任务不存在"
                 )
-
-            # 转换查询结果为字典
-            columns = [col[0] for col in cursor.description]
-            task_dict = dict(zip(columns, task))
-
-            return ResponseHandler.success(
-                data=task_dict,
-                msg="获取任务详情成功"
-            )
-
+            
+            # 构建更新字段
+            update_fields = ['status = ?']
+            params = [new_status]
+            
+            if extra_data:
+                for key, value in extra_data.items():
+                    update_fields.append(f"{key} = ?")
+                    params.append(value)
+            
+            params.extend([task_id, player_id])
+            
+            # 执行更新
+            cursor.execute(f'''
+                UPDATE player_task 
+                SET {", ".join(update_fields)}
+                WHERE id = ? AND player_id = ?
+            ''', params)
+            
+            conn.commit()
+            # 返回更新后的任务状态
+            return ResponseHandler.success(msg=f"任务状态更新为{new_status}",data={'status':new_status,'extra_data':extra_data})
+            
         except Exception as e:
+            logger.error(f"更新任务状态失败: {str(e)}")
+            if conn:
+                conn.rollback()
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
-                msg=f"获取任务详情失败: {str(e)}"
+                msg=f"更新任务状态失败: {str(e)}"
             )
         finally:
             if conn:
                 conn.close()
 
-    def get_current_task_by_id(self, task_id):
-        """获取当前任务详情"""
-        try:
-            conn = self.get_db()
-            cursor = conn.cursor()
-            
-            # 联表查询player_task和task表的数据
-            cursor.execute('''
-                SELECT 
-                    pt.id,
-                    pt.player_id,
-                    pt.status,
-                    pt.starttime,
-                    pt.endtime,
-                    pt.complete_time,
-                    t.name,
-                    t.description,
-                    t.task_type,
-                    t.stamina_cost,
-                    t.task_rewards,
-                    t.icon,
-                    t.limit_time
-                FROM player_task pt
-                JOIN task t ON pt.task_id = t.id
-                WHERE pt.id = ?
-            ''', (task_id,))
-            
-            task = cursor.fetchone()
-            
-            if task:
-                # 将查询结果转换为字典
-                task_data = dict(task)
-                
-                return ResponseHandler.success(
-                    data=task_data,
-                    msg="获取当前任务详情成功"
-                )
-            else:
-                return ResponseHandler.error(
-                    code=StatusCode.TASK_NOT_FOUND,
-                    msg="任务不存在"
-                )
-                
-        except sqlite3.Error as e:
-            return ResponseHandler.error(
-                code=StatusCode.SERVER_ERROR,
-                msg=f"获取当前任务详情失败: {str(e)}"
-            )
-        finally:
-            conn.close()
-            
+    def get_task_by_id(self, task_id: int) -> Dict:
+        """获取任务信息"""
+        return self._get_task_by_id_base(task_id)
+
+    def get_current_task_by_id(self, task_id: int):
+        """获取当前任务信息"""
+        return self._get_task_by_id_base(task_id)
+
+    def get_tasks(self, page=None, limit=None):
+        """获取任务列表"""
+        return self._get_tasks_base(page=page, limit=limit)
+
+    def get_check_tasks(self, page: int = 1, limit: int = 20) -> Dict:
+        """获取待审核任务列表"""
+        conditions = "pt.status = 'CHECK'"
+        return self._get_tasks_base(conditions, [], page, limit)
+
+    def get_task_history(self, task_id: int = None, player_id: int = None, 
+                        status: str = None, page: int = 1, limit: int = 20) -> Dict:
+        """获取任务历史记录"""
+        conditions = []
+        params = []
+        
+        if task_id:
+            conditions.append("t.id = ?")
+            params.append(task_id)
+        if player_id:
+            conditions.append("pt.player_id = ?")
+            params.append(player_id)
+        if status:
+            conditions.append("pt.status = ?")
+            params.append(status)
+        
+        where_clause = " AND ".join(conditions) if conditions else ""
+        return self._get_tasks_base(where_clause, params, page, limit)
+
+    def submit_task(self, player_id: int, task_id: int, comment: str = None) -> Dict:
+        """提交任务"""
+        return self._update_task_status(
+            task_id, 
+            player_id, 
+            'CHECK',
+            {
+                'submit_time': int(time.time()),
+                'comment': comment
+            }
+        )
+
+    def approve_task(self, task_id: int) -> Dict:
+        """通过任务"""
+        return self._update_task_status(
+            task_id,
+            player_id,
+            'COMPLETED',
+            {
+                'complete_time': int(time.time())
+            }
+        )
+
+    def reject_task(self, task_id: int, reject_reason: str = None) -> Dict:
+        """驳回任务"""
+        return self._update_task_status(
+            task_id,
+            player_id,
+            'REJECT',
+            {
+                'reject_reason': reject_reason,
+                'complete_time': int(time.time())
+            }
+        )
+
     def get_available_tasks(self, player_id: int) -> Dict:
         """获取可用任务列表"""
         try:
@@ -131,7 +294,7 @@ class TaskService:
                 SELECT t.task_type, t.id
                 FROM player_task pt
                 JOIN task t ON pt.task_id = t.id
-                WHERE pt.player_id = ? AND pt.status = 'IN_PROGRESS'
+                WHERE pt.player_id = ? AND (pt.status = 'IN_PROGRESS' OR pt.status = 'CHECK')
             ''', (player_id,))
             current_tasks = cursor.fetchall()
             
@@ -163,7 +326,7 @@ class TaskService:
             cursor.execute('''
                 SELECT 
                     t.id, t.name, t.description, t.stamina_cost,
-                    t.task_rewards, t.task_type, t.task_status, t.limit_time, t.icon,
+                    t.task_rewards,t.need_check, t.task_type, t.task_status, t.limit_time, t.icon,
                     t.parent_task_id, t.task_scope, t.repeatable, t.repeat_time
                 FROM task t
                 WHERE t.is_enabled = 1 
@@ -220,6 +383,11 @@ class TaskService:
                     elif current_count == 0:
                         # 不可重复任务，今天还未接受过
                         available_tasks.append(task_dict)
+                else:
+                    # 特殊任务处理
+                    if task_dict['task_type'] == 'SPECIAL':
+                        if task_dict['task_status'] == 'AVAIL':
+                            available_tasks.append(task_dict)
 
             return ResponseHandler.success(
                 data=available_tasks,
@@ -249,6 +417,7 @@ class TaskService:
                     t.name,
                     t.description,
                     t.stamina_cost,
+                    t.need_check,
                     pt.starttime,
                     pt.status,
                     t.task_type,
@@ -270,12 +439,13 @@ class TaskService:
                     'name': row[1],
                     'description': row[2],
                     'stamina_cost': row[3],
-                    'starttime': row[4],
-                    'status': row[5],
-                    'task_type': row[6],
-                    'endtime': row[7],
-                    'icon': row[8],
-                    'task_rewards':row[9]
+                    'need_check': row[4],
+                    'starttime': row[5],
+                    'status': row[6],
+                    'task_type': row[7],
+                    'endtime': row[8],
+                    'icon': row[9],
+                    'task_rewards':row[10]
                 })
 
             return ResponseHandler.success(
@@ -548,193 +718,308 @@ class TaskService:
         finally:
             conn.close()
 
-    def complete_task_api(self, player_id: int, task_id: int) -> Dict:
-        """完成任务"""
+    def complete_task_api(self, player_id: int, task_id: int, comment: str = None) -> Dict:
+        """完成任务并发放奖励
+        
+        Args:
+            player_id: 玩家ID
+            task_id: 任务ID
+            comment: 完成说明（可选）
+            
+        Returns:
+            Dict: 包含完成状态和奖励信息的响应
+        """
         try:
             conn = self.get_db()
             cursor = conn.cursor()
             
-            # 1. 完成当前任务
+            # 1. 检查任务状态
             cursor.execute('''
-                UPDATE player_tasks 
-                SET status = 'COMPLETED', 
-                    complete_time = CURRENT_TIMESTAMP
-                WHERE player_id = ? AND task_id = ? 
-                AND status = 'IN_PROGRESS'
+                SELECT pt.*, t.need_check, t.task_rewards
+                FROM player_task pt
+                JOIN task t ON pt.task_id = t.id
+                WHERE pt.player_id = ? AND pt.task_id = ? 
+                AND pt.status = 'IN_PROGRESS'
             ''', (player_id, task_id))
             
-            if cursor.rowcount == 0:
+            task_info = cursor.fetchone()
+            if not task_info:
                 return ResponseHandler.error(
                     code=StatusCode.TASK_NOT_FOUND,
-                    msg="任务状态无效或已完成"
+                    msg="任务状态无效或不存在"
+                )
+            
+            current_time = int(time.time())
+            
+            # 2. 根据任务配置决定是否需要审核
+            if task_info['need_check']:
+                # 需要审核的任务，更新状态为待审核
+                return self._update_task_status(
+                    task_id,
+                    player_id,
+                    'CHECK',
+                    {
+                        'submit_time': current_time,
+                        'comment': comment
+                    }
+                )
+            
+            # 3. 不需要审核的任务，直接完成并发放奖励
+            try:
+                # 发放奖励
+                rewards_summary = self._process_task_rewards(cursor, player_id, task_info, current_time)
+                
+                # 更新任务状态
+                cursor.execute('''
+                    UPDATE player_task
+                    SET status = 'COMPLETED',
+                        complete_time = ?,
+                        comment = ?
+                    WHERE player_id = ? AND task_id = ?
+                ''', (current_time, comment, player_id, task_id))
+                
+                # 4. 检查并处理主线任务进度
+                completed_main_quests = self._process_main_quest_completion(
+                    cursor, player_id, task_id, current_time
                 )
                 
-            # 2. 发放任务奖励
-            success, message, rewards = self._grant_task_rewards(conn, player_id, task_id)
-            if not success:
+                conn.commit()
+                
+                # 构建返回结果
+                result = {
+                    'task_completed': True,
+                    'rewards': rewards_summary,
+                    'main_quests_completed': completed_main_quests
+                }
+                
+                return ResponseHandler.success(
+                    data=result,
+                    msg="任务完成，奖励已发放"
+                )
+                
+            except Exception as e:
                 conn.rollback()
+                logger.error(f"处理任务完成失败: {str(e)}")
                 return ResponseHandler.error(
-                    code=StatusCode.FAIL,
-                    msg=f"发放奖励失败: {message}"
+                    code=StatusCode.SERVER_ERROR,
+                    msg=f"处理任务完成失败: {str(e)}"
                 )
-                
-            # 3. 检查父主线任务
-            parent_main_quests = self.get_parent_main_quests(task_id)
-            completed_main_quests = []
-            
-            for main_quest_id in parent_main_quests:
-                if self.check_main_quest_completion(player_id, main_quest_id):
-                    # 自动完成主线任务
-                    cursor.execute('''
-                        UPDATE player_tasks 
-                        SET status = 'COMPLETED', 
-                            complete_time = CURRENT_TIMESTAMP
-                        WHERE player_id = ? AND task_id = ? 
-                        AND status = 'IN_PROGRESS'
-                    ''', (player_id, main_quest_id))
-                    
-                    if cursor.rowcount > 0:
-                        # 发放主线任务奖励
-                        main_success, main_message, main_rewards = self._grant_task_rewards(
-                            conn, player_id, main_quest_id
-                        )
-                        if main_success:
-                            completed_main_quests.append({
-                                'task_id': main_quest_id,
-                                'rewards': main_rewards
-                            })
-                        else:
-                            logger.error(f"主线任务奖励发放失败: {main_message}")
-            
-            conn.commit()
-            
-            # 构建返回信息
-            result = {
-                'task_completed': True,
-                'rewards': rewards,
-                'main_quests_completed': completed_main_quests
-            }
-            
-            return ResponseHandler.success(
-                data=result,
-                msg="任务完成"
-            )
             
         except Exception as e:
-            conn.rollback()
             logger.error(f"完成任务失败: {str(e)}")
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
                 msg=f"完成任务失败: {str(e)}"
             )
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
-    def _grant_task_rewards(self, conn, player_id, task_id):
-        """发放任务奖励（保持现有实现）"""
-        # ... 现有的奖励发放代码 ...
-        pass
+    def _process_task_rewards(self, cursor, player_id: int, task_info: Dict, current_time: int) -> Dict:
+        """处理任务奖励发放
+        
+        Args:
+            cursor: 数据库游标
+            player_id: 玩家ID
+            task_info: 任务信息
+            current_time: 当前时间戳
+            
+        Returns:
+            Dict: 奖励发放摘要
+        """
+        rewards_summary = {
+            'points': 0,
+            'exp': 0,
+            'cards': [],
+            'medals': []
+        }
+        
+        rewards = json.loads(task_info['task_rewards'])
+        
+        # 1. 处理积分奖励
+        if rewards.get('points_rewards'):
+            for reward in rewards['points_rewards']:
+                if reward['type'] == 'points':
+                    points = int(reward['number'])
+                    cursor.execute('''
+                        UPDATE player_data 
+                        SET points = points + ? 
+                        WHERE player_id = ?
+                    ''', (points, player_id))
+                    rewards_summary['points'] = points
+                elif reward['type'] == 'exp':
+                    exp = int(reward['number'])
+                    cursor.execute('SELECT experience FROM player_data WHERE player_id = ?', (player_id,))
+                    current_exp = cursor.fetchone()['experience']
+                    new_exp = current_exp + exp
+                    
+                    cursor.execute('''
+                        UPDATE player_data 
+                        SET experience = ? 
+                        WHERE player_id = ?
+                    ''', (new_exp, player_id))
+                    
+                    cursor.execute('''
+                        INSERT INTO exp_record (player_id, number, addtime, total)
+                        VALUES (?, ?, ?, ?)
+                    ''', (player_id, exp, current_time, new_exp))
+                    
+                    rewards_summary['exp'] = exp
+        
+        # 2. 处理卡片奖励
+        if rewards.get('card_rewards'):
+            for card in rewards['card_rewards']:
+                card_id = card.get('id')
+                number = card.get('number', 1)
+                if not card_id:
+                    continue
+                
+                cursor.execute('''
+                    INSERT INTO player_game_card (player_id, game_card_id, number, timestamp)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(player_id, game_card_id) DO UPDATE
+                    SET number = number + ?,
+                        timestamp = ?
+                ''', (player_id, card_id, number, current_time, number, current_time))
+                
+                rewards_summary['cards'].append({
+                    'id': card_id,
+                    'number': number
+                })
+        
+        # 3. 处理勋章奖励
+        if rewards.get('medal_rewards'):
+            for medal in rewards['medal_rewards']:
+                medal_id = medal.get('id')
+                if not medal_id:
+                    continue
+                
+                cursor.execute('''
+                    INSERT OR IGNORE INTO player_medal (player_id, medal_id, addtime)
+                    VALUES (?, ?, ?)
+                ''', (player_id, medal_id, current_time))
+                
+                if cursor.rowcount > 0:
+                    rewards_summary['medals'].append(medal_id)
+        
+        return rewards_summary
 
-    # 管理员API方法
+    def _process_main_quest_completion(self, cursor, player_id: int, task_id: int, 
+                                     current_time: int) -> List[Dict]:
+        """处理主线任务完成进度
+        
+        Args:
+            cursor: 数据库游标
+            player_id: 玩家ID
+            task_id: 任务ID
+            current_time: 当前时间戳
+            
+        Returns:
+            List[Dict]: 完成的主线任务列表及其奖励
+        """
+        completed_main_quests = []
+        
+        # 获取父主线任务
+        parent_main_quests = self.get_parent_main_quests(task_id)
+        
+        for main_quest_id in parent_main_quests:
+            # 检查主线任务是否可以完成
+            if self.check_main_quest_completion(player_id, main_quest_id):
+                # 获取主线任务信息
+                cursor.execute('''
+                    SELECT t.*, pt.player_id
+                    FROM task t
+                    LEFT JOIN player_task pt ON t.id = pt.task_id AND pt.player_id = ?
+                    WHERE t.id = ?
+                ''', (player_id, main_quest_id))
+                main_quest = cursor.fetchone()
+                
+                if main_quest and main_quest['player_id']:
+                    # 更新主线任务状态
+                    cursor.execute('''
+                        UPDATE player_task
+                        SET status = 'COMPLETED',
+                            complete_time = ?
+                        WHERE player_id = ? AND task_id = ?
+                    ''', (current_time, player_id, main_quest_id))
+                    
+                    # 发放主线任务奖励
+                    rewards = self._process_task_rewards(cursor, player_id, main_quest, current_time)
+                    
+                    completed_main_quests.append({
+                        'task_id': main_quest_id,
+                        'rewards': rewards
+                    })
+        
+        return completed_main_quests
+
+    def _get_admin_tasks_query(self):
+        """获取管理后台任务查询SQL"""
+        return '''
+            SELECT t.*
+            FROM task t
+        '''
+
     def get_tasks(self, page=None, limit=None):
-        """获取任务列表，支持分页"""
+        """获取任务列表（管理后台接口）
+        
+        Args:
+            page: 页码
+            limit: 每页数量
+            
+        Returns:
+            Dict: 任务列表数据
+        """
         try:
             conn = self.get_db()
             cursor = conn.cursor()
-
-            # 获取总记录数
-            cursor.execute("SELECT COUNT(*) as total FROM task")
-            total = cursor.fetchone()['total']
-
+            
             # 构建基础查询
-            base_query = '''
-                SELECT id, name, description, task_type, task_status, 
-                       task_chain_id, parent_task_id, task_scope, stamina_cost,
-                       limit_time, repeat_time, is_enabled, repeatable, task_rewards
-                FROM task
-            '''
-
-            # 根据是否有分页参数决定查询方式
+            query = self._get_admin_tasks_query()
+            
+            # 获取总数
+            count_query = f"SELECT COUNT(*) FROM task"
+            cursor.execute(count_query)
+            total = cursor.fetchone()[0]
+            
+            # 添加排序和分页
+            query += " ORDER BY id DESC"
             if page is not None and limit is not None:
                 offset = (page - 1) * limit
-                query = base_query + ' LIMIT ? OFFSET ?'
-                cursor.execute(query, (limit, offset))
-            else:
-                cursor.execute(base_query)
-
+                query += f" LIMIT {limit} OFFSET {offset}"
+            
+            cursor.execute(query)
             tasks = []
             for row in cursor.fetchall():
-                task = dict(row)
-                # 处理task_rewards JSON字符串
-                if task['task_rewards'] and isinstance(task['task_rewards'], str):
+                task_data = dict(row)
+                # 确保 task_rewards 是 JSON 格式
+                if 'task_rewards' in task_data and isinstance(task_data['task_rewards'], str):
                     try:
-                        task['task_rewards'] = json.loads(task['task_rewards'])
-                    except json.JSONDecodeError:
-                        task['task_rewards'] = {}
-                tasks.append(task)
-
+                        task_data['task_rewards'] = json.loads(task_data['task_rewards'])
+                    except:
+                        task_data['task_rewards'] = {}
+                tasks.append(task_data)
+            
             return ResponseHandler.success(
                 data={
-                    "tasks": tasks,
                     "total": total,
-                    "page": page,
-                    "limit": limit
+                    "tasks": tasks
                 },
                 msg="获取任务列表成功"
             )
-
         except Exception as e:
-            print(f"获取任务列表失败: {str(e)}")
+            logger.error(f"获取任务列表失败: {str(e)}")
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
                 msg=f"获取任务列表失败: {str(e)}"
             )
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     def get_task(self, task_id):
         """获取单个任务信息"""
-        try:
-            conn = self.get_db()
-            cursor = conn.cursor()
-
-            # 获取任务信息
-            cursor.execute('''
-                SELECT id, name, description, task_type, task_status, 
-                       task_chain_id, parent_task_id, task_scope, stamina_cost,
-                       limit_time, repeat_time, is_enabled, repeatable, task_rewards
-                FROM task 
-                WHERE id = ?
-            ''', (task_id,))
-            
-            task = cursor.fetchone()
-            if not task:
-                return ResponseHandler.error(
-                    code=StatusCode.TASK_NOT_FOUND,
-                    msg="任务不存在"
-                )
-
-            task_dict = dict(task)
-            # 处理task_rewards JSON字符串
-            if task_dict['task_rewards'] and isinstance(task_dict['task_rewards'], str):
-                try:
-                    task_dict['task_rewards'] = json.loads(task_dict['task_rewards'])
-                except json.JSONDecodeError:
-                    task_dict['task_rewards'] = {}
-
-            return ResponseHandler.success(
-                data=task_dict,
-                msg="获取任务成功"
-            )
-
-        except Exception as e:
-            print(f"获取任务信息失败: {str(e)}")
-            return ResponseHandler.error(
-                code=StatusCode.SERVER_ERROR,
-                msg=f"获取任务信息失败: {str(e)}"
-            )
-        finally:
-            conn.close()
+        return self._get_task_by_id_base(task_id)
 
     def add_task(self, data):
         """添加新任务"""
@@ -860,7 +1145,7 @@ class TaskService:
 
             conn = self.get_db()
             cursor = conn.cursor()
-
+            logger.info(f"更新任务: {data}")
             # 检查任务是否存在
             cursor.execute('SELECT id FROM task WHERE id = ?', (task_id,))
             if not cursor.fetchone():
@@ -1001,7 +1286,6 @@ class TaskService:
             )
         finally:
             conn.close()
-
 
     # admin接口
     def get_player_tasks(self, page=1, limit=20):

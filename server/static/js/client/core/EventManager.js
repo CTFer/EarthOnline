@@ -319,6 +319,13 @@ class EventManager {
       this.handleError("任务接受", error, "接受任务失败");
     }
   }
+  async handleTaskSubmit(data) {
+    try {
+      await this.taskService.handleTaskSubmit(data);
+    } catch (error) {
+      this.handleError("任务提交", error, "提交任务失败");
+    }
+  }
   async handleTaskCompleted(data) {
     try {
       await this.wordcloudService.updateWordCloud();
@@ -333,6 +340,7 @@ class EventManager {
     this.eventBus.on(TASK_EVENTS.ABANDONED, this.handleTaskAbandon.bind(this));
     this.eventBus.on(TASK_EVENTS.ACCEPT, this.handleTaskAccept.bind(this));
     this.eventBus.on(TASK_EVENTS.ACCEPTED, this.handleTaskAccepted.bind(this));
+    this.eventBus.on(TASK_EVENTS.SUBMIT, this.handleTaskSubmit.bind(this));
     Logger.info("EventManager", "initializeTaskEvents:136", "任务事件监听器设置完成");
   }
 

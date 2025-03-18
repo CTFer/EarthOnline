@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-13 21:56:01
- * @LastEditTime: 2025-03-10 10:15:49
+ * @LastEditTime: 2025-03-18 12:56:54
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -92,10 +92,8 @@ export const SWIPER_CONFIG = {
             el: ".swiper-scrollbar-task-list",     // 滚动条容器的类名
             draggable: true,           // 是否可拖动
             hide: false,               // 是否自动隐藏
-            dragSize: 100,             // 滚动条滑块的大小
-            snapOnRelease: true,       // 释放时是否自动对齐
-            dragClass: 'swiper-scrollbar-drag',    // 滚动条滑块的类名
-            lockClass: 'swiper-scrollbar-lock',    // 滚动条锁定时的类名
+            dragSize: 'auto',    // 改为自动计算大小
+            snapOnRelease: false       // 关闭释放自动对齐
         },
         
         resistance: true,              // 开启边缘阻力

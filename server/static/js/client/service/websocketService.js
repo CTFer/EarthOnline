@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-17 13:47:42
- * @LastEditTime: 2025-03-11 17:16:55
+ * @LastEditTime: 2025-03-17 12:42:06
  * @LastEditors: 一根鱼骨棒
  * @Description: WebSocket服务管理
  */
@@ -222,6 +222,25 @@ class WebSocketService {
                     reconnecting: this.socket.io.reconnecting,
                     attempts: this.reconnectAttempts
                 });
+                
+                // 更新连接状态
+                this.state = WS_STATE.DISCONNECTED;
+                
+                // 清理订阅信息
+                this.currentSubscribedPlayerId = null;
+                this.subscriptions.clear();
+                
+                // 触发断开连接事件
+                this.eventBus.emit(WS_EVENTS.DISCONNECTED, {
+                    reason,
+                    wasConnected: this.socket.connected,
+                    reconnecting: this.socket.io.reconnecting
+                });
+                
+                // 如果不是主动断开连接，尝试重连
+                if (reason !== 'io client disconnect') {
+                    this.handleReconnection();
+                }
             });
 
             // 添加传输升级日志
@@ -529,6 +548,39 @@ class WebSocketService {
     // 获取连接状态
     isConnected() {
         return this.state === WS_STATE.CONNECTED;
+    }
+
+    // 添加重连处理方法
+    async handleReconnection() {
+        if (this.state === WS_STATE.CONNECTING) {
+            return;
+        }
+        
+        try {
+            this.reconnectAttempts++;
+            Logger.info('WebSocketService', `尝试重新连接 (第 ${this.reconnectAttempts} 次)`);
+            
+            // 重新连接
+            await this.connect();
+            
+            // 重新订阅之前的事件
+            if (this.currentSubscribedPlayerId) {
+                this.subscribeToPlayerEvents(this.currentSubscribedPlayerId);
+            }
+            
+        } catch (error) {
+            this.handleWSError(error, 'reconnect');
+            
+            // 如果重试次数未超过最大值，继续重试
+            if (this.reconnectAttempts < WS_CONFIG.CONNECTION.maxRetries) {
+                setTimeout(() => {
+                    this.handleReconnection();
+                }, WS_CONFIG.CONNECTION.retryInterval);
+            } else {
+                Logger.error('WebSocketService', '重连失败，已达到最大重试次数');
+                this.eventBus.emit(WS_EVENTS.RECONNECT_FAILED);
+            }
+        }
     }
 }
 

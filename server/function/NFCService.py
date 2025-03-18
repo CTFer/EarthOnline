@@ -647,239 +647,42 @@ class NFCService:
 
     def _handle_task_card(self, cursor, conn, task_id, player_id, socketio, room):
         """处理任务卡片"""
+        from function.TaskService import task_service  # 导入任务服务
+        
         print(f"[NFC] 开始处理任务卡片 - 任务ID: {task_id}")
         
-        # 首先验证玩家ID是否有效
-        cursor.execute('SELECT player_id FROM player_data WHERE player_id = ?', (player_id,))
-        player = cursor.fetchone()
-        if not player:
-            error_msg = f'无效的玩家ID: {player_id}'
-            print(f"[NFC] 错误: {error_msg}")
-            self._send_socket_message(socketio, room, 'ERROR', error_msg, task_id=task_id)
-            return {
-                'code': 404,
-                'msg': error_msg,
-                'data': None
-            }, 404
-        
-        # 查询任务信息
-        cursor.execute('''
-            SELECT id, name, description, task_type, need_check, 
-                   is_enabled, limit_time, task_rewards as rewards
-            FROM task 
-            WHERE id = ?
-        ''', (task_id,))
-        task = cursor.fetchone()
-        print(f"[NFC] 查询到的任务信息: {json.dumps(dict(task) if task else None, ensure_ascii=False)}")
-
-        if not task:
-            error_msg = f'任务不存在 (ID: {task_id})'
-            print(f"[NFC] 错误: {error_msg}")
-            self._send_socket_message(socketio, room, 'ERROR', error_msg, task_id=task_id)
-            return {
-                'code': 404,
-                'msg': error_msg,
-                'data': None
-            }, 404
-
-        if not task['is_enabled']:
-            error_msg = f'任务未启用 (ID: {task_id})'
-            print(f"[NFC] 错误: {error_msg}")
-            self._send_socket_message(socketio, room, 'ERROR', error_msg, task_id=task_id)
-            return {
-                'code': 403,
-                'msg': error_msg,
-                'data': None
-            }, 403
-
-        # 查询玩家任务状态
-        cursor.execute('''
-            SELECT pt.*, t.name as task_name, t.description, t.task_type
-            FROM player_task pt
-            JOIN task t ON pt.task_id = t.id
-            WHERE pt.player_id = ? AND pt.task_id = ? 
-            ORDER BY pt.starttime DESC LIMIT 1
-        ''', (player_id, task_id))
-        task_info = cursor.fetchone()
-        
-        print(f"[NFC] 查询到的玩家任务状态: {json.dumps(dict(task_info) if task_info else None, ensure_ascii=False)}")
-        
-        if not task_info:
-            message = self._format_task_message(
-                task,
-                "未接受",
-                "请先在任务面板接受该任务"
-            )
-            print(f"[NFC] 错误: 任务未接受")
-            self._send_socket_message(socketio, room, 'ERROR', message, task=dict(task))
-            return {
-                'code': 403, 
-                'msg': '未接受该任务',
-                'data': None
-            }, 403
-
-        status = task_info['status']
-        task_info = dict(task_info)
-
-        # 检查任务是否已完成
-        if status == 'COMPLETED':
-            complete_time = datetime.fromtimestamp(task_info["complete_time"]).strftime("%Y-%m-%d %H:%M:%S") if task_info.get("complete_time") else "未知"
-            message = self._format_task_message(
-                task,
-                "已完成",
-                f"完成时间：{complete_time}"
-            )
-            print(f"[NFC] 任务已经完成: {task['name']}")
-            self._send_socket_message(socketio, room, 'ALREADY_COMPLETED', message, task=task_info)
-            return {
-                'code': 0,
-                'msg': '任务已经完成',
-                'data': task_info
-            }, 200
-
-        # 检查任务是否在进行中
-        if status == 'IN_PROGRESS':
-            # 如果是自动完成的任务
-            if task['need_check'] == 0:
-                try:
-                    success, message, rewards_summary = self._complete_task(
-                        cursor, player_id, task_id, task_info, int(time.time()))
-                    
-                    if success:
-                        conn.commit()
-                        self._send_socket_message(
-                            socketio, room, 'COMPLETE', message, 
-                            task=task_info, rewards=rewards_summary, 
-                            timestamp=int(time.time())
-                        )
-                        return {
-                            'code': 0,
-                            'msg': message,
-                            'data': task_info
-                        }, 200
-                except Exception as e:
-                    conn.rollback()
-                    raise
+        try:
+            # 验证玩家和任务
+            result = task_service.complete_task_api(player_id, task_id)
+            
+            if result['code'] == 0:
+                # 任务完成成功
+                self._send_socket_message(
+                    socketio, 
+                    room, 
+                    'COMPLETE' if not result.get('data', {}).get('need_check') else 'CHECK',
+                    "任务提交成功",
+                    result.get('data', {})
+                )
+                return result
             else:
-                # 提交检查
-                cursor.execute('''
-                    UPDATE player_task
-                    SET status = 'CHECK'
-                    WHERE player_id = ? AND task_id = ?
-                ''', (player_id, task_id))
-                conn.commit()
-                print(f"[NFC] 任务已提交检查: {task['name']}")
-                self._send_socket_message(socketio, room, 'CHECK', message, task=task_info)
-                return {
-                    'code': 0,
-                    'msg': '任务已提交检查',
-                    'data': task_info
-                }, 200
-
-        return {
-            'code': 400,
-            'msg': f'无效的任务状态: {status}',
-            'data': task_info
-        }, 400
-
-    def _complete_task(self, cursor, player_id, task_id, task_info, current_time):
-        """完成任务并发放奖励"""
-        rewards_summary = {
-            'points': 0,
-            'exp': 0,
-            'cards': [],
-            'medals': []
-        }
-
-        # 获取任务奖励信息
-        cursor.execute('SELECT task_rewards FROM task WHERE id = ?', (task_id,))
-        rewards = json.loads(cursor.fetchone()['task_rewards'])
-
-        # 1. 处理积分奖励
-        if rewards.get('points', 0) > 0:
-            cursor.execute('''
-                UPDATE player_data 
-                SET points = points + ? 
-                WHERE player_id = ?
-            ''', (rewards['points'], player_id))
-            rewards_summary['points'] = rewards['points']
-
-        # 2. 处理经验奖励
-        if rewards.get('exp', 0) > 0:
-            cursor.execute('SELECT experience FROM player_data WHERE player_id = ?', (player_id,))
-            current_exp = cursor.fetchone()['experience']
-            new_exp = current_exp + rewards['exp']
+                # 任务完成失败
+                self._send_socket_message(
+                    socketio,
+                    room,
+                    'ERROR',
+                    result['msg']
+                )
+                return result
             
-            cursor.execute('''
-                UPDATE player_data 
-                SET experience = ? 
-                WHERE player_id = ?
-            ''', (new_exp, player_id))
-            
-            cursor.execute('''
-                INSERT INTO exp_record (player_id, number, addtime, total)
-                VALUES (?, ?, ?, ?)
-            ''', (player_id, rewards['exp'], current_time, new_exp))
-            
-            rewards_summary['exp'] = rewards['exp']
-
-        # 3. 处理卡片奖励
-        for card in rewards.get('cards', []):
-            card_id = card.get('id')
-            if not card_id:
-                continue
-                
-            cursor.execute('''
-                SELECT * FROM player_game_card 
-                WHERE player_id = ? AND game_card_id = ?
-            ''', (player_id, card_id))
-            existing_card = cursor.fetchone()
-            
-            if existing_card:
-                cursor.execute('''
-                    UPDATE player_game_card 
-                    SET number = number + 1,
-                        timestamp = ?
-                    WHERE player_id = ? AND game_card_id = ?
-                ''', (current_time, player_id, card_id))
-            else:
-                cursor.execute('''
-                    INSERT INTO player_game_card (
-                        player_id, game_card_id, number, timestamp
-                    ) VALUES (?, ?, 1, ?)
-                ''', (player_id, card_id, current_time))
-            
-            rewards_summary['cards'].append(card_id)
-
-        # 4. 处理勋章奖励
-        for medal in rewards.get('medals', []):
-            medal_id = medal.get('id')
-            if not medal_id:
-                continue
-                
-            cursor.execute('''
-                SELECT * FROM player_medal 
-                WHERE player_id = ? AND medal_id = ?
-            ''', (player_id, medal_id))
-            
-            if not cursor.fetchone():
-                cursor.execute('''
-                    INSERT INTO player_medal (
-                        player_id, medal_id, addtime
-                    ) VALUES (?, ?, ?)
-                ''', (player_id, medal_id, current_time))
-                
-                rewards_summary['medals'].append(medal_id)
-
-        # 更新任务状态为已完成
-        cursor.execute('''
-            UPDATE player_task
-            SET status = 'COMPLETED', 
-                complete_time = ? 
-            WHERE player_id = ? AND task_id = ?
-        ''', (current_time, player_id, task_id))
-
-        return True, "任务完成，奖励已发放", rewards_summary
+        except Exception as e:
+            error_msg = f"处理任务卡片失败: {str(e)}"
+            print(f"[NFC] 错误: {error_msg}")
+            self._send_socket_message(socketio, room, 'ERROR', error_msg)
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=error_msg
+            )
 
     def _handle_points_card(self, cursor, conn, card_id, value, player_id):
         """处理积分卡片"""

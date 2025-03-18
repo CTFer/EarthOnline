@@ -427,7 +427,6 @@ class AMapRenderer {
           ${gpsData.accuracy !== undefined ? `<p style="margin: 5px 0; color: #666; font-size: 12px;"><span style="color: #333;">精度:</span> ${gpsData.accuracy}m</p>` : ""}
         </div>
       `;
-      Logger.debug('AMapRenderer', 'createInfoWindowContent', '生成的内容:', content);
       return content;
     } catch (error) {
       Logger.error('AMapRenderer', 'createInfoWindowContent', '创建信息窗口内容失败:', error);

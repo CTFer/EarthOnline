@@ -148,163 +148,88 @@ class RoadmapService:
     def sync_from_prod(self):
         """从生产环境同步数据到本地，并将本地独有数据同步到生产环境
         
-        同步流程：
-        1. 环境检查：确保只在本地环境运行
-        2. 准备同步：构建请求头，包含API密钥和上次同步时间
-        3. 获取数据：从生产环境获取增量更新数据
-        4. 处理数据：将获取的数据更新到本地数据库
-        5. 同步本地：将本地独有数据同步到生产环境
-        6. 更新时间：记录本次同步时间
-        
-        同步规则：
-        - 根据edittime判断数据是否需要更新
-        - is_deleted标记用于处理已删除的记录
-        - 使用事务确保数据一致性
-        - 本地独有数据会被同步到生产环境
-        
-        返回格式：
-        {
-            'code': 0/500,  # 0表示成功，其他表示失败
-            'msg': '处理结果说明',
-            'data': {
-                'from_prod': [], # 从生产环境同步的数据
-                'to_prod': []    # 同步到生产环境的数据
-            }
-        }
+        同步策略：
+        1. 获取本地和生产环境的数据
+        2. 比较edittime时间戳
+        3. 本地较新的同步到生产环境
+        4. 生产环境较新的同步到本地
         """
-        # 初始化数据库连接为 None
         conn = None
-        
-        # 1. 环境检查
-        if ENV != 'local':
-            print("[Sync] 只能在本地环境同步数据")
-            return json.dumps({
-                'code': 400,
-                'msg': '只能在本地环境同步数据',
-                'data': None
-            })
-
         try:
-            print("[Sync] 开始双向同步数据...")
+            print("[Sync] 开始双向增量同步...")
             
-            # 2. 准备同步请求
+            # 准备同步请求头
             headers = {
                 'X-API-Key': PROD_SERVER['API_KEY'],
                 'X-Sync-Time': str(self.last_sync_time)
             }
             
-            # 3. 从生产环境获取数据
+            # 1. 从生产环境获取增量更新
             sync_url = f"{PROD_SERVER['URL']}/api/roadmap/sync"
-            print(f"[Sync] 从生产环境获取更新 - 上次同步时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_sync_time))}")
-            print(f"[Sync] 目标URL: {sync_url}")
+            print(f"[Sync] 从生产环境获取增量更新 - 上次同步时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_sync_time))}")
             
             response = requests.get(sync_url, headers=headers, timeout=PROD_SERVER['TIMEOUT'])
-            
             if response.status_code != 200:
-                print(f"[Sync] 从生产环境获取数据失败: {response.text}")
-                return json.dumps({
-                    'code': 500,
-                    'msg': f'同步失败: {response.text}',
-                    'data': None
-                })
+                raise Exception(f"获取生产环境数据失败: HTTP {response.status_code}")
             
-            updates_from_prod = response.json()
+            prod_updates = response.json().get('data', [])
+            print(f"[Sync] 收到 {len(prod_updates)} 条生产环境更新")
             
-            # 4. 处理数据更新
+            # 2. 获取本地数据库连接
             conn = self.get_db()
             cursor = conn.cursor()
             
-            # 记录同步统计
-            stats = {
-                'from_prod': {'updates': 0, 'deletes': 0},
-                'to_prod': {'updates': 0, 'deletes': 0}
-            }
+            # 3. 处理从生产环境获取的更新
+            stats = {'from_prod': 0, 'to_prod': 0}
             
-            # 4.1 处理从生产环境获取的更新
-            if updates_from_prod.get('data'):
-                print(f"[Sync] 收到 {len(updates_from_prod['data'])} 条生产环境更新")
+            for item in prod_updates:
+                cursor.execute('SELECT edittime FROM roadmap WHERE id = ?', (item['id'],))
+                local_record = cursor.fetchone()
                 
-                for item in updates_from_prod['data']:
-                    # 检查记录是否存在
-                    cursor.execute('SELECT id FROM roadmap WHERE id = ?', (item['id'],))
-                    exists = cursor.fetchone()
-                    
-                    # 确保user_id有值
-                    user_id = item.get('user_id', 1)  # 默认使用ID 1
-                    
-                    if exists:
-                        # 更新现有记录
+                if not local_record or local_record['edittime'] < item['edittime']:
+                    # 更新本地记录
+                    if local_record:
                         cursor.execute('''
                             UPDATE roadmap 
-                            SET name = ?, 
-                                description = ?, 
-                                status = ?, 
-                                color = ?,
-                                addtime = ?,
-                                edittime = ?,
-                                "order" = ?,
-                                user_id = ?,
-                                is_deleted = ?
+                            SET name = ?, description = ?, status = ?, 
+                                color = ?, addtime = ?, edittime = ?,
+                                "order" = ?, user_id = ?, is_deleted = ?
                             WHERE id = ?
                         ''', (
-                            item['name'],
-                            item['description'],
-                            item['status'],
-                            item.get('color', '#ffffff'),
-                            item['addtime'],
-                            item['edittime'],
-                            item.get('order', 0),
-                            user_id,
-                            item.get('is_deleted', 0),
+                            item['name'], item['description'], item['status'],
+                            item.get('color', '#ffffff'), item['addtime'], item['edittime'],
+                            item.get('order', 0), item.get('user_id', 1), item.get('is_deleted', 0),
                             item['id']
                         ))
+                        print(f"[Sync] 更新本地记录 {item['id']}: 生产环境时间 {item['edittime']} > 本地时间 {local_record['edittime']}")
                     else:
-                        # 插入新记录
                         cursor.execute('''
-                            INSERT INTO roadmap (
-                                id, name, description, status, color,
-                                addtime, edittime, "order", user_id, is_deleted
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            INSERT INTO roadmap (id, name, description, status, color,
+                                addtime, edittime, "order", user_id, is_deleted)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
-                            item['id'],
-                            item['name'],
-                            item['description'],
-                            item['status'],
-                            item.get('color', '#ffffff'),
-                            item['addtime'],
-                            item['edittime'],
-                            item.get('order', 0),
-                            user_id,
-                            item.get('is_deleted', 0)
+                            item['id'], item['name'], item['description'], item['status'],
+                            item.get('color', '#ffffff'), item['addtime'], item['edittime'],
+                            item.get('order', 0), item.get('user_id', 1), item.get('is_deleted', 0)
                         ))
-                    
-                    if item.get('is_deleted', 0):
-                        stats['from_prod']['deletes'] += 1
-                    else:
-                        stats['from_prod']['updates'] += 1
+                        print(f"[Sync] 插入新记录 {item['id']}")
+                    stats['from_prod'] += 1
             
-            # 4.2 获取本地独有的数据
+            # 4. 获取本地需要同步到生产环境的更新
             cursor.execute('''
-                SELECT r.*, 
-                    CASE 
-                        WHEN r.edittime > ? THEN 0 
-                        ELSE 1 
-                    END as is_deleted
-                FROM roadmap r
-                WHERE r.edittime > ?
-                ORDER BY r.edittime ASC
-            ''', (self.last_sync_time, self.last_sync_time))
+                SELECT * FROM roadmap 
+                WHERE edittime > ?
+                ORDER BY edittime ASC
+            ''', (self.last_sync_time,))
             
             local_updates = []
             for row in cursor.fetchall():
                 item = dict(row)
-                # 确保所有必需字段都有值
-                item['color'] = item.get('color', '#ffffff')
-                item['order'] = item.get('order', 0)
-                item['is_deleted'] = item.get('is_deleted', 0)
-                local_updates.append(item)
+                # 如果这条记录不在生产环境的更新列表中
+                if not any(p['id'] == item['id'] and p['edittime'] >= item['edittime'] for p in prod_updates):
+                    local_updates.append(item)
             
-            # 4.3 将本地更新同步到生产环境
+            # 5. 将本地更新同步到生产环境
             if local_updates:
                 print(f"[Sync] 发现 {len(local_updates)} 条本地更新需要同步到生产环境")
                 
@@ -317,50 +242,46 @@ class RoadmapService:
                 )
                 
                 if response.status_code != 200:
-                    print(f"[Sync] 同步到生产环境失败: {response.text}")
                     raise Exception("同步到生产环境失败")
                     
                 result = response.json()
                 if result.get('code') == 0:
-                    stats['to_prod']['updates'] = result.get('data', {}).get('updated', 0)
-                    stats['to_prod']['deletes'] = result.get('data', {}).get('deleted', 0)
-                    print(f"[Sync] 成功同步到生产环境: {stats['to_prod']['updates']} 更新, {stats['to_prod']['deletes']} 删除")
+                    stats['to_prod'] = len(local_updates)
+                    print(f"[Sync] 成功同步 {stats['to_prod']} 条记录到生产环境")
                 else:
                     raise Exception(f"同步到生产环境失败: {result.get('msg')}")
             
-            # 提交事务
+            # 6. 提交事务并更新同步时间
             conn.commit()
-            
-            # 5. 更新同步时间
             self.last_sync_time = int(time.time())
             
-            print(f"[Sync] 双向同步完成:")
-            print(f"从生产环境: {stats['from_prod']['updates']} 更新, {stats['from_prod']['deletes']} 删除")
-            print(f"到生产环境: {stats['to_prod']['updates']} 更新, {stats['to_prod']['deletes']} 删除")
+            print(f"[Sync] 双向增量同步完成:")
+            print(f"从生产环境同步: {stats['from_prod']} 条")
+            print(f"同步到生产环境: {stats['to_prod']} 条")
             
             return json.dumps({
                 'code': 0,
-                'msg': '双向同步成功',
+                'msg': '双向增量同步成功',
                 'data': {
-                    'from_prod': updates_from_prod.get('data', []),
-                    'to_prod': local_updates,
-                    'stats': stats
+                    'stats': stats,
+                    'from_prod': prod_updates,
+                    'to_prod': local_updates
                 }
             })
             
         except Exception as e:
-            print(f"[Sync] 同步过程出错: {str(e)}")
+            print(f"[Sync] 同步失败: {str(e)}")
             if conn:
                 conn.rollback()
             return json.dumps({
                 'code': 500,
-                'msg': f'同步过程出错: {str(e)}',
+                'msg': f'同步失败: {str(e)}',
                 'data': None
             })
         finally:
             if conn:
                 conn.close()
-    
+
     def sync_data(self):
         """提供数据同步接口（仅在生产环境可用）"""
         conn = None
@@ -680,13 +601,10 @@ class RoadmapService:
                 conn.close()
 
     def batch_sync(self, updates):
-        """批量同步数据（仅在生产环境可用）
+        """处理批量同步请求（仅在生产环境可用）
         
         Args:
             updates: 要同步的数据列表
-            
-        Returns:
-            同步结果
         """
         if ENV != 'prod':
             return json.dumps({
@@ -700,72 +618,49 @@ class RoadmapService:
             conn = self.get_db()
             cursor = conn.cursor()
             
-            stats = {'updated': 0, 'deleted': 0}
-            
+            updated_count = 0
             for item in updates:
-                # 检查记录是否存在
-                cursor.execute('SELECT id FROM roadmap WHERE id = ?', (item['id'],))
-                exists = cursor.fetchone()
+                # 检查记录是否存在并比较时间戳
+                cursor.execute('SELECT edittime FROM roadmap WHERE id = ?', (item['id'],))
+                existing = cursor.fetchone()
                 
-                # 确保user_id有值
-                user_id = item.get('user_id', 1)
+                if existing and existing['edittime'] >= item['edittime']:
+                    print(f"[Sync] 跳过记录 {item['id']}: 本地时间 {existing['edittime']} >= 同步时间 {item['edittime']}")
+                    continue
                 
-                if exists:
-                    # 更新现有记录
+                if existing:
                     cursor.execute('''
                         UPDATE roadmap 
-                        SET name = ?, 
-                            description = ?, 
-                            status = ?, 
-                            color = ?,
-                            addtime = ?,
-                            edittime = ?,
-                            "order" = ?,
-                            user_id = ?,
-                            is_deleted = ?
+                        SET name = ?, description = ?, status = ?, 
+                            color = ?, addtime = ?, edittime = ?,
+                            "order" = ?, user_id = ?, is_deleted = ?
                         WHERE id = ?
                     ''', (
-                        item['name'],
-                        item['description'],
-                        item['status'],
-                        item.get('color', '#ffffff'),
-                        item['addtime'],
-                        item['edittime'],
-                        item.get('order', 0),
-                        user_id,
-                        item.get('is_deleted', 0),
+                        item['name'], item['description'], item['status'],
+                        item.get('color', '#ffffff'), item['addtime'], item['edittime'],
+                        item.get('order', 0), item.get('user_id', 1), item.get('is_deleted', 0),
                         item['id']
                     ))
+                    print(f"[Sync] 更新记录 {item['id']}")
                 else:
-                    # 插入新记录
                     cursor.execute('''
-                        INSERT INTO roadmap (
-                            id, name, description, status, color,
-                            addtime, edittime, "order", user_id, is_deleted
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO roadmap (id, name, description, status, color,
+                            addtime, edittime, "order", user_id, is_deleted)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
-                        item['id'],
-                        item['name'],
-                        item['description'],
-                        item['status'],
-                        item.get('color', '#ffffff'),
-                        item['addtime'],
-                        item['edittime'],
-                        item.get('order', 0),
-                        user_id,
-                        item.get('is_deleted', 0)
+                        item['id'], item['name'], item['description'], item['status'],
+                        item.get('color', '#ffffff'), item['addtime'], item['edittime'],
+                        item.get('order', 0), item.get('user_id', 1), item.get('is_deleted', 0)
                     ))
+                    print(f"[Sync] 插入新记录 {item['id']}")
                 
-                if item.get('is_deleted', 0):
-                    stats['deleted'] += 1
-                else:
-                    stats['updated'] += 1
+                updated_count += 1
             
             conn.commit()
             return json.dumps({
                 'code': 0,
                 'msg': '批量同步成功',
-                'data': stats
+                'data': {'updated': updated_count}
             })
             
         except Exception as e:

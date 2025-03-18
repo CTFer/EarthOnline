@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-13 23:30:20
- * @LastEditTime: 2025-03-12 11:57:41
+ * @LastEditTime: 2025-03-17 14:29:17
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -23,12 +23,12 @@
     <script type="module" src="/static/js/admin/taskForm.js"></script>
   </head>
   <body>
-    {% extends "admin_base.html" %} {% block title %}管理{% endblock %} {% block header_title %}管理{% endblock %} {% block content %}
+    {% extends "admin/admin_base.html" %} {% block title %}管理{% endblock %} {% block header_title %}管理{% endblock %} {% block content %}
 
     <div class="task-manage-header">
       <h1>任务管理系统</h1>
       <div class="header-actions">
-        <a href="/admin" class="layui-btn layui-btn-primary"> <i class="layui-icon layui-icon-return"></i> 返回主页 </a>
+        <a href="/admin/" class="layui-btn layui-btn-primary"> <i class="layui-icon layui-icon-return"></i> 返回主页 </a>
         <button class="layui-btn" onclick="showTaskFormDialog()"><i class="layui-icon layui-icon-add-1"></i> 添加任务</button>
         <button class="layui-btn layui-btn-normal" onclick="showJsonDialog()"><i class="layui-icon layui-icon-code-circle"></i> 查看JSON</button>
       </div>

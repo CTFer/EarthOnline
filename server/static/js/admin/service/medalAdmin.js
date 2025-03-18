@@ -8,6 +8,7 @@
  * Copyright 2025 迷舍
  */
 import { gameUtils } from "../../utils/utils.js";
+
 class MedalAdmin {
   constructor() {
     this.layer = layui.layer;

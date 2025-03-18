@@ -1,3 +1,6 @@
+"""
+管理后台蓝图
+"""
 from flask import Blueprint, request, render_template, session, redirect, url_for, flash, current_app, jsonify
 from functools import wraps
 import sqlite3
@@ -72,6 +75,27 @@ def setup_logging():
 
 setup_logging()
 
+@admin_bp.before_request
+def before_request():
+    """请求预处理：检查认证状态"""
+    # 登录页面和静态文件不需要验证
+    if request.endpoint == 'admin.login' or \
+       request.endpoint == 'admin.static' or \
+       request.path.startswith('/static/'):
+        return None
+        
+    # 检查是否已登录
+    if not session.get('is_admin'):
+        # 检查是否是 AJAX 请求
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify(ResponseHandler.error(
+                code=StatusCode.UNAUTHORIZED,
+                msg="需要管理员权限"
+            ))
+        # 普通请求重定向到登录页面，保存当前URL
+        return redirect(url_for('admin.login', next=request.url))
+    return None
+
 # 路由处理
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -82,10 +106,12 @@ def login():
         
         if not username or not password:
             flash("用户名和密码不能为空")
-            return render_template('admin_login.html')
+            return render_template('admin/admin_login.html')
 
+        # 使用 AdminService 的登录方法
         result = admin_service.login(username, password)
         if result['code'] == 0:
+            # session已经在 AdminService.login 中设置
             logger.info(f"管理员 {username} 登录成功")
             next_url = request.args.get('next') or url_for('admin.index')
             return redirect(next_url)
@@ -93,23 +119,19 @@ def login():
             logger.warning(f"管理员 {username} 登录失败: {result['msg']}")
             flash(result['msg'])
 
-    return render_template('admin_login.html')
-
+    return render_template('admin/admin_login.html')
 
 @admin_bp.route('/logout')
 def logout():
     """管理员登出"""
-    username = session.get('username')
     result = admin_service.logout()
-    logger.info(f"管理员 {username} 登出")
     return redirect(url_for('admin.login'))
-
 
 @admin_bp.route('/')
 @admin_service.admin_required
 def index():
     """管理后台首页"""
-    return render_template('admin.html')
+    return render_template('admin/admin.html')
 
 
 @admin_bp.route('/api/players', methods=['GET'])
@@ -253,10 +275,17 @@ def delete_skill(skill_id):
 @admin_service.admin_required
 @api_response
 def get_tasks():
-    """获取任务列表"""
-    page = request.args.get('page', type=int)
-    limit = request.args.get('limit', type=int)
-    return task_service.get_tasks(page=page, limit=limit)
+    """获取任务列表（管理后台）"""
+    try:
+        page = request.args.get('page', type=int)
+        limit = request.args.get('limit', type=int)
+        return task_service.get_tasks(page=page, limit=limit)
+    except Exception as e:
+        logger.error(f"获取任务列表失败: {str(e)}")
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=f"获取任务列表失败: {str(e)}"
+        )
 
 @admin_bp.route('/api/tasks/<int:task_id>', methods=['GET'])
 @admin_service.admin_required
@@ -295,7 +324,7 @@ def delete_task(task_id):
 @admin_service.admin_required
 def task_manage():
     """任务管理页面"""
-    return render_template('task_manage.html')
+    return render_template('admin/task_manage.html')
 
 # 任务管理页面路由
 
@@ -304,7 +333,7 @@ def task_manage():
 @admin_service.admin_required
 def player_task_manage():
     """用户任务管理页面"""
-    return render_template('player_task_manage.html')
+    return render_template('admin/player_task_manage.html')
 
 # Player Task API路由
 
@@ -597,13 +626,63 @@ def admin_cleanup_notifications():
             'msg': str(e)
         })
 
-@admin_bp.before_request
-def before_request():
-    """请求预处理：检查认证状态"""
-    # 检查是否需要登录（除了登录页面）
-    if request.endpoint != 'admin.login' and not session.get('is_admin'):
-        return ResponseHandler.redirect(url_for('admin.login'))
-    return None
+# 任务审核相关路由
+@admin_bp.route('/api/tasks/check', methods=['GET'])
+@admin_service.admin_required
+@api_response
+def get_check_tasks():
+    """获取待审核任务列表"""
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 20, type=int)
+    return task_service.get_check_tasks(page=page, limit=limit)
+
+@admin_bp.route('/api/tasks/history', methods=['GET'])
+@admin_service.admin_required
+@api_response
+def get_task_history():
+    """获取任务历史记录"""
+    task_id = request.args.get('task_id', type=int)
+    player_id = request.args.get('player_id', type=int)
+    status = request.args.get('status')
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 20, type=int)
+    return task_service.get_task_history(
+        task_id=task_id,
+        player_id=player_id,
+        status=status,
+        page=page,
+        limit=limit
+    )
+
+@admin_bp.route('/api/tasks/<int:task_id>/approve', methods=['POST'])
+@admin_service.admin_required
+@api_response
+def approve_task(task_id):
+    """通过任务审核"""
+    return task_service.approve_task(task_id)
+
+@admin_bp.route('/api/tasks/<int:task_id>/reject', methods=['POST'])
+@admin_service.admin_required
+@api_response
+def reject_task(task_id):
+    """驳回任务"""
+    data = request.get_json()
+    reject_reason = data.get('reject_reason')
+    return task_service.reject_task(task_id, reject_reason)
+
+# 添加任务审核页面路由
+@admin_bp.route('/task_check')
+@admin_service.admin_required
+def task_check():
+    """任务审核页面"""
+    return render_template('admin/task_check.html')
+
+# 添加任务历史页面路由
+@admin_bp.route('/task_history')
+@admin_service.admin_required
+def task_history():
+    """任务历史页面"""
+    return render_template('admin/task_history.html')
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

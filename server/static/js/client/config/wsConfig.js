@@ -57,6 +57,29 @@ export const WS_EVENT_TYPES = {
     }
 };
 
+// WebSocket房间配置
+export const WS_ROOMS = {
+    USER_PREFIX: 'user_',
+    GPS_PREFIX: 'gps_',
+    TASK_PREFIX: 'task_'
+};
+
+// WebSocket订阅主题
+export const WS_TOPICS = {
+    GPS: 'gps_update',
+    TASK: 'task_update',
+    PLAYER: 'player_update',
+    NFC: 'nfc_task_update'
+};
+
+// WebSocket重试策略
+export const WS_RETRY = {
+    INITIAL_DELAY: 1000,
+    MAX_DELAY: 5000,
+    MULTIPLIER: 1.5,
+    MAX_ATTEMPTS: 5
+};
+
 // WebSocket配置
 export const WS_CONFIG = {
     // 连接配置
@@ -73,7 +96,7 @@ export const WS_CONFIG = {
         closeOnBeforeunload: true,
         secure: SSL_ENABLED,
         rejectUnauthorized: false,
-        withCredentials: true  // 允许跨域请求携带凭证
+        withCredentials: true,  // 允许跨域请求携带凭证
     },
     // 重连配置
     RECONNECT: {

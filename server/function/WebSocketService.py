@@ -67,10 +67,26 @@ class WebSocketService:
             emit('connected', {'status': 'success', 'client_info': client_info})
 
         @self.socketio.on('disconnect')
-        def handle_disconnect():
-            """处理WebSocket断开连接"""
-            sid = request.sid if hasattr(request, 'sid') else 'unknown'
-            logger.info(f"[WebSocket] 客户端断开连接: {sid}")
+        def handle_disconnect(disconnect_data=None):
+            """处理WebSocket断开连接
+            
+            Args:
+                disconnect_data: 断开连接时的数据，由Flask-SocketIO提供
+            """
+            try:
+                sid = request.sid if hasattr(request, 'sid') else 'unknown'
+                logger.info(f"[WebSocket] 客户端断开连接: {sid}, 断开原因: {disconnect_data}")
+                
+                # 如果客户端在房间中，清理房间信息
+                if hasattr(request, 'sid'):
+                    rooms = self.socketio.server.rooms(request.sid)
+                    for room in rooms:
+                        if room != request.sid:  # 不处理默认房间
+                            leave_room(room)
+                            logger.info(f"[WebSocket] 客户端离开房间: {room}")
+                            
+            except Exception as e:
+                logger.error(f"[WebSocket] 处理断开连接失败: {str(e)}", exc_info=True)
 
         @self.socketio.on_error()
         def handle_error(e):
@@ -92,7 +108,7 @@ class WebSocketService:
                 player_id = data.get('player_id')
                 if player_id:
                     room = f'user_{player_id}'
-                    join_room(room)
+                    self.join_room_with_check(request.sid, room)
                     logger.info(f"[WebSocket] 用户 {player_id} 加入房间: {room}")
                     # 发送确认消息
                     emit('subscription_confirmed', {
@@ -113,7 +129,7 @@ class WebSocketService:
                 player_id = data.get('player_id')
                 if player_id:
                     room = f'user_{player_id}'
-                    join_room(room)
+                    self.join_room_with_check(request.sid, room)
                     logger.info(f"[WebSocket] 用户 {player_id} 加入GPS房间: {room}")
                     # 发送确认消息
                     emit('gps_subscription_confirmed', {
@@ -133,7 +149,7 @@ class WebSocketService:
                 logger.info(f"[WebSocket] 收到房间加入请求: {data}")
                 room = data.get('room')
                 if room:
-                    join_room(room)
+                    self.join_room_with_check(request.sid, room)
                     logger.info(f"[WebSocket] 客户端加入房间: {room}")
                     # 发送确认消息
                     emit('join_confirmed', {
@@ -269,6 +285,18 @@ class WebSocketService:
         except Exception as e:
             logger.error(f"[WebSocket] 获取房间 {room} 连接数量失败: {str(e)}", exc_info=True)
             return 0
+
+    def join_room_with_check(self, sid: str, room: str) -> None:
+        """检查并加入房间，避免重复加入"""
+        try:
+            current_rooms = self.socketio.server.rooms(sid)
+            if room not in current_rooms:
+                join_room(room)
+                logger.info(f"[WebSocket] 用户加入房间: {room}")
+            else:
+                logger.debug(f"[WebSocket] 用户已在房间中: {room}")
+        except Exception as e:
+            logger.error(f"[WebSocket] 加入房间失败: {str(e)}", exc_info=True)
 
 # 创建WebSocket服务实例
 websocket_service = WebSocketService() 

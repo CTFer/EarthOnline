@@ -79,16 +79,18 @@ if CLOUDFLARE['enabled']:
         x_port=CLOUDFLARE['headers']['X-Forwarded-Port'],
         x_prefix=CLOUDFLARE['headers']['X-Forwarded-Prefix']
     )
-    # 强制设置 URL scheme 为 HTTPS
-    class SchemeEnforcingMiddleware:
-        def __init__(self, app):
-            self.app = app
+    
+    # 只在非本地环境且需要强制 HTTPS 时添加 SchemeEnforcingMiddleware
+    if ENV != 'local' and (HTTPS_ENABLED or CLOUDFLARE['flexible_ssl']):
+        class SchemeEnforcingMiddleware:
+            def __init__(self, app):
+                self.app = app
 
-        def __call__(self, environ, start_response):
-            environ['wsgi.url_scheme'] = 'https'
-            return self.app(environ, start_response)
+            def __call__(self, environ, start_response):
+                environ['wsgi.url_scheme'] = 'https'
+                return self.app(environ, start_response)
 
-    app.wsgi_app = SchemeEnforcingMiddleware(app.wsgi_app)
+        app.wsgi_app = SchemeEnforcingMiddleware(app.wsgi_app)
 
 # 优化应用配置
 app.config.update(
@@ -99,8 +101,10 @@ app.config.update(
     PROPAGATE_EXCEPTIONS=True,  # 传播异常
     TRAP_HTTP_EXCEPTIONS=True,  # 捕获HTTP异常
     TRAP_BAD_REQUEST_ERRORS=True,  # 捕获错误请求
-    PREFERRED_URL_SCHEME='https',  # 强制使用HTTPS
-    SESSION_COOKIE_SECURE=True,  # 只在HTTPS下发送cookie
+    # 根据环境设置默认 scheme
+    PREFERRED_URL_SCHEME='http' if ENV == 'local' and not HTTPS_ENABLED else 'https',
+    # 根据环境设置 cookie 安全性
+    SESSION_COOKIE_SECURE=ENV != 'local' or HTTPS_ENABLED,
     SESSION_COOKIE_HTTPONLY=True,  # 防止JavaScript访问cookie
     SESSION_COOKIE_SAMESITE='Lax'  # 设置SameSite属性
 )
@@ -266,6 +270,38 @@ def abandon_task():
             code=StatusCode.SERVER_ERROR,
             msg=f'处理任务请求失败: {str(e)}'
         )
+
+@app.route('/api/tasks/submit', methods=['POST'])
+@api_response
+def submit_task_api():
+    """提交任务接口"""
+    try:
+        data = request.get_json()
+        logger.info(f"[TaskAPI] 收到提交任务请求: {data}")
+
+       
+        # 检查必要字段
+        required_fields = ['player_id', 'task_id']
+        for field in required_fields:
+            if field not in data:
+                return ResponseHandler.error(
+                    code=StatusCode.PARAM_ERROR,
+                    msg=f'缺少必要参数: {field}'
+                )
+        
+        # 调用任务服务
+        logger.debug(f"[TaskAPI] 开始处理任务提交请求 - 玩家ID: {data['player_id']}, 任务ID: {data['task_id']}")
+        result = task_service.submit_task(data['player_id'], data['task_id'])
+        logger.info(f"[TaskAPI] 任务提交处理完成: {result}")
+        return result
+
+    except Exception as e:
+        logger.error(f"[TaskAPI] 处理任务提交请求时发生错误: {str(e)}", exc_info=True)
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=f'处理任务请求失败: {str(e)}'
+        )
+
 
 @app.route('/api/tasks/complete', methods=['POST'])
 @api_response
@@ -892,10 +928,6 @@ def handle_404(e):
 @app.before_request
 def before_request():
     """请求前处理"""
-    # 本地环境不处理
-    if ENV == 'local':
-        return None
-        
     # 静态文件不处理
     if request.endpoint and 'static' in request.endpoint:
         return None
@@ -904,15 +936,12 @@ def before_request():
     if request.path.startswith('/.well-known/acme-challenge/'):
         return None
         
-    # 在 Cloudflare 灵活 SSL 模式下，检查是否是域名访问
-    if CLOUDFLARE['enabled']:
-        host = request.headers.get('Host', '').lower()
-        # 只对域名访问进行HTTPS重定向
-        if DOMAIN.lower() in host:
-            proto = request.headers.get('X-Forwarded-Proto', 'http')
-            if proto != 'https':
-                url = request.url.replace('http://', 'https://', 1)
-                return ResponseHandler.redirect(url, permanent=False)
+    # 检查是否需要 HTTPS 重定向
+    if ResponseHandler.should_use_https(request):
+        proto = request.headers.get('X-Forwarded-Proto', 'http')
+        if proto != 'https':
+            url = request.url.replace('http://', 'https://', 1)
+            return ResponseHandler.redirect(url, permanent=False)
             
     # 安全检查
     security_check_result = security_service.security_check()
