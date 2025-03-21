@@ -1,0 +1,135 @@
+<!--
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-02-20 13:19:45
+ * @LastEditTime: 2025-03-20 13:53:47
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2025 迷舍
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFC读卡器测试</title>
+    <link rel="stylesheet" href="https://unpkg.com/layui@2.7.6/dist/css/layui.css">
+    <style>
+        .container {
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .card {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #e6e6e6;
+            border-radius: 4px;
+        }
+        .log-container {
+            height: 300px;
+            overflow-y: auto;
+            background: #f8f8f8;
+            padding: 10px;
+            border: 1px solid #e6e6e6;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .log-info { color: #1E9FFF; }
+        .log-error { color: #FF5722; }
+        .log-warn { color: #FFB800; }
+        .log-debug { color: #393D49; }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h2>NFC读卡器控制面板</h2>
+            <div class="layui-btn-container">
+                <button id="connectButton" class="layui-btn">连接设备</button>
+                <button id="disconnectButton" class="layui-btn layui-btn-danger" disabled>断开连接</button>
+                <button id="readCardButton" class="layui-btn layui-btn-normal" disabled>读取卡片</button>
+                <button id="writeCardButton" class="layui-btn layui-btn-warm" disabled>写入数据</button>
+                <button id="clearLogButton" class="layui-btn layui-btn-primary">清空日志</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>设备信息</h3>
+            <div id="deviceInfo" class="layui-form">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">连接状态</label>
+                    <div class="layui-input-block">
+                        <input type="text" id="connectionStatus" class="layui-input" readonly value="未连接">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">端口信息</label>
+                    <div class="layui-input-block">
+                        <input type="text" id="portInfo" class="layui-input" readonly value="无">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>卡片数据</h3>
+            <div id="cardInfo" class="layui-form">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">卡片ID</label>
+                    <div class="layui-input-block">
+                        <input type="text" id="cardId" class="layui-input" readonly value="无">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">卡片类型</label>
+                    <div class="layui-input-block">
+                        <input type="text" id="cardType" class="layui-input" readonly value="未知">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">卡片数据</label>
+                    <div class="layui-input-block">
+                        <textarea id="cardData" class="layui-textarea" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>写入数据</h3>
+            <div class="layui-form">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">数据类型</label>
+                    <div class="layui-input-block">
+                        <input type="radio" name="dataType" value="ascii" title="ASCII" checked>
+                        <input type="radio" name="dataType" value="hex" title="HEX">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">写入数据</label>
+                    <div class="layui-input-block">
+                        <textarea id="writeData" class="layui-textarea" placeholder="请输入要写入的数据"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>操作日志</h3>
+            <div id="logContainer" class="log-container"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/layui@2.7.6/dist/layui.js"></script>
+    <script type="module" src="/static/js/nfc.js"></script>
+</body>
+
+</html>

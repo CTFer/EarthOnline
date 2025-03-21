@@ -25,7 +25,7 @@ import sqlite3
 import logging
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_cors import CORS
-from flask import Flask, request, redirect, send_from_directory, make_response, render_template, jsonify
+from flask import Flask, request, redirect, send_from_directory, make_response, render_template, jsonify, session
 from shop import shop_bp  # 确保在同一目录下
 from function.PlayerService import player_service
 from function.TaskService import task_service
@@ -94,7 +94,7 @@ if CLOUDFLARE['enabled']:
 
 # 优化应用配置
 app.config.update(
-    SEND_FILE_MAX_AGE_DEFAULT=31536000,  # 静态文件缓存1年
+
     MAX_CONTENT_LENGTH=50 * 1024 * 1024,  # 最大请求体大小50MB
     JSONIFY_PRETTYPRINT_REGULAR=False,  # 禁用JSON美化
     JSON_SORT_KEYS=False,  # 禁用JSON键排序
@@ -106,7 +106,12 @@ app.config.update(
     # 根据环境设置 cookie 安全性
     SESSION_COOKIE_SECURE=ENV != 'local' or HTTPS_ENABLED,
     SESSION_COOKIE_HTTPONLY=True,  # 防止JavaScript访问cookie
-    SESSION_COOKIE_SAMESITE='Lax'  # 设置SameSite属性
+    SESSION_COOKIE_SAMESITE='Lax',  # 设置SameSite属性
+    # Session配置
+    SESSION_COOKIE_NAME='earthonline_session',
+    PERMANENT_SESSION_LIFETIME=timedelta(days=7),  # session有效期7天
+    # 如果使用IP访问，不要强制HTTPS
+    SESSION_COOKIE_DOMAIN=None if ENV == 'local' else DOMAIN,
 )
 
 # 配置CORS允许所有来源
@@ -159,6 +164,26 @@ TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templat
 # 注意：不再需要重复定义WebSocket事件处理器，因为它们已经在WebSocketService中定义
 # 以下是其他API路由
 
+# 添加玩家登录路由
+@app.route('/api/player/login', methods=['POST'])
+def player_login():
+    """玩家登录"""
+    try:
+        data = request.get_json()
+        return player_service.login(data.get('player_name'), data.get('password'))
+    except Exception as e:
+        logger.error(f"登录失败: {str(e)}")
+        return ResponseHandler.error(
+            code=StatusCode.LOGIN_FAILED,
+            msg=f"登录失败: {str(e)}"
+        )
+
+@app.route('/api/player/logout', methods=['POST'])
+def player_logout():
+    """玩家登出"""
+    return player_service.logout()
+
+# 修改需要认证的路由，添加 @player_required 装饰器
 @app.route('/api/player/<int:player_id>', methods=['GET'])
 @api_response
 def get_player_api(player_id):
@@ -196,6 +221,7 @@ def get_current_tasks(player_id):
     return task_service.get_current_tasks(player_id)
 
 @app.route('/api/tasks/accept', methods=['POST'])
+@player_service.player_required
 @api_response
 def accept_task():
     """接受任务接口"""
@@ -234,6 +260,7 @@ def accept_task():
         )
 
 @app.route('/api/tasks/abandon', methods=['POST'])
+@player_service.player_required
 @api_response
 def abandon_task():
     """放弃任务接口"""
@@ -272,6 +299,7 @@ def abandon_task():
         )
 
 @app.route('/api/tasks/submit', methods=['POST'])
+@player_service.player_required
 @api_response
 def submit_task_api():
     """提交任务接口"""
@@ -279,7 +307,6 @@ def submit_task_api():
         data = request.get_json()
         logger.info(f"[TaskAPI] 收到提交任务请求: {data}")
 
-       
         # 检查必要字段
         required_fields = ['player_id', 'task_id']
         for field in required_fields:
@@ -302,8 +329,8 @@ def submit_task_api():
             msg=f'处理任务请求失败: {str(e)}'
         )
 
-
 @app.route('/api/tasks/complete', methods=['POST'])
+@player_service.player_required
 @api_response
 def complete_task_api():
     data = request.get_json()
@@ -419,14 +446,19 @@ def handle_nfc_card():
             data = request.form.to_dict()
             print(f"[NFC API Debug] 接收到Form数据: {json.dumps(data, ensure_ascii=False)}")
         
-        # 获取必要参数
-        card_id = data.get('card_id')
-        player_id = data.get('player_id')
+        # 获取必要参数（不区分大小写）
+        card_id = data.get('CARD_ID') or data.get('card_id')
+        player_id = data.get('PLAYER_ID') or data.get('player_id')
+        device = data.get('DEVICE') or data.get('device', 'unknown')
+        timestamp = data.get('TIMESTAMP') or data.get('timestamp')
+        value = data.get('VALUE') or data.get('value')
+        card_type = data.get('TYPE') or data.get('type')
 
         # 参数验证
         if not card_id or not player_id:
-            error_msg = '缺少必要参数: card_id 或 player_id'
+            error_msg = '缺少必要参数: CARD_ID 或 PLAYER_ID'
             print(f"[NFC API Debug] 错误: {error_msg}")
+            print(f"[NFC API Debug] 收到的数据: card_id={card_id}, player_id={player_id}")
             return json.dumps({
                 'code': 400,
                 'msg': error_msg,
@@ -435,10 +467,13 @@ def handle_nfc_card():
 
         print(f"[NFC API Debug] 卡片ID: {card_id}")
         print(f"[NFC API Debug] 玩家ID: {player_id}")
+        print(f"[NFC API Debug] 设备: {device}")
+        print(f"[NFC API Debug] 时间戳: {timestamp}")
+        print(f"[NFC API Debug] 值: {value}")
+        print(f"[NFC API Debug] 类型: {card_type}")
 
         # 调用 NFC 服务处理
-        from function.NFC_service import NFCService
-        nfc_service = NFCService()
+        from function.NFCService import nfc_service
         response, status_code = nfc_service.handle_nfc_card(card_id, player_id, socketio)
 
         print(f"[NFC API Debug] 处理结果: {json.dumps(response, ensure_ascii=False)}")
@@ -585,6 +620,7 @@ def get_player_gps(player_id):
     return gps_service.get_player_gps(player_id)
 
 @app.route('/api/gps/<int:gps_id>', methods=['PUT'])
+@player_service.player_required
 def update_gps(gps_id):
     """更新GPS记录"""
     data = request.get_json()
@@ -618,10 +654,7 @@ def get_roadmap():
     return roadmap_service.get_roadmap()
 
 def sync_to_prod(methods=['POST', 'PUT', 'DELETE']):
-    """
-    装饰器：同步数据库操作到生产环境
-    :param methods: 需要同步的HTTP方法列表
-    """
+    """装饰器：同步数据库操作到生产环境"""
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -633,23 +666,45 @@ def sync_to_prod(methods=['POST', 'PUT', 'DELETE']):
                 try:
                     # 构建同步请求
                     prod_url = f"{PROD_SERVER['URL']}{request.path}"
+                    
+                    # 使用配置的请求头
                     prod_headers = {
-                        'Content-Type': 'application/json',
-                        'X-Sync-From': 'local',
+                        **PROD_SERVER['HEADERS'],
                         'X-API-Key': PROD_SERVER['API_KEY']
+                    }
+                    
+                    # 使用配置的SSL验证
+                    ssl_config = {
+                        'verify': PROD_SERVER['SSL_VERIFY'],
+                        'timeout': PROD_SERVER['TIMEOUT']
                     }
                     
                     print(f"[Sync] Syncing {request.method} {request.path} to production")
                     print(f"[Sync] Target URL: {prod_url}")
+                    print(f"[Sync] Headers: {prod_headers}")
                     
                     # 发送同步请求
                     sync_response = None
                     if request.method == 'POST':
-                        sync_response = requests.post(prod_url, json=request.get_json(), headers=prod_headers)
+                        sync_response = requests.post(
+                            prod_url, 
+                            json=request.get_json(), 
+                            headers=prod_headers,
+                            **ssl_config
+                        )
                     elif request.method == 'PUT':
-                        sync_response = requests.put(prod_url, json=request.get_json(), headers=prod_headers)
+                        sync_response = requests.put(
+                            prod_url, 
+                            json=request.get_json(), 
+                            headers=prod_headers,
+                            **ssl_config
+                        )
                     elif request.method == 'DELETE':
-                        sync_response = requests.delete(prod_url, headers=prod_headers)
+                        sync_response = requests.delete(
+                            prod_url, 
+                            headers=prod_headers,
+                            **ssl_config
+                        )
                     
                     print(f"[Sync] Sync completed with status code: {sync_response.status_code}")
                     if sync_response.status_code != 200:
@@ -703,10 +758,6 @@ def batch_sync_roadmap_data():
     data = request.get_json()
     return roadmap_service.batch_sync(data.get('updates', []))
 
-# 添加NFC接口测试页面路由
-@app.route('/nfc_test')
-def nfc_test():
-    return render_template('nfc_test.html')
 
 # 通知相关接口
 @app.route('/api/notifications', methods=['GET'])
@@ -936,13 +987,6 @@ def before_request():
     if request.path.startswith('/.well-known/acme-challenge/'):
         return None
         
-    # 检查是否需要 HTTPS 重定向
-    if ResponseHandler.should_use_https(request):
-        proto = request.headers.get('X-Forwarded-Proto', 'http')
-        if proto != 'https':
-            url = request.url.replace('http://', 'https://', 1)
-            return ResponseHandler.redirect(url, permanent=False)
-            
     # 安全检查
     security_check_result = security_service.security_check()
     if security_check_result is not None:
@@ -960,6 +1004,11 @@ def before_request():
 def after_request(response):
     """请求后处理"""
     return security_service.add_security_headers(response)
+
+@app.route('/test/nfc')
+def nfc_test():
+    """NFC测试页面"""
+    return render_template('nfc.html')
 
 if __name__ == '__main__':
     logger.info("开始初始化服务器...")

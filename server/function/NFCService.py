@@ -555,7 +555,7 @@ class NFCService:
                 
             # 道具卡片处理
             elif card_type == 'CARD':
-                return self._handle_prop_card(cursor, conn, value, player_id)
+                return self._handle_game_card(cursor, conn, value, player_id)
                 
             # 勋章卡片处理
             elif card_type == 'MEDAL':
@@ -743,7 +743,7 @@ class NFCService:
                 'data': None
             }), 500
 
-    def _handle_prop_card(self, cursor, conn, value, player_id):
+    def _handle_game_card(self, cursor, conn, value, player_id):
         """处理道具卡片"""
         try:
             # 检查道具是否存在

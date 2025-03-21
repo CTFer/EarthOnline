@@ -25,10 +25,10 @@ layui.use(['table', 'form', 'layer'], function () {
         <button class="layui-btn layui-btn-sm layui-btn-normal" onclick="approveTask(${data.id})">
           <i class="layui-icon">&#xe605;</i> 通过
         </button>
-        <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="showRejectForm(${JSON.stringify(data)})">
+        <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="showRejectForm(${JSON.stringify(data).replace(/"/g, '&quot;')})">
           <i class="layui-icon">&#x1006;</i> 驳回
         </button>
-        <button class="layui-btn layui-btn-sm" onclick="showTaskDetail(${JSON.stringify(data)})">
+        <button class="layui-btn layui-btn-sm" onclick="showTaskDetail(${JSON.stringify(data).replace(/"/g, '&quot;')})">
           <i class="layui-icon">&#xe63c;</i> 详情
         </button>
       </div>
@@ -39,42 +39,41 @@ layui.use(['table', 'form', 'layer'], function () {
   function initTable() {
     table.render({
       elem: "#taskCheckTable",
-      url: "/api/tasks/check",
+      url: "/admin/api/tasks/check",
       page: true,
-      cols: [
-        [
-          { field: "id", title: "ID", width: 80, sort: true },
-          { field: "task_name", title: "任务名称", width: 150 },
-          { field: "player_name", title: "玩家", width: 120 },
-          { field: "task_description", title: "任务描述", width: 200 },
-          { field: "comment", title: "提交说明", width: 200 },
-          { 
-            field: "starttime", 
-            title: "开始时间", 
-            width: 160, 
-            sort: true, 
-            templet: function(d) {
-              return formatDateTime(d.starttime);
-            }
-          },
-          { 
-            field: "submit_time", 
-            title: "提交时间", 
-            width: 160, 
-            sort: true, 
-            templet: function(d) {
-              return formatDateTime(d.submit_time);
-            }
-          },
-          { 
-            title: "操作", 
-            width: 250, 
-            templet: function(d) {
-              return generateOperationHtml(d);
-            }
-          },
-        ],
-      ],
+      cols: [[
+        { field: "id", title: "ID", width: 80, sort: true },  // player_task表的id
+        { field: "task_id", title: "任务ID", width: 80 },    // task表的id
+        { field: "name", title: "任务名称", width: 150 },
+        { field: "player_name", title: "玩家", width: 120 },
+        { field: "description", title: "任务描述", width: 200 },
+        { field: "comment", title: "提交说明", width: 200 },
+        { 
+          field: "starttime", 
+          title: "开始时间", 
+          width: 160, 
+          sort: true, 
+          templet: function(d) {
+            return formatDateTime(d.starttime);
+          }
+        },
+        { 
+          field: "submit_time", 
+          title: "提交时间", 
+          width: 160, 
+          sort: true, 
+          templet: function(d) {
+            return formatDateTime(d.submit_time);
+          }
+        },
+        { 
+          title: "操作", 
+          width: 250, 
+          templet: function(d) {
+            return generateOperationHtml(d);
+          }
+        }
+      ]],
       response: {
         statusCode: 0
       },
@@ -105,12 +104,21 @@ layui.use(['table', 'form', 'layer'], function () {
       area: ['600px', '500px'],
       content: $('#taskDetailTpl').html(),
       success: function(layero, index) {
+        // 解析任务奖励
+        let rewards = {};
+        try {
+          rewards = JSON.parse(data.task_rewards);
+        } catch (e) {
+          console.error('解析任务奖励失败:', e);
+        }
+
         form.val('taskDetailForm', {
-          'task_name': data.task_name,
-          'description': data.task_description,
-          'comment': data.comment,
+          'task_name': data.name,
+          'description': data.description,
+          'comment': data.comment || '',
           'submit_time': formatDateTime(data.submit_time),
-          'player_info': `${data.player_name}(ID: ${data.player_id})`
+          'player_info': `${data.player_name}(ID: ${data.player_id || '未知'})`,
+          'task_rewards': JSON.stringify(rewards, null, 2)
         });
       }
     });
@@ -133,14 +141,17 @@ layui.use(['table', 'form', 'layer'], function () {
   }
 
   // 通过任务
-  window.approveTask = function(taskId) {
+  window.approveTask = function(playerTaskId) {
     layer.confirm('确认通过该任务？', function(index) {
-      fetch(`/api/tasks/${taskId}/approve`, {
+      fetch(`/admin/api/player_tasks/${playerTaskId}/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Requested-With': 'XMLHttpRequest'
-        }
+        },
+        body: JSON.stringify({
+          player_task_id: playerTaskId
+        })
       })
       .then(response => response.json())
       .then(result => {
@@ -160,14 +171,15 @@ layui.use(['table', 'form', 'layer'], function () {
   }
 
   // 驳回任务
-  window.rejectTask = function(taskId, rejectReason) {
-    fetch(`/api/tasks/${taskId}/reject`, {
+  window.rejectTask = function(playerTaskId, rejectReason) {
+    fetch(`/admin/api/player_tasks/${playerTaskId}/reject`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify({
+        player_task_id: playerTaskId,
         reject_reason: rejectReason
       })
     })

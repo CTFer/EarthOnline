@@ -160,6 +160,7 @@ class RoadmapService:
             
             # 准备同步请求头
             headers = {
+                **PROD_SERVER['HEADERS'],  # 使用配置的标准头
                 'X-API-Key': PROD_SERVER['API_KEY'],
                 'X-Sync-Time': str(self.last_sync_time)
             }
@@ -168,14 +169,20 @@ class RoadmapService:
             sync_url = f"{PROD_SERVER['URL']}/api/roadmap/sync"
             print(f"[Sync] 从生产环境获取增量更新 - 上次同步时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_sync_time))}")
             
-            response = requests.get(sync_url, headers=headers, timeout=PROD_SERVER['TIMEOUT'])
+            # 添加SSL验证配置
+            ssl_config = {
+                'verify': PROD_SERVER['SSL_VERIFY'],
+                'timeout': PROD_SERVER['TIMEOUT']
+            }
+            
+            response = requests.get(sync_url, headers=headers, **ssl_config)
             if response.status_code != 200:
                 raise Exception(f"获取生产环境数据失败: HTTP {response.status_code}")
             
             prod_updates = response.json().get('data', [])
             print(f"[Sync] 收到 {len(prod_updates)} 条生产环境更新")
             
-            # 2. 获取本地数据库连接
+            # 2. 获取数据库连接
             conn = self.get_db()
             cursor = conn.cursor()
             
@@ -238,11 +245,11 @@ class RoadmapService:
                     sync_url,
                     headers=headers,
                     json={'updates': local_updates},
-                    timeout=PROD_SERVER['TIMEOUT']
+                    **ssl_config
                 )
                 
                 if response.status_code != 200:
-                    raise Exception("同步到生产环境失败")
+                    raise Exception(f"同步到生产环境失败: HTTP {response.status_code}")
                     
                 result = response.json()
                 if result.get('code') == 0:

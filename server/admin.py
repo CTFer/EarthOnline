@@ -654,21 +654,60 @@ def get_task_history():
         limit=limit
     )
 
-@admin_bp.route('/api/tasks/<int:task_id>/approve', methods=['POST'])
+@admin_bp.route('/api/player_tasks/<int:player_task_id>/approve', methods=['POST'])
 @admin_service.admin_required
 @api_response
-def approve_task(task_id):
+def approve_player_task(player_task_id):
     """通过任务审核"""
-    return task_service.approve_task(task_id)
+    try:
+        # 确保请求体是有效的JSON，即使是空的
+        if request.is_json:
+            request.get_json()  # 验证JSON格式
+            
+        result = task_service.approve_player_task(player_task_id)
+        if result.get('code') == 0:
+            # 发送通知
+            try:
+                task_info = task_service.get_player_task(player_task_id)
+                if task_info.get('code') == 0:
+                    task_data = task_info.get('data', {})
+                    notification_service.add_notification({
+                        'title': '任务审核通过',
+                        'content': f'您的任务 "{task_data.get("task_name", "未知任务")}" 已通过审核',
+                        'type': 'task',
+                        'target_type': 'player',
+                        'target_id': task_data.get('player_id'),
+                        'extra_data': json.dumps({
+                            'task_id': task_data.get('task_id'),
+                            'player_task_id': player_task_id
+                        })
+                    })
+            except Exception as e:
+                logger.error(f"发送任务审核通知失败: {str(e)}")
+                
+        return result
+    except Exception as e:
+        logger.error(f"任务审核失败: {str(e)}")
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=f"任务审核失败: {str(e)}"
+        )
 
-@admin_bp.route('/api/tasks/<int:task_id>/reject', methods=['POST'])
+@admin_bp.route('/api/player_tasks/<int:player_task_id>/reject', methods=['POST'])
 @admin_service.admin_required
 @api_response
-def reject_task(task_id):
+def reject_player_task(player_task_id):
     """驳回任务"""
-    data = request.get_json()
-    reject_reason = data.get('reject_reason')
-    return task_service.reject_task(task_id, reject_reason)
+    try:
+        data = request.get_json()
+        reject_reason = data.get('reject_reason') if data else None
+        return task_service.reject_player_task(player_task_id, reject_reason)
+    except Exception as e:
+        logger.error(f"任务驳回失败: {str(e)}")
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=f"任务驳回失败: {str(e)}"
+        )
 
 # 添加任务审核页面路由
 @admin_bp.route('/task_check')

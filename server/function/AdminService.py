@@ -60,16 +60,25 @@ class AdminService:
             result = self.verify_user(username, password)
             
             if result['code'] == 0:
+                user_data = result['data']
+                # 检查是否是管理员
+                if not user_data.get('isadmin'):
+                    return ResponseHandler.error(
+                        code=StatusCode.UNAUTHORIZED,
+                        msg="该用户不是管理员"
+                    )
+                
                 # 设置session
                 session['is_admin'] = True
-                session['user_id'] = result['data']['id']
-                session['username'] = result['data']['username']
+                session['user_id'] = user_data['id']
+                session['username'] = user_data['username']
+                session['nickname'] = user_data.get('nickname')
                 session['login_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 session['login_ip'] = request.remote_addr
                 
                 logger.info(f"用户 {username} 登录成功")
                 return ResponseHandler.success(
-                    data=result['data'],
+                    data=user_data,
                     msg="登录成功"
                 )
             else:
@@ -125,9 +134,9 @@ class AdminService:
             conn = self.get_db_connection()
             cursor = conn.cursor()
 
-            # 获取用户信息，包括密码字段
+            # 获取用户信息，包括所有字段
             cursor.execute('''
-                SELECT id, username, password, created_at
+                SELECT id, username, password, created_at, isadmin, nickname, wechat_userid
                 FROM users 
                 WHERE username = ?
             ''', (username,))
@@ -144,11 +153,7 @@ class AdminService:
             if user['password'] == self.encrypt_password(password):
                 logger.info(f"用户验证成功: {username}")
                 return ResponseHandler.success(
-                    data={
-                        "id": user['id'],
-                        "username": user['username'],
-                        "created_at": user['created_at']
-                    },
+                    data=dict(user),
                     msg="验证成功"
                 )
             else:
@@ -180,11 +185,14 @@ class AdminService:
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
-            cursor.execute('SELECT id, username, created_at FROM users')
+            cursor.execute('''
+                SELECT id, username, created_at, isadmin, nickname, wechat_userid 
+                FROM users
+            ''')
             users = [dict(row) for row in cursor.fetchall()]
             return ResponseHandler.success(data=users, msg="获取成功")
         except Exception as e:
-            print(f"获取用户列表失败: {str(e)}")
+            logger.error(f"获取用户列表失败: {str(e)}")
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
                 msg=f"获取用户列表失败: {str(e)}"
@@ -218,10 +226,18 @@ class AdminService:
             # 对密码进行MD5加密
             encrypted_password = self.encrypt_password(data['password'])
 
+            # 插入新用户
             cursor.execute('''
-                INSERT INTO users (username, password, created_at)
-                VALUES (?, ?, datetime('now'))
-            ''', (data['username'], encrypted_password))
+                INSERT INTO users (
+                    username, password, created_at, isadmin, nickname, wechat_userid
+                ) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
+            ''', (
+                data['username'],
+                encrypted_password,
+                data.get('isadmin', 0),
+                data.get('nickname'),
+                data.get('wechat_userid')
+            ))
 
             user_id = cursor.lastrowid
             conn.commit()
@@ -233,7 +249,7 @@ class AdminService:
         except Exception as e:
             if conn:
                 conn.rollback()
-            print(f"添加用户失败: {str(e)}")
+            logger.error(f"添加用户失败: {str(e)}")
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
                 msg=f"添加用户失败: {str(e)}"
@@ -248,8 +264,11 @@ class AdminService:
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
-            cursor.execute(
-                'SELECT id, username, created_at FROM users WHERE id = ?', (user_id,))
+            cursor.execute('''
+                SELECT id, username, created_at, isadmin, nickname, wechat_userid 
+                FROM users 
+                WHERE id = ?
+            ''', (user_id,))
             user = cursor.fetchone()
 
             if user is None:
@@ -263,7 +282,7 @@ class AdminService:
                 msg="获取成功"
             )
         except Exception as e:
-            print(f"获取用户信息失败: {str(e)}")
+            logger.error(f"获取用户信息失败: {str(e)}")
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
                 msg=f"获取用户信息失败: {str(e)}"
@@ -276,13 +295,6 @@ class AdminService:
         """更新用户信息"""
         conn = None
         try:
-            # 验证必要字段
-            if not data.get('username'):
-                return ResponseHandler.error(
-                    code=StatusCode.PARAM_ERROR,
-                    msg="用户名不能为空"
-                )
-
             conn = self.get_db_connection()
             cursor = conn.cursor()
 
@@ -295,35 +307,61 @@ class AdminService:
                 )
 
             # 检查新用户名是否与其他用户冲突
-            cursor.execute('SELECT id FROM users WHERE username = ? AND id != ?', 
-                         (data['username'], user_id))
-            if cursor.fetchone():
+            if data.get('username'):
+                cursor.execute('SELECT id FROM users WHERE username = ? AND id != ?', 
+                             (data['username'], user_id))
+                if cursor.fetchone():
+                    return ResponseHandler.error(
+                        code=StatusCode.USER_EXISTS,
+                        msg="用户名已存在"
+                    )
+
+            # 构建更新语句
+            update_fields = []
+            params = []
+            
+            if data.get('username'):
+                update_fields.append('username = ?')
+                params.append(data['username'])
+            
+            if data.get('password'):
+                update_fields.append('password = ?')
+                params.append(self.encrypt_password(data['password']))
+            
+            if 'isadmin' in data:
+                update_fields.append('isadmin = ?')
+                params.append(data['isadmin'])
+            
+            if 'nickname' in data:
+                update_fields.append('nickname = ?')
+                params.append(data['nickname'])
+            
+            if 'wechat_userid' in data:
+                update_fields.append('wechat_userid = ?')
+                params.append(data['wechat_userid'])
+
+            if not update_fields:
                 return ResponseHandler.error(
-                    code=StatusCode.USER_EXISTS,
-                    msg="用户名已存在"
+                    code=StatusCode.PARAM_ERROR,
+                    msg="没有需要更新的字段"
                 )
 
-            if data.get('password'):
-                # 如果更新包含密码，进行MD5加密
-                encrypted_password = self.encrypt_password(data['password'])
-                cursor.execute('''
-                    UPDATE users 
-                    SET username = ?, password = ?
-                    WHERE id = ?
-                ''', (data['username'], encrypted_password, user_id))
-            else:
-                cursor.execute('''
-                    UPDATE users 
-                    SET username = ?
-                    WHERE id = ?
-                ''', (data['username'], user_id))
+            # 添加WHERE条件的参数
+            params.append(user_id)
+            
+            # 执行更新
+            cursor.execute(f'''
+                UPDATE users 
+                SET {', '.join(update_fields)}
+                WHERE id = ?
+            ''', params)
 
             conn.commit()
             return ResponseHandler.success(msg="更新成功")
         except Exception as e:
             if conn:
                 conn.rollback()
-            print(f"更新用户信息失败: {str(e)}")
+            logger.error(f"更新用户信息失败: {str(e)}")
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
                 msg=f"更新用户信息失败: {str(e)}"
@@ -340,11 +378,20 @@ class AdminService:
             cursor = conn.cursor()
 
             # 检查用户是否存在
-            cursor.execute('SELECT id FROM users WHERE id = ?', (user_id,))
-            if not cursor.fetchone():
+            cursor.execute('SELECT isadmin FROM users WHERE id = ?', (user_id,))
+            user = cursor.fetchone()
+            
+            if not user:
                 return ResponseHandler.error(
                     code=StatusCode.USER_NOT_FOUND,
                     msg="用户不存在"
+                )
+                
+            # 检查是否是管理员
+            if user['isadmin']:
+                return ResponseHandler.error(
+                    code=StatusCode.OPERATION_FAILED,
+                    msg="不能删除管理员用户"
                 )
 
             # 删除用户
@@ -355,7 +402,7 @@ class AdminService:
         except Exception as e:
             if conn:
                 conn.rollback()
-            print(f"删除用户失败: {str(e)}")
+            logger.error(f"删除用户失败: {str(e)}")
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
                 msg=f"删除用户失败: {str(e)}"

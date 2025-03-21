@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-02-04 23:29:47
-# LastEditTime: 2025-03-07 20:32:40
+# LastEditTime: 2025-03-20 16:03:14
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -13,9 +13,12 @@ import os
 import logging
 import json
 import time
+import hashlib
 from typing import Dict, List, Optional
+from flask import session, request
 from utils.response_handler import ResponseHandler, StatusCode
 from config.config import DEBUG
+from functools import wraps
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,113 @@ class PlayerService:
     def get_db(self):
         """获取数据库连接"""
         return sqlite3.connect(self.db_path)
+
+    def encrypt_password(self, password):
+        """使用MD5加密密码"""
+        if not password:
+            raise ValueError("密码不能为空")
+        return hashlib.md5(password.encode('utf-8')).hexdigest()
+
+    def login(self, player_name, password):
+        """玩家登录"""
+        logger.info(f"尝试登录玩家: {player_name}")
+        try:
+            if not player_name or not password:
+                return ResponseHandler.error(
+                    code=StatusCode.PARAM_ERROR,
+                    msg="用户名和密码不能为空"
+                )
+                
+            # 验证用户名和密码
+            conn = self.get_db()
+            cursor = conn.cursor()
+
+            # 获取玩家信息，包括密码字段
+            cursor.execute('''
+                SELECT player_id, player_name, password, level, points
+                FROM player_data 
+                WHERE player_name = ?
+            ''', (player_name,))
+
+            player = cursor.fetchone()
+            
+            if not player:
+                logger.warning(f"玩家不存在: {player_name}")
+                return ResponseHandler.error(
+                    code=StatusCode.USER_NOT_FOUND,
+                    msg="玩家不存在"
+                )
+                            
+            if player[2] == self.encrypt_password(password):
+                # 设置session
+                session['is_player'] = True
+                session['player_id'] = player[0]
+                session['player_name'] = player[1]
+                session['level'] = player[3]
+                session['points'] = player[4]
+                
+                logger.info(f"玩家 {player_name} 登录成功")
+                return ResponseHandler.success(
+                    data={
+                        "player_id": player[0],
+                        "player_name": player[1],
+                        "level": player[3],
+                        "points": player[4]
+                    },
+                    msg="登录成功"
+                )
+            else:
+                logger.warning(f"密码错误: {player_name}")
+                return ResponseHandler.error(
+                    code=StatusCode.LOGIN_FAILED,
+                    msg="用户名或密码错误"
+                )
+
+        except Exception as e:
+            logger.error(f"登录过程发生错误: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.LOGIN_FAILED,
+                msg=f"登录失败: {str(e)}"
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    def logout(self):
+        """玩家登出"""
+        try:
+            player_name = session.get('player_name')
+            logger.info(f"玩家 {player_name} 正在登出")
+            
+            # 清除session
+            session.pop('is_player', None)
+            session.pop('player_id', None)
+            session.pop('player_name', None)
+            session.pop('level', None)
+            session.pop('points', None)
+            
+            logger.info(f"玩家 {player_name} 登出成功")
+            return ResponseHandler.success(msg="登出成功")
+        except Exception as e:
+            logger.error(f"登出过程发生错误: {str(e)}")
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"登出失败: {str(e)}"
+            )
+
+    def player_required(self, f):
+        """玩家认证装饰器"""
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not session.get('is_player'):
+                logger.warning(f"未授权访问: {request.path}")
+                return ResponseHandler.error(
+                    code=StatusCode.UNAUTHORIZED,
+                    msg="需要玩家登录"
+                )
+            return f(*args, **kwargs)
+        return decorated_function
+
     def get_player_by_wechat_userid(self, wechat_userid):
         """根据企业微信用户ID获取玩家信息"""
         try:

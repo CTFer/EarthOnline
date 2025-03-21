@@ -41,6 +41,7 @@ class TaskService:
         """获取基础任务查询SQL"""
         return '''
             SELECT t.*, 
+                   pt.id as player_task_id,
                    p.player_name,
                    COALESCE(pt.status, 'AVAIL') as current_status,
                    pt.starttime,
@@ -130,7 +131,22 @@ class TaskService:
                 query += f" LIMIT {limit} OFFSET {offset}"
             
             cursor.execute(query, params or [])
-            tasks = [dict(row) for row in cursor.fetchall()]
+            tasks = []
+            for row in cursor.fetchall():
+                task_data = dict(row)
+                # 确保返回的数据中包含正确的ID
+                task_data['task_id'] = task_data['id']  # 保存原始任务ID
+                if task_data['player_task_id']:
+                    task_data['id'] = task_data['player_task_id']  # 使用玩家任务ID作为主ID
+                
+                # 处理task_rewards字段
+                if 'task_rewards' in task_data and isinstance(task_data['task_rewards'], str):
+                    try:
+                        task_data['task_rewards'] = json.loads(task_data['task_rewards'])
+                    except:
+                        task_data['task_rewards'] = {}
+                        
+                tasks.append(task_data)
             
             return ResponseHandler.success(
                 data={
@@ -225,8 +241,16 @@ class TaskService:
         return self._get_tasks_base(page=page, limit=limit)
 
     def get_check_tasks(self, page: int = 1, limit: int = 20) -> Dict:
-        """获取待审核任务列表"""
-        conditions = "pt.status = 'CHECK'"
+        """获取待审核任务列表
+        
+        Args:
+            page: 页码
+            limit: 每页数量
+            
+        Returns:
+            Dict: 包含待审核任务列表的响应
+        """
+        conditions = "pt.status = 'CHECK' AND pt.id IS NOT NULL"
         return self._get_tasks_base(conditions, [], page, limit)
 
     def get_task_history(self, task_id: int = None, player_id: int = None, 
@@ -260,28 +284,6 @@ class TaskService:
             }
         )
 
-    def approve_task(self, task_id: int) -> Dict:
-        """通过任务"""
-        return self._update_task_status(
-            task_id,
-            player_id,
-            'COMPLETED',
-            {
-                'complete_time': int(time.time())
-            }
-        )
-
-    def reject_task(self, task_id: int, reject_reason: str = None) -> Dict:
-        """驳回任务"""
-        return self._update_task_status(
-            task_id,
-            player_id,
-            'REJECT',
-            {
-                'reject_reason': reject_reason,
-                'complete_time': int(time.time())
-            }
-        )
 
     def get_available_tasks(self, player_id: int) -> Dict:
         """获取可用任务列表"""
@@ -1571,5 +1573,130 @@ class TaskService:
             )
         finally:
             conn.close()
+
+    def approve_player_task(self, player_task_id: int) -> Dict:
+        """通过任务审核"""
+        conn = None
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 检查玩家任务是否存在且状态为待审核
+            cursor.execute('''
+                SELECT pt.*, t.name as task_name, t.task_rewards, t.id as task_id
+                FROM player_task pt
+                JOIN task t ON pt.task_id = t.id
+                WHERE pt.id = ? AND pt.status = 'CHECK'
+            ''', (player_task_id,))
+            
+            task = cursor.fetchone()
+            if not task:
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在或状态不正确"
+                )
+            
+            current_time = int(time.time())
+            
+            # 更新任务状态为已完成
+            cursor.execute('''
+                UPDATE player_task 
+                SET status = 'COMPLETED',
+                    complete_time = ?
+                WHERE id = ? AND status = 'CHECK'
+            ''', (current_time, player_task_id))
+            
+            if cursor.rowcount == 0:
+                conn.rollback()
+                return ResponseHandler.error(
+                    code=StatusCode.FAIL,
+                    msg="更新任务状态失败"
+                )
+            
+            # 处理任务奖励
+            task_dict = dict(task)
+            rewards_summary = self._process_task_rewards(cursor, task_dict['player_id'], task_dict, current_time)
+            
+            conn.commit()
+            return ResponseHandler.success(
+                data={
+                    'task_id': task_dict['task_id'],
+                    'player_task_id': player_task_id,
+                    'rewards': rewards_summary
+                },
+                msg="任务审核通过"
+            )
+            
+        except Exception as e:
+            logger.error(f"任务审核失败: {str(e)}")
+            if conn:
+                conn.rollback()
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"任务审核失败: {str(e)}"
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    def reject_player_task(self, player_task_id: int, reject_reason: str = None) -> Dict:
+        """驳回任务"""
+        conn = None
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 检查玩家任务是否存在且状态为待审核
+            cursor.execute('''
+                SELECT pt.*, t.name as task_name
+                FROM player_task pt
+                JOIN task t ON pt.task_id = t.id
+                WHERE pt.id = ? AND pt.status = 'CHECK'
+            ''', (player_task_id,))
+            
+            task = cursor.fetchone()
+            if not task:
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在或状态不正确"
+                )
+            
+            # 更新任务状态为已驳回
+            cursor.execute('''
+                UPDATE player_task 
+                SET status = 'REJECT',
+                    reject_reason = ?,
+                    complete_time = ?
+                WHERE id = ? AND status = 'CHECK'
+            ''', (reject_reason or '', int(time.time()), player_task_id))
+            
+            if cursor.rowcount == 0:
+                conn.rollback()
+                return ResponseHandler.error(
+                    code=StatusCode.FAIL,
+                    msg="更新任务状态失败"
+                )
+            
+            conn.commit()
+            return ResponseHandler.success(
+                data={
+                    'player_task_id': player_task_id,
+                    'task_name': task['task_name'],
+                    'reject_reason': reject_reason
+                },
+                msg="任务已驳回"
+            )
+            
+        except Exception as e:
+            logger.error(f"任务驳回失败: {str(e)}")
+            if conn:
+                conn.rollback()
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"任务驳回失败: {str(e)}"
+            )
+        finally:
+            if conn:
+                conn.close()
 
 task_service = TaskService() 

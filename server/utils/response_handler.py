@@ -188,58 +188,8 @@ class ResponseHandler:
         :param request: Flask request 对象（可选）
         :return: 是否应该使用 HTTPS
         """
-        from config.config import ENV, HTTPS_ENABLED, CLOUDFLARE, DOMAIN
-        
-        if ENV == 'local':
-            return HTTPS_ENABLED
-        
-        # 生产环境
-        if HTTPS_ENABLED:
-            return True
-        
-        if CLOUDFLARE['enabled'] and CLOUDFLARE['flexible_ssl']:
-            if CLOUDFLARE['domain_only_ssl'] and request:
-                host = request.headers.get('Host', '').lower()
-                return DOMAIN.lower() in host
-            return True
-        
-        return False
-
-    @staticmethod
-    def redirect(location: str, permanent: bool = False) -> Response:
-        """
-        重定向响应
-        :param location: 重定向目标URL
-        :param permanent: 是否永久重定向
-        :return: Flask Response 对象
-        """
-        from flask import request
-        
-        # 确定是否应该使用 HTTPS
-        should_use_https = ResponseHandler.should_use_https(request)
-        
-        # 根据配置调整 URL scheme
-        if should_use_https and location.startswith('http://'):
-            location = location.replace('http://', 'https://', 1)
-        elif not should_use_https and location.startswith('https://'):
-            location = location.replace('https://', 'http://', 1)
-        
-        # 使用 302 临时重定向或 301 永久重定向
-        status_code = 301 if permanent else 302
-        
-        # 创建重定向响应
-        response = Response(
-            status=status_code,
-            headers={'Location': location}
-        )
-        
-        # 设置响应头，防止浏览器缓存
-        if not permanent:
-            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-            response.headers['Pragma'] = 'no-cache'
-            response.headers['Expires'] = '0'
-        
-        return response
+        from config.config import HTTPS_ENABLED
+        return HTTPS_ENABLED
 
     @staticmethod
     def response(

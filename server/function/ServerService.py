@@ -220,15 +220,15 @@ class ServerService:
             # 基础配置
             server_config = {
                 'host': SERVER_IP,
-                'port': PORT,
+                'port': HTTPS_PORT if HTTPS_ENABLED else PORT,
                 'debug': DEBUG,
-                'use_reloader': False,  # 禁用reloader提高性能
+                'use_reloader': False,
                 'log_output': True,
-                'max_connections': 5000,  # 增加最大连接数
-                'backlog': 4096,  # 增加等待队列
-                'worker_connections': 20000,  # 增加工作连接数
-                'keepalive_timeout': 30,  # 减少keepalive超时
-                'client_max_body_size': '50M'  # 增加最大请求体大小
+                'max_connections': 5000,
+                'backlog': 4096,
+                'worker_connections': 20000,
+                'keepalive_timeout': 30,
+                'client_max_body_size': '50M'
             }
             
             # 更新配置
@@ -256,20 +256,6 @@ class ServerService:
                     'path': CLOUDFLARE['websocket'].get('path', '/socket.io'),
                     'transports': ['websocket']
                 })
-            # HTTPS模式配置
-            # if ENV == 'local' and HTTPS_ENABLED:
-            #     # 本地开发环境使用自签名证书
-            #     ssl_success, ssl_context = self.setup_ssl(SSL_CERT_DIR)
-            #     if ssl_success:
-            #         server_config.update({
-            #             'port': HTTPS_PORT,
-            #             'ssl_context': ssl_context,
-            #             'ssl_version': ssl.PROTOCOL_TLSv1_2,  # 使用TLS 1.2
-            #             'ciphers': 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384'  # 高性能密码套件
-            #         })
-            #     else:
-            #         logger.warning("SSL配置失败，回退到HTTP模式")
-            #         server_config['port'] = PORT + 1
 
             logger.info(f"[SocketIO] 服务器配置: {server_config}")
             logger.info(f"[SocketIO] SocketIO配置: {socketio_config}")
@@ -279,25 +265,64 @@ class ServerService:
                 if hasattr(socketio, key):
                     setattr(socketio, key, value)
             
-            # 创建更大的eventlet工作线程池
+            # 创建工作线程池
             pool = eventlet.GreenPool(2000)
             
-            # 启动服务器
+            # 创建监听socket
             sock = listen(
                 (server_config['host'], server_config['port']), 
                 backlog=server_config['backlog']
             )
             
-            # 如果是HTTPS模式，包装socket
-            if 'ssl_context' in server_config:
-                logger.info(f"正在配置HTTPS socket，端口: {server_config['port']}")
-                sock = server_config['ssl_context'].wrap_socket(sock, server_side=True)
-                logger.info("HTTPS socket配置完成")
+            # 配置SSL（如果启用）
+            if HTTPS_ENABLED:
+                try:
+                    ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                    
+                    # 根据环境加载证书
+                    if ENV == 'local':
+                        logger.info("本地环境：使用自签名证书")
+                        ssl_context.load_cert_chain(
+                            certfile=os.path.join(SSL_CERT_DIR, 'dev', 'cert.pem'),
+                            keyfile=os.path.join(SSL_CERT_DIR, 'dev', 'key.pem')
+                        )
+                    else:
+                        logger.info("生产环境：使用Cloudflare证书")
+                        ssl_context.load_cert_chain(
+                            certfile=SSL_CERT_FILE,
+                            keyfile=SSL_KEY_FILE
+                        )
+                    
+                    # 配置SSL选项
+                    ssl_context.options |= (
+                        ssl.OP_NO_COMPRESSION |  # 禁用压缩以减少CPU开销
+                        ssl.OP_NO_RENEGOTIATION |  # 禁用重新协商以提高安全性
+                        ssl.OP_CIPHER_SERVER_PREFERENCE |  # 使用服务器的密码套件优先级
+                        ssl.OP_SINGLE_DH_USE  # 每次连接使用新的DH密钥
+                    )
+                    
+                    # 设置现代密码套件
+                    ssl_context.set_ciphers(
+                        'ECDHE-ECDSA-AES256-GCM-SHA384:'
+                        'ECDHE-RSA-AES256-GCM-SHA384:'
+                        'ECDHE-ECDSA-CHACHA20-POLY1305:'
+                        'ECDHE-RSA-CHACHA20-POLY1305:'
+                        'ECDHE-ECDSA-AES128-GCM-SHA256:'
+                        'ECDHE-RSA-AES128-GCM-SHA256'
+                    )
+                    
+                    # 包装socket
+                    sock = ssl_context.wrap_socket(sock, server_side=True)
+                    logger.info("SSL配置完成")
+                    
+                except Exception as e:
+                    logger.error(f"SSL配置失败: {str(e)}")
+                    raise RuntimeError(f"SSL配置失败: {str(e)}")
             
-            protocol = 'https' if 'ssl_context' in server_config else 'http'
+            protocol = 'https' if HTTPS_ENABLED else 'http'
             logger.info(f"服务器启动于 {protocol}://{server_config['host']}:{server_config['port']}")
             
-            # 使用工作线程池处理请求
+            # 启动服务器
             wsgi.server(
                 sock,
                 app,
@@ -305,7 +330,7 @@ class ServerService:
                 log_output=server_config['log_output'],
                 max_size=server_config['worker_connections'],
                 keepalive=server_config['keepalive_timeout'],
-                socket_timeout=30  # 设置socket超时
+                socket_timeout=30
             )
 
         except Exception as e:

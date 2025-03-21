@@ -110,10 +110,16 @@ WAITRESS_CONFIG = {
 
 # 生产环境配置 用于同步数据库
 PROD_SERVER = {
-    'URL': 'http://1.95.11.164',  # 生产环境服务器地址
+    'URL': f'https://{DOMAIN_IP}' if HTTPS_ENABLED else f'http://{DOMAIN_IP}',  # 使用IP地址
     'API_KEY': '95279527',    # API认证密钥 用于同步数据库
-    'TIMEOUT': 5,                      # 请求超时时间（秒）
-    'RETRY': 3                         # 失败重试次数
+    'TIMEOUT': 5,             # 请求超时时间（秒）
+    'RETRY': 3,              # 失败重试次数
+    'SSL_VERIFY': False,     # 禁用SSL验证，因为使用IP访问
+    'HEADERS': {             # 标准请求头
+        'Content-Type': 'application/json',
+        'X-Sync-From': 'local',
+        'Host': DOMAIN       # 添加Host头以支持SSL
+    }
 }
 # 同步时间 秒
 Roadmap_SYNC_TIME = 300
