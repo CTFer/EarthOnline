@@ -28,7 +28,7 @@
 @import "./components/footer.less";
 @import "./components/notification.less";
 @import "./components/shop.less";
-
+@import "./components/login.less";
 // 导入响应式样式
 @import "./base/responsive.less";
 
@@ -156,39 +156,5 @@
   }
 }
 
-// 商城入口样式
-.shop-entrance {
-  margin-top: 20px;
-  padding: 12px 15px;
-  background: rgba(138, 162, 193, 0.1);
-  border: 1px solid rgba(138, 162, 193, 0.2);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: all @transition-duration;
-  
-  &:hover {
-    background: rgba(138, 162, 193, 0.2);
-    border-color: rgba(138, 162, 193, 0.3);
-    transform: translateY(-2px);
-  }
 
-  .shop-icon {
-    width: 24px;
-    height: 24px;
-    object-fit: contain;
-  }
-
-  .shop-text {
-    flex: 1;
-    color: @text-color;
-    font-size: 14px;
-  }
-
-  .layui-icon {
-    color: rgba(138, 162, 193, 0.6);
-    font-size: 12px;
-  }
-}
 

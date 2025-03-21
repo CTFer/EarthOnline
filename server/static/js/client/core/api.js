@@ -320,6 +320,30 @@ class APIClient {
         });
     }
 
+    // 登录相关 API
+    async login(playerId, password) {
+        Logger.info('API', '玩家登录:', playerId);
+        return this.request('/api/player/login', {
+            method: 'POST',
+            body: JSON.stringify({
+                player_id: playerId,
+                password: password
+            })
+        });
+    }
+
+    async logout() {
+        Logger.info('API', '玩家登出');
+        return this.request('/api/player/logout', {
+            method: 'POST'
+        });
+    }
+
+    async checkLoginStatus() {
+        Logger.info('API', '检查登录状态');
+        return this.request('/api/player/check_login');
+    }
+
 }
 
 // 修改导出方式

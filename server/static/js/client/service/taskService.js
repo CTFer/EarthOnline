@@ -130,6 +130,8 @@ class TaskService {
 
         await this.updateTaskStatus(taskStatus);
         await this.loadCurrentTasks();
+      }else{
+        throw response.msg;
       }
       return response;
     } catch (error) {

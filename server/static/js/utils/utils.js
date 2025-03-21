@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:48
- * @LastEditTime: 2025-03-04 09:22:46
+ * @LastEditTime: 2025-03-21 23:00:52
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -143,5 +143,28 @@ export const gameUtils = {
   // 设置页面标题
   setPageTitle(title) {
     document.title = title;
+  },
+
+  /**
+   * MD5加密函数
+   * @param {string} str 需要加密的字符串
+   * @param {string} [salt=''] 混淆字符串(可选)
+   * @returns {string} 加密后的字符串
+   */
+  md5Encrypt(str, salt = '') {
+    // 将输入字符串和混淆字符串拼接
+    const input = str + salt;
+    
+    // 使用全局的 CryptoJS 对象
+    if (typeof CryptoJS === 'undefined') {
+      Logger.error("Utils", "CryptoJS 未加载");
+      throw new Error("CryptoJS 未加载");
+    }
+    
+    // 使用 CryptoJS 进行 MD5 加密
+    const hash = CryptoJS.MD5(input);
+    
+    // 返回十六进制字符串
+    return hash.toString();
   },
 };

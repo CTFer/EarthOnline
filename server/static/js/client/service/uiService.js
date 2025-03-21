@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-03-18 13:38:53
+ * @LastEditTime: 2025-03-21 21:39:22
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -945,7 +945,7 @@ class UIService {
       Logger.error("UIService", "提交任务失败:", error);
       this.showNotification({
         type: "ERROR",
-        message: "提交任务失败",
+        message: "uiservice:提交任务失败",
       });
       this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
     }

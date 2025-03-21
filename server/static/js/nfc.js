@@ -1,16 +1,32 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-08 11:24:25
- * @LastEditTime: 2025-03-20 15:52:13
+ * @LastEditTime: 2025-03-21 21:22:31
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
  * Copyright 2025 迷舍
  */
 
-// 检查浏览器是否支持Web Serial API
+// 检查浏览器是否支持Web Serial API和Web NFC API
 async function checkBrowserSupport() {
-    // 检查navigator.serial是否存在
+    // 检查是否为移动设备
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // 移动设备检查Web NFC支持
+        if (!('NDEFReader' in window)) {
+            const errorMsg = '您的手机浏览器不支持Web NFC。请确保：\n' +
+                '1. 使用Chrome或Edge浏览器\n' +
+                '2. 系统已开启NFC功能\n' +
+                '3. 使用HTTPS环境';
+            alert(errorMsg);
+            return false;
+        }
+        return true;
+    }
+    
+    // 桌面设备检查Web Serial支持
     if (!navigator?.serial) {
         const errorMsg = '您的浏览器不支持Web Serial API。请确保：\n' +
             '1. 使用的是Chrome或Edge浏览器\n' +
@@ -40,6 +56,10 @@ async function checkBrowserSupport() {
 
 class NFCDevice {
     constructor() {
+        // 添加移动设备判断
+        this.isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        this.ndefReader = null;
+        
         // 设备状态
         this.port = null;
         this.reader = null;
@@ -78,6 +98,17 @@ class NFCDevice {
 
         // 初始化事件监听
         this.initEventListeners();
+
+        // 如果是移动设备，页面加载完成后预请求NFC权限
+        if (this.isMobile && 'NDEFReader' in window) {
+            // 延迟一秒执行，确保页面完全加载
+            setTimeout(() => {
+                const reader = new NDEFReader();
+                reader.scan().catch(error => {
+                    console.log('NFC预授权请求:', error);
+                });
+            }, 1000);
+        }
     }
 
     // 初始化事件监听器
@@ -115,61 +146,14 @@ class NFCDevice {
     // 连接设备
     async connect() {
         try {
-            // 先检查浏览器支持
             if (!await checkBrowserSupport()) {
                 return;
             }
 
-            this.log('正在请求串口访问权限...');
-            
-            // 添加过滤器，只显示USB设备
-            const filters = [
-                { usbVendorId: 0x0483 }, // STM32
-                { usbVendorId: 0x2341 }, // Arduino
-                { usbVendorId: 0x1A86 }  // CH340
-            ];
-
-            try {
-                this.port = await navigator.serial.requestPort({ filters });
-            } catch (error) {
-                if (error.name === 'NotFoundError') {
-                    this.log('未找到支持的设备', 'error');
-                    return;
-                } else if (error.name === 'SecurityError') {
-                    this.log('需要在HTTPS或localhost环境下运行', 'error');
-                    return;
-                } else if (error.name === 'AbortError') {
-                    this.log('用户取消了设备选择', 'warn');
-                    return;
-                }
-                throw error;
-            }
-
-            const { usbProductId, usbVendorId } = this.port.getInfo();
-            
-            this.log(`设备信息: VID:${usbVendorId.toString(16)} PID:${usbProductId.toString(16)}`);
-            this.elements.portInfo.value = `VID:${usbVendorId.toString(16)} PID:${usbProductId.toString(16)}`;
-
-            // 尝试打开端口
-            try {
-                await this.port.open({ baudRate: 115200 });
-            } catch (error) {
-                if (error.name === 'InvalidStateError') {
-                    this.log('端口已经打开', 'warn');
-                    await this.port.close();
-                    await this.port.open({ baudRate: 115200 });
-                } else {
-                    throw error;
-                }
-            }
-
-            this.log('串口连接成功');
-
-            // 初始化设备
-            if (await this.initializeDevice()) {
-                this.initialized = true;
-                this.updateUIState(true);
-                this.log('设备初始化成功', 'info');
+            if (this.isMobile) {
+                await this.connectMobileNFC();
+            } else {
+                await this.connectSerialDevice();
             }
         } catch (error) {
             this.log(`连接失败: ${error.message}`, 'error');
@@ -177,20 +161,140 @@ class NFCDevice {
         }
     }
 
-    // 断开连接
+    // 新增移动端NFC连接方法
+    async connectMobileNFC() {
+        try {
+            // 先检查系统NFC是否开启
+            if (!('NDEFReader' in window)) {
+                this.log('设备不支持NFC功能，请确保：\n1. 使用Chrome浏览器\n2. 系统已开启NFC功能', 'error');
+                return;
+            }
+
+            // 创建NDEFReader实例并主动请求权限
+            this.ndefReader = new NDEFReader();
+            
+            // 使用 layui 显示提示框
+            layer.msg('请在系统弹出的授权提示中允许访问NFC功能', {
+                icon: 16,
+                time: 0,
+                shade: 0.3
+            });
+
+            try {
+                // 主动触发权限请求
+                await this.ndefReader.scan();
+                // 关闭提示框
+                layer.closeAll();
+                
+                this.log('NFC功能已启动，请将NFC标签靠近手机背面');
+                this.initialized = true;
+                this.updateUIState(true);
+                
+                // 监听NFC读取事件
+                this.ndefReader.addEventListener("reading", event => {
+                    this.handleNFCReading(event);
+                });
+
+                this.ndefReader.addEventListener("readingerror", () => {
+                    this.log('读取NFC标签失败', 'error');
+                });
+
+            } catch (error) {
+                // 关闭提示框
+                layer.closeAll();
+                
+                if (error.name === 'NotAllowedError') {
+                    layer.confirm('需要授权访问NFC功能，是否重新请求权限？', {
+                        btn: ['重新请求', '手动设置', '取消'],
+                        title: 'NFC权限未授权'
+                    }, 
+                    // 重新请求按钮
+                    async () => {
+                        try {
+                            const reader = new NDEFReader();
+                            await reader.scan();
+                            this.connect(); // 重新尝试连接
+                        } catch (e) {
+                            console.error('重新请求权限失败:', e);
+                        }
+                    },
+                    // 手动设置按钮
+                    () => {
+                        // 原有的设置指导代码...
+                    });
+                } else if (error.name === 'NotSupportedError') {
+                    layer.alert('设备不支持NFC功能，请确保：<br>' +
+                        '1. 手机NFC功能已开启<br>' +
+                        '2. 使用Chrome浏览器<br>' +
+                        '3. 系统版本支持NFC功能', {
+                        title: '设备不支持',
+                        icon: 2
+                    });
+                } else {
+                    layer.alert(`NFC启动失败: ${error.message}`, {
+                        title: '错误',
+                        icon: 2
+                    });
+                }
+                throw error;
+            }
+        } catch (error) {
+            console.error('NFC连接错误:', error);
+            this.log(`NFC连接失败: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    // 新增处理NFC读取事件的方法
+    async handleNFCReading(event) {
+        try {
+            // 更新卡片ID
+            const cardId = event.serialNumber;
+            this.elements.cardId.value = cardId;
+            this.log(`检测到NFC标签: ${cardId}`);
+
+            // 更新卡片类型
+            this.elements.cardType.value = 'NDEF';
+            
+            // 读取NDEF消息
+            let cardData = '';
+            for (const record of event.message.records) {
+                if (record.recordType === "text") {
+                    const textDecoder = new TextDecoder();
+                    const text = textDecoder.decode(record.data);
+                    cardData += text;
+                } else if (record.recordType === "url") {
+                    cardData += record.data;
+                }
+            }
+            
+            this.elements.cardData.value = cardData;
+            this.log(`读取数据: ${cardData}`);
+            
+        } catch (error) {
+            this.log(`处理NFC数据失败: ${error.message}`, 'error');
+        }
+    }
+
+    // 修改断开连接方法以支持移动端
     async disconnect() {
         try {
-            this.reading = false;
-            if (this.reader) {
-                await this.reader.cancel();
-                this.reader = null;
-            }
-            if (this.writer) {
-                this.writer.releaseLock();
-                this.writer = null;
-            }
-            if (this.port?.readable) {
-                await this.port.close();
+            if (this.isMobile && this.ndefReader) {
+                // 停止NFC扫描
+                this.ndefReader = null;
+            } else {
+                this.reading = false;
+                if (this.reader) {
+                    await this.reader.cancel();
+                    this.reader = null;
+                }
+                if (this.writer) {
+                    this.writer.releaseLock();
+                    this.writer = null;
+                }
+                if (this.port?.readable) {
+                    await this.port.close();
+                }
             }
             this.initialized = false;
             this.updateUIState(false);
@@ -357,64 +461,40 @@ class NFCDevice {
     async writeCardData() {
         try {
             const data = this.elements.writeData.value;
-            const isAscii = document.querySelector('input[name="dataType"]:checked').value === 'ascii';
-            
             if (!data) {
                 this.log('请输入要写入的数据', 'warn');
                 return;
             }
 
-            // 转换数据格式
-            let hexData;
-            if (isAscii) {
-                hexData = Array.from(new TextEncoder().encode(data))
-                    .map(b => b.toString(16).padStart(2, '0'))
-                    .join('');
+            if (this.isMobile) {
+                await this.writeMobileNFC(data);
             } else {
-                hexData = data.replace(/[^0-9A-Fa-f]/g, '');
+                await this.writeSerialDevice(data);
             }
-
-            // 检查数据长度
-            if (hexData.length % 2 !== 0) {
-                this.log('HEX数据长度必须是偶数', 'error');
-                return;
-            }
-
-            // 分页写入数据
-            const pageSize = 4; // 每页4字节
-            const pages = Math.ceil(hexData.length / 8);
-            
-            for (let page = 0; page < pages; page++) {
-                const start = page * 8;
-                const pageData = hexData.substring(start, start + 8).padEnd(8, '0');
-                
-                if (!await this.writeCardPage(page + 4, pageData)) {
-                    this.log(`写入页 ${page + 4} 失败`, 'error');
-                    return;
-                }
-                
-                this.log(`写入页 ${page + 4} 成功: ${pageData}`);
-            }
-
-            this.log('数据写入完成');
         } catch (error) {
             this.log(`写入数据失败: ${error.message}`, 'error');
         }
     }
 
-    // 写入单页数据
-    async writeCardPage(page, data) {
+    // 新增移动端NFC写入方法
+    async writeMobileNFC(data) {
         try {
-            const cmd = new Uint8Array([
-                0x00, 0x00, 0xFF, 0x05, 0xFB, 0xD4, 0x40, 0x01, 0xA2, page,
-                ...Array.from(data.match(/.{2}/g).map(byte => parseInt(byte, 16)))
-            ]);
-            
-            const response = await this.sendCommand(cmd);
-            return response && response.includes('d541');
+            const writer = new NDEFWriter();
+            await writer.write({
+                records: [{
+                    recordType: "text",
+                    data: data
+                }]
+            });
+            this.log('数据写入成功');
         } catch (error) {
-            this.log(`写入页 ${page} 失败: ${error.message}`, 'error');
-            return false;
+            if (error.name === 'NotAllowedError') {
+                this.log('需要授权写入NFC标签', 'error');
+            } else if (error.name === 'NotSupportedError') {
+                this.log('设备不支持NFC写入功能', 'error');
+            } else {
+                throw error;
+            }
         }
     }
 

@@ -170,7 +170,7 @@ def player_login():
     """玩家登录"""
     try:
         data = request.get_json()
-        return player_service.login(data.get('player_name'), data.get('password'))
+        return player_service.login(data.get('player_id'), data.get('password'))
     except Exception as e:
         logger.error(f"登录失败: {str(e)}")
         return ResponseHandler.error(
@@ -182,6 +182,24 @@ def player_login():
 def player_logout():
     """玩家登出"""
     return player_service.logout()
+@app.route('/api/player/check_login', methods=['GET'])
+def check_login():
+    """检查玩家登录状态"""
+    response = player_service.check_login()
+    if response:
+        return ResponseHandler.success(
+            code=StatusCode.SUCCESS,
+            msg="已登录",
+            data={
+                "is_player": True,
+                "player_id": response
+            }
+        )
+    else:
+        return ResponseHandler.error(
+            code=StatusCode.UNAUTHORIZED,
+            msg="未登录"
+        )
 
 # 修改需要认证的路由，添加 @player_required 装饰器
 @app.route('/api/player/<int:player_id>', methods=['GET'])

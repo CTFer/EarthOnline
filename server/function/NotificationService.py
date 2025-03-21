@@ -63,7 +63,7 @@ class NotificationService:
             
             # 创建通知表
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS notifications (
+                CREATE TABLE IF NOT EXISTS notification (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     title TEXT NOT NULL,
                     content TEXT NOT NULL,
@@ -98,7 +98,7 @@ class NotificationService:
             cursor = conn.cursor()
             
             query = '''
-                SELECT * FROM notifications 
+                SELECT * FROM notification 
                 WHERE status = 'active' 
                 AND (target_type = ? OR target_type = 'all')
             '''
@@ -126,7 +126,7 @@ class NotificationService:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            cursor.execute('SELECT * FROM notifications WHERE id = ?', (notification_id,))
+            cursor.execute('SELECT * FROM notification WHERE id = ?', (notification_id,))
             notification = cursor.fetchone()
             
             return dict(notification) if notification else None
@@ -144,7 +144,7 @@ class NotificationService:
             current_time = int(time.time())
             
             cursor.execute('''
-                INSERT INTO notifications (
+                INSERT INTO notification (
                     title, content, type, target_type, target_id,
                     create_time, update_time, expire_time
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -163,7 +163,7 @@ class NotificationService:
             conn.commit()
             
             # 获取新创建的通知
-            cursor.execute('SELECT * FROM notifications WHERE id = ?', (notification_id,))
+            cursor.execute('SELECT * FROM notification WHERE id = ?', (notification_id,))
             notification = cursor.fetchone()
             
             return dict(notification)
@@ -206,7 +206,7 @@ class NotificationService:
             params.append(notification_id)
             
             query = f'''
-                UPDATE notifications 
+                UPDATE notification 
                 SET {', '.join(update_fields)}
                 WHERE id = ?
             '''
@@ -215,7 +215,7 @@ class NotificationService:
             conn.commit()
             
             # 获取更新后的通知
-            cursor.execute('SELECT * FROM notifications WHERE id = ?', (notification_id,))
+            cursor.execute('SELECT * FROM notification WHERE id = ?', (notification_id,))
             notification = cursor.fetchone()
             
             return dict(notification) if notification else None
@@ -231,7 +231,7 @@ class NotificationService:
             cursor = conn.cursor()
             
             cursor.execute('''
-                UPDATE notifications 
+                UPDATE notification 
                 SET status = 'deleted', update_time = ? 
                 WHERE id = ?
             ''', (int(time.time()), notification_id))
@@ -250,7 +250,7 @@ class NotificationService:
             cursor = conn.cursor()
             
             cursor.execute('''
-                UPDATE notifications 
+                UPDATE notification 
                 SET is_read = 1, update_time = ? 
                 WHERE id = ?
             ''', (int(time.time()), notification_id))
@@ -271,7 +271,7 @@ class NotificationService:
             current_time = int(time.time())
             
             cursor.execute('''
-                UPDATE notifications 
+                UPDATE notification 
                 SET status = 'expired', update_time = ? 
                 WHERE expire_time IS NOT NULL 
                 AND expire_time < ? 

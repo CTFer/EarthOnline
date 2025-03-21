@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-18 09:03:41
- * @LastEditTime: 2025-02-19 14:17:47
+ * @LastEditTime: 2025-03-21 23:14:17
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -68,6 +68,8 @@ export const TASK_EVENTS = {
 
 // 玩家相关事件
 export const PLAYER_EVENTS = {
+  // 玩家登录成功
+  LOGIN_SUCCESS: "player:login:success",
   // 玩家ID更新
   ID_UPDATED: "player:id:updated",
   // 玩家信息更新

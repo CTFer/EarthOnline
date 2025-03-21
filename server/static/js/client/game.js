@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-03-15 21:44:15
+ * @LastEditTime: 2025-03-21 23:09:13
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -200,7 +200,98 @@ class GameManager {
     // 加载状态
     this.loading = false;
 
+    // 初始化登录相关事件监听
+    this.initializeLoginEvents();
+
     Logger.info("GameManager", "基础属性初始化完成");
+  }
+
+  // 初始化登录相关事件
+  initializeLoginEvents() {
+    Logger.info("GameManager", "初始化登录事件");
+
+    // 监听登录按钮点击
+    const loginBtn = document.getElementById('loginBtn');
+    if (loginBtn) {
+      loginBtn.addEventListener('click', () => this.showLoginDialog());
+    }
+
+    // 监听登录状态变化
+    this.eventBus.on(PLAYER_EVENTS.LOGIN_STATUS_CHECKED, (data) => {
+      this.templateService.updateLoginButton(data.isLoggedIn, data.playerData?.player_name);
+    });
+  }
+
+  // 显示登录弹窗
+  async showLoginDialog() {
+    Logger.info("GameManager", "显示登录弹窗");
+
+    try {
+      // 获取可选玩家列表
+      const response = await this.api.request('/api/get_players');
+      if (response.code !== 0) {
+        throw new Error(response.msg || '获取玩家列表失败');
+      }
+
+      // 创建登录弹窗
+      const dialogContent = this.templateService.createLoginDialogTemplate(response.data);
+
+      layer.open({
+        type: 1,
+        title: '登录',
+        content: dialogContent,
+        area: ['500px', 'auto'],
+        success: function(layero) {
+          // 初始化表单
+          layui.form.render();
+          
+          // 绑定表单提交事件
+          layui.form.on('submit(loginForm)', async function(data) {
+            try {
+              const { player_id, password } = data.field;
+              if (!player_id) {
+                layer.msg('请选择角色', {icon: 2});
+                return false;
+              }
+
+              // 获取玩家创建时间作为混淆字符
+              const playerInfo = response.data.find(p => p.player_id == player_id);
+              const salt = playerInfo?.create_time || '';
+              
+              // 加密密码
+              const encryptedPassword = gameUtils.md5Encrypt(password, salt);
+              
+              // 发送加密后的密码
+              await window.GameManager.playerService.login(player_id, encryptedPassword);
+              layer.closeAll();
+            } catch (error) {
+              // 错误已在 playerService 中处理
+            }
+            return false;
+          });
+
+          // 初始化玩家选择
+          const container = layero.find('.player-type-container');
+          container.find('[lay-radio]').on('click', function() {
+            const input = $(this).prev('input[type=radio]');
+            container.find('[lay-radio]').removeClass('selected');
+            container.find('input[type=radio]').prop('checked', false);
+            $(this).addClass('selected');
+            input.prop('checked', true);
+          });
+
+          // 默认选中第一个玩家
+          container.find('input[type=radio]').first()
+            .prop('checked', true)
+            .next('[lay-radio]')
+            .addClass('selected');
+        }
+      });
+
+    } catch (error) {
+      Logger.error("GameManager", "显示登录弹窗失败:", error);
+      layer.msg(error.message || "显示登录弹窗失败");
+    }
   }
 
   // 优化初始化应用方法
@@ -287,44 +378,6 @@ class GameManager {
 
     return this.initializationPromise;
   }
-
-  // 初始化观察器 已经在uiService中初始化
-  // setupDOMObserver() {
-  //   Logger.debug("GameManager", "初始化DOM观察器");
-  //   const taskObserver = new MutationObserver((mutations) => {
-  //     mutations.forEach((mutation) => {
-  //       if (mutation.type === "childList") {
-  //         mutation.addedNodes.forEach((node) => {
-  //           if (node.nodeType === 1) {
-  //             // 处理任务卡片
-  //             if (node.classList?.contains("task-card")) {
-  //               this.uiService.initializeTaskCard(node);
-  //             }
-  //             // 处理新添加节点中的任务卡片
-  //             // const taskCards = node.getElementsByClassName("task-card");
-  //             // Array.from(taskCards).forEach((card) => this.uiService.initializeTaskCard(card));
-  //           }
-  //         });
-  //       }
-  //     });
-  //   });
-
-  //   // 设置观察器配置
-  //   const config = { childList: true, subtree: true };
-
-  //   // 监听相关容器
-  //   const containers = [document.getElementById("taskList"), document.querySelector(".active-tasks-swiper .swiper-wrapper"), document.querySelector(".tasks-list")].filter(Boolean);
-
-  //   containers.forEach((container) => {
-  //     taskObserver.observe(container, config);
-  //     // 初始化已存在的任务卡片
-  //     // Array.from(container.getElementsByClassName("task-card")).forEach((card) => this.uiService.initializeTaskCard(card));
-  //   });
-
-  //   // 存储观察器实例以便后续清理
-  //   this._taskObserver = taskObserver;
-  // }
-
   // 初始化文字云
   async initWordCloud() {
     Logger.info("GameManager", "初始化文字云");

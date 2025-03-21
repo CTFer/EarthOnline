@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-02-04 23:29:47
-# LastEditTime: 2025-03-20 16:03:14
+# LastEditTime: 2025-03-21 22:59:05
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -49,37 +49,39 @@ class PlayerService:
             raise ValueError("密码不能为空")
         return hashlib.md5(password.encode('utf-8')).hexdigest()
 
-    def login(self, player_name, password):
+    def login(self, player_id, password):
         """玩家登录"""
-        logger.info(f"尝试登录玩家: {player_name}")
+        logger.info(f"尝试登录玩家ID: {player_id}")
+        conn = None
         try:
-            if not player_name or not password:
+            if not player_id or not password:
                 return ResponseHandler.error(
                     code=StatusCode.PARAM_ERROR,
-                    msg="用户名和密码不能为空"
+                    msg="玩家ID和密码不能为空"
                 )
                 
-            # 验证用户名和密码
+            # 验证玩家ID和密码
             conn = self.get_db()
             cursor = conn.cursor()
 
-            # 获取玩家信息，包括密码字段
+            # 获取玩家信息
             cursor.execute('''
-                SELECT player_id, player_name, password, level, points
+                SELECT player_id, player_name, password, level, points, create_time
                 FROM player_data 
-                WHERE player_name = ?
-            ''', (player_name,))
+                WHERE player_id = ?
+            ''', (player_id,))
 
             player = cursor.fetchone()
             
             if not player:
-                logger.warning(f"玩家不存在: {player_name}")
+                logger.warning(f"玩家不存在: {player_id}")
                 return ResponseHandler.error(
                     code=StatusCode.USER_NOT_FOUND,
                     msg="玩家不存在"
                 )
                             
-            if player[2] == self.encrypt_password(password):
+            # 直接比较加密后的密码字符串
+            if player[2] == password:  # 前端已经用相同的方式加密
                 # 设置session
                 session['is_player'] = True
                 session['player_id'] = player[0]
@@ -87,7 +89,7 @@ class PlayerService:
                 session['level'] = player[3]
                 session['points'] = player[4]
                 
-                logger.info(f"玩家 {player_name} 登录成功")
+                logger.info(f"玩家 {player[1]} 登录成功")
                 return ResponseHandler.success(
                     data={
                         "player_id": player[0],
@@ -98,16 +100,16 @@ class PlayerService:
                     msg="登录成功"
                 )
             else:
-                logger.warning(f"密码错误: {player_name}")
+                logger.warning(f"密码错误: {player_id}")
                 return ResponseHandler.error(
-                    code=StatusCode.LOGIN_FAILED,
-                    msg="用户名或密码错误"
+                    code=StatusCode.PASSWORD_ERROR,
+                    msg="密码错误"
                 )
 
         except Exception as e:
-            logger.error(f"登录过程发生错误: {str(e)}")
+            logger.error(f"登录失败: {str(e)}")
             return ResponseHandler.error(
-                code=StatusCode.LOGIN_FAILED,
+                code=StatusCode.SERVER_ERROR,
                 msg=f"登录失败: {str(e)}"
             )
         finally:
@@ -135,6 +137,14 @@ class PlayerService:
                 code=StatusCode.SERVER_ERROR,
                 msg=f"登出失败: {str(e)}"
             )
+
+    def check_login(self):
+        """检查玩家登录状态"""
+        logger.info(f"检查玩家登录状态: {session.get('is_player', False)}")
+        if session.get('is_player', False):
+            return session.get('player_id')
+        else:
+            return False
 
     def player_required(self, f):
         """玩家认证装饰器"""

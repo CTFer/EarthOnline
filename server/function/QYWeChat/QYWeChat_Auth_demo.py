@@ -210,7 +210,7 @@ class QYWeChatCrypt:
         except CryptError:
             raise
         except Exception as e:
-            logger.error(f"[QYWeChat] 消息解密失败: {str(e)}", exc_info=True)
+            logger.error(f"[QYWeChat_Auth_demo] 消息解密失败: {str(e)}", exc_info=True)
             raise CryptError(900007, f"消息解密失败: {str(e)}")
 
     def verify_url(self, signature: str, timestamp: str, nonce: str, echostr: str) -> str:

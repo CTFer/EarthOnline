@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-02-12 20:04:48
-# LastEditTime: 2025-03-04 21:34:59
+# LastEditTime: 2025-03-21 20:12:32
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -44,13 +44,13 @@ class MedalService:
             offset = (page - 1) * limit
             
             # 获取总数
-            cursor.execute('SELECT COUNT(*) FROM medals')
+            cursor.execute('SELECT COUNT(*) FROM medal')
             total = cursor.fetchone()[0]
             
             # 获取分页数据
             cursor.execute('''
                 SELECT id, name, description, addtime, icon, conditions
-                FROM medals 
+                FROM medal 
                 ORDER BY id DESC 
                 LIMIT ? OFFSET ?
             ''', (limit, offset))
@@ -85,7 +85,7 @@ class MedalService:
             
             cursor.execute('''
                 SELECT id, name, description, addtime, icon, conditions
-                FROM medals 
+                FROM medal 
                 WHERE id = ?
             ''', (medal_id,))
             
@@ -121,7 +121,7 @@ class MedalService:
             current_time = int(time.time())
             
             cursor.execute('''
-                INSERT INTO medals (name, description, addtime, icon, conditions)
+                INSERT INTO medal (name, description, addtime, icon, conditions)
                 VALUES (?, ?, ?, ?, ?)
             ''', (
                 data.get('name'),
@@ -166,7 +166,7 @@ class MedalService:
             }
             
             cursor.execute('''
-                UPDATE medals
+                UPDATE medal
                 SET name = ?,
                     description = ?,
                     icon = ?,
@@ -189,7 +189,7 @@ class MedalService:
             conn.commit()
             
             # 获取更新后的数据
-            cursor.execute('SELECT * FROM medals WHERE id = ?', (medal_id,))
+            cursor.execute('SELECT * FROM medal WHERE id = ?', (medal_id,))
             updated_medal = cursor.fetchone()
             
             return ResponseHandler.success(
@@ -215,7 +215,7 @@ class MedalService:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
-            cursor.execute('DELETE FROM medals WHERE id = ?', (medal_id,))
+            cursor.execute('DELETE FROM medal WHERE id = ?', (medal_id,))
             
             if cursor.rowcount == 0:
                 return ResponseHandler.error(
@@ -268,7 +268,7 @@ class MedalService:
             cursor.execute('''
                 SELECT m.name, pm.level
                 FROM player_medal pm
-                JOIN medals m ON pm.medal_id = m.id
+                JOIN medal m ON pm.medal_id = m.id
                 WHERE pm.show = 1
             ''')
             

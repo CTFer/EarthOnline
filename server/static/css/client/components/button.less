@@ -1,1 +1,81 @@
 // out: false
+
+// 按钮组样式
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+// 商店按钮样式
+.shop-entrance {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    border-radius: 8px;
+    color: white;
+    transition: all 0.3s ease;
+    cursor: pointer;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .shop-icon {
+        width: 24px;
+        height: 24px;
+        margin-right: 10px;
+    }
+
+    .shop-text {
+        flex: 1;
+        font-size: 16px;
+        font-weight: 500;
+    }
+
+    .layui-icon {
+        font-size: 16px;
+    }
+}
+
+// 登录按钮样式
+.login-entrance {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+    border-radius: 8px;
+    color: white;
+    transition: all 0.3s ease;
+    cursor: pointer;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .layui-icon {
+        font-size: 20px;
+        margin-right: 10px;
+    }
+
+    .login-text {
+        flex: 1;
+        font-size: 16px;
+        font-weight: 500;
+    }
+}
+
+// 登录后样式
+.logged-in {
+    .login-entrance {
+        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        
+        .login-text {
+            color: #E8F5E9;
+        }
+    }
+}

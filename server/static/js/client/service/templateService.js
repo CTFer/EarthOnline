@@ -591,6 +591,74 @@ class TemplateService {
             return '';
         }
     }
+
+    /**
+     * 创建登录弹窗模板
+     * @param {Array} players 可选的玩家列表
+     * @returns {string} 登录弹窗HTML
+     */
+    createLoginDialogTemplate(players = []) {
+        return `
+            <div class="login-dialog">
+                <div class="layui-form login-form">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">选择角色</label>
+                        <div class="layui-input-block">
+                            <div class="player-type-container">
+                                ${players.map(player => `
+                                    <input type="radio" name="player_id" value="${player.player_id}" title="${player.player_name}" lay-skin="none">
+                                    <div lay-radio class="lay-skin-taskcard">
+                                        <div class="lay-skin-taskcard-detail">
+                                            <div class="lay-skin-taskcard-header">
+                                                <i class="layui-icon layui-icon-user"></i>
+                                                ${player.player_name}
+                                            </div>
+                                            <div class="lay-skin-taskcard-description">
+                                                <span>等级 ${player.level || 1}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">密码</label>
+                        <div class="layui-input-block">
+                            <input type="password" name="password" class="layui-input" 
+                                placeholder="请输入密码" lay-verify="required" 
+                                lay-reqText="请输入密码">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <div class="layui-input-block">
+                            <button class="layui-btn" lay-submit lay-filter="loginForm">登录</button>
+                            <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * 更新登录按钮状态
+     * @param {boolean} isLoggedIn 是否已登录
+     * @param {string} playerName 玩家名称
+     */
+    updateLoginButton(isLoggedIn, playerName = '') {
+        const loginBtn = document.getElementById('loginBtn');
+        if (!loginBtn) return;
+
+        const loginText = loginBtn.querySelector('.login-text');
+        if (isLoggedIn) {
+            loginBtn.classList.add('logged-in');
+            loginText.textContent = playerName;
+        } else {
+            loginBtn.classList.remove('logged-in');
+            loginText.textContent = '登录';
+        }
+    }
 }
 
 export default TemplateService;
