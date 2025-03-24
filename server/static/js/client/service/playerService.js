@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 22:49:55
- * @LastEditTime: 2025-03-21 23:10:22
+ * @LastEditTime: 2025-03-24 19:43:39
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -9,7 +9,7 @@
  */
 import Logger from "../../utils/logger.js";
 import { TASK_EVENTS, PLAYER_EVENTS, UI_EVENTS } from "../config/events.js";
-
+import { gameUtils } from '../../utils/utils.js';
 class PlayerService {
   constructor(apiClient, eventBus, store) {
     this.api = apiClient;
@@ -27,7 +27,7 @@ class PlayerService {
       loading: false,
       initialized: false,
       lastUpdate: null,
-      isLoggedIn: false,  // 添加登录状态
+      isLoggedIn: false, // 添加登录状态
     };
 
     // 初始化状态
@@ -257,13 +257,14 @@ class PlayerService {
 
     // 如果ID相同且不是首次发送，则跳过
     if (this.lastEmittedId === id) {
+      Logger.debug("PlayerService", `玩家ID未变化，跳过更新事件: ${id}`);
       return;
     }
 
     this.updateTimeout = setTimeout(() => {
       this.lastEmittedId = id;
-      this.eventBus.emit(PLAYER_EVENTS.ID_UPDATED, id);
       Logger.info("PlayerService", `发送玩家ID更新事件: ${id}`);
+      this.eventBus.emit(PLAYER_EVENTS.ID_UPDATED, id);
     }, 300); // 300ms 防抖
   }
 
@@ -277,144 +278,139 @@ class PlayerService {
 
   async login(playerId, password) {
     Logger.info("PlayerService", "尝试登录:", playerId);
-    
     try {
-        const response = await this.api.login(playerId, password);
+      // 先获取玩家信息
+      const playerListResponse = await this.api.request('/api/get_players');
+      if (playerListResponse.code !== 0) {
+        throw new Error(playerListResponse.msg || "获取玩家信息失败");
+      }
 
-        if (response.code === 0) {
-            // 更新状态
-            this.setState({
-                playerId: response.data.player_id,
-                playerData: response.data,
-                isLoggedIn: true,
-                lastUpdate: Date.now()
-            });
+      // 获取玩家创建时间作为混淆字符
+      const playerInfo = playerListResponse.data.find((p) => p.player_id == playerId);
+      if (!playerInfo) {
+        throw new Error("未找到玩家信息");
+      }
+      
+      const salt = playerInfo?.create_time || "";
 
-            // 保存到localStorage
-            localStorage.setItem("playerId", response.data.player_id);
+      // 加密密码
+      const encryptedPassword = gameUtils.md5Encrypt(password, salt);
 
-            // 发送登录成功事件
-            this.eventBus.emit(PLAYER_EVENTS.LOGIN_SUCCESS, response.data);
-            
-            Logger.info("PlayerService", "登录成功");
-            return response;
-        } else {
-            throw new Error(response.msg || '登录失败');
-        }
-    } catch (error) {
-        Logger.error("PlayerService", "登录失败:", error);
-        this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-            type: "ERROR",
-            message: error.message || "登录失败"
+      // 发送登录请求
+      const loginResponse = await this.api.login(playerId, encryptedPassword);
+
+      if (loginResponse.code === 0) {
+        // 更新状态
+        this.setState({
+          playerId: loginResponse.data.player_id,
+          playerData: loginResponse.data,
+          isLoggedIn: true,
+          lastUpdate: Date.now(),
         });
-        throw error;
+
+        // 保存到localStorage
+        localStorage.setItem("playerId", loginResponse.data.player_id);
+        localStorage.setItem("isLoggedIn", "true");
+
+        // 发送登录成功事件
+        this.eventBus.emit(PLAYER_EVENTS.LOGIN_SUCCESS, {
+          isLoggedIn: true,
+          playerData: loginResponse.data,
+          playerId: loginResponse.data.player_id,
+          lastUpdate: Date.now(),
+        });
+
+
+        Logger.info("PlayerService", "登录成功");
+        return loginResponse;
+      } else {
+        throw new Error(loginResponse.msg || "登录失败");
+      }
+    } catch (error) {
+      Logger.error("PlayerService", "登录失败:", error);
+      this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+        type: "ERROR",
+        message: error.message || "登录失败",
+      });
+      throw error;
     }
   }
 
   async logout() {
     Logger.info("PlayerService", "尝试登出");
-    
+
     try {
-        const response = await this.api.logout();
+      const response = await this.api.logout();
 
-        if (response.code === 0) {
-            // 清除状态
-            this.setState({
-                playerId: null,
-                playerData: null,
-                isLoggedIn: false,
-                lastUpdate: null
-            });
-
-            // 清除localStorage
-            localStorage.removeItem("playerId");
-
-            // 发送登出成功事件
-            this.eventBus.emit(PLAYER_EVENTS.LOGOUT_SUCCESS);
-            
-            Logger.info("PlayerService", "登出成功");
-            return response;
-        } else {
-            throw new Error(response.msg || '登出失败');
-        }
-    } catch (error) {
-        Logger.error("PlayerService", "登出失败:", error);
-        this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-            type: "ERROR",
-            message: error.message || "登出失败"
+      if (response.code === 0) {
+        // 清除状态
+        this.setState({
+          isLoggedIn: false,
+          lastUpdate: null,
         });
-        throw error;
+
+        // 清除localStorage
+        localStorage.removeItem("isLoggedIn");
+
+        // 发送登出成功事件
+        this.eventBus.emit(PLAYER_EVENTS.LOGOUT_SUCCESS, {
+          isLoggedIn: false,
+          playerData: null,
+        });
+
+
+        Logger.info("PlayerService", "登出成功");
+        return response;
+      } else {
+        throw new Error(response.msg || "登出失败");
+      }
+    } catch (error) {
+      Logger.error("PlayerService", "登出失败:", error);
+      this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
+        type: "ERROR",
+        message: error.message || "登出失败",
+      });
+      throw error;
     }
   }
 
   async checkLoginStatus() {
     Logger.debug("PlayerService", "检查登录状态");
-    
-    try {
-        // 从 localStorage 获取玩家ID
-        const playerId = localStorage.getItem("playerId");
-        
-        if (playerId) {
-            // 获取玩家信息用于展示
-            const response = await this.api.getPlayerInfo(playerId);
-            
-            if (response.code === 0) {
-                // 更新状态
-                this.setState({
-                    playerId: playerId,
-                    playerData: response.data,
-                    isLoggedIn: true,  // 只要有 playerId 就认为是登录状态
-                    lastUpdate: Date.now()
-                });
-                
-                // 发送登录状态事件
-                this.eventBus.emit(PLAYER_EVENTS.LOGIN_STATUS_CHECKED, {
-                    isLoggedIn: true,
-                    playerData: response.data
-                });
 
-                // 更新UI
-                this.updatePlayerUI(response.data);
-                
-                Logger.info("PlayerService", "玩家信息加载成功");
-            } else {
-                Logger.warn("PlayerService", "玩家信息加载失败，但保持登录状态");
-                // 即使加载失败也保持登录状态，只是显示默认数据
-                this.setState({
-                    playerId: playerId,
-                    isLoggedIn: true,
-                    lastUpdate: Date.now()
-                });
-            }
+    try {
+        // 从 localStorage 获取登录状态 存在为true，不存在为false
+        let isLoggedIn = false;
+        if (localStorage.getItem("isLoggedIn") && localStorage.getItem("isLoggedIn") === "true") {
+          isLoggedIn = true;
         } else {
-            // 没有 playerId 才视为未登录
-            this.handleLoggedOut();
+          isLoggedIn = false;
         }
+
+        
+        // 更新状态
+        this.setState({
+            isLoggedIn: isLoggedIn
+        });
+
+      Logger.info("PlayerService", `登录状态检查完成: ${isLoggedIn ? "已登录" : "未登录"}`);
+      return isLoggedIn;
     } catch (error) {
-        Logger.error("PlayerService", "玩家信息加载失败:", error);
-        // 错误时仍保持登录状态，只是显示默认数据
-        if (this.state.playerId) {
-            this.showPlayerError("数据加载失败");
-        } else {
-            this.handleLoggedOut();
-        }
+      Logger.error("PlayerService", "登录状态检查失败:", error);
+      this.handleLoggedOut();
     }
   }
 
   // 处理登出状态
   handleLoggedOut() {
     this.setState({
-        playerId: null,
-        playerData: null,
-        isLoggedIn: false,
-        lastUpdate: null
+      playerData: null,
+      isLoggedIn: false,
+      lastUpdate: null,
     });
-    
-    this.eventBus.emit(PLAYER_EVENTS.LOGIN_STATUS_CHECKED, {
-        isLoggedIn: false,
-        playerData: null
-    });
-    
+
+    // 清除localStorage
+    localStorage.removeItem("isLoggedIn");
+
     Logger.info("PlayerService", "用户未登录");
   }
 

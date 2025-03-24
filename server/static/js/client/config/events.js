@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-18 09:03:41
- * @LastEditTime: 2025-03-21 23:14:17
+ * @LastEditTime: 2025-03-24 15:32:53
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -55,7 +55,7 @@ export const TASK_EVENTS = {
   // 当前任务更新
   CURRENT_UPDATED: "task:current:updated",
   // 当前任务提交
-  SUBMITT: "task:current:submit ",
+  SUBMIT: "task:current:submit ",
   // 任务错误
   ERROR: "task:error",
   // 任务点击
@@ -70,6 +70,8 @@ export const TASK_EVENTS = {
 export const PLAYER_EVENTS = {
   // 玩家登录成功
   LOGIN_SUCCESS: "player:login:success",
+  // 玩家登出成功
+  LOGOUT_SUCCESS: "player:logout:success",
   // 玩家ID更新
   ID_UPDATED: "player:id:updated",
   // 玩家信息更新

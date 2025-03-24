@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-12 20:29:01
- * @LastEditTime: 2025-03-18 13:31:15
+ * @LastEditTime: 2025-03-24 19:54:29
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -229,9 +229,9 @@ class APIClient {
     }
 
     // 词云相关
-    async getWordCloud() {
+    async getWordCloud(playerId) {
         Logger.info('API', '获取词云数据');
-        return this.request('/api/wordcloud');
+        return this.request(`/api/player/${playerId}/wordcloud`);
     }
 
     async updateWordCloud(data) {

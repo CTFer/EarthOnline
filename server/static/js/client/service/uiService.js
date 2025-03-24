@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-02-15 13:47:39
- * @LastEditTime: 2025-03-21 21:39:22
+ * @LastEditTime: 2025-03-24 20:13:39
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  */
@@ -11,7 +11,7 @@ import { WS_STATE, WS_CONFIG } from "../config/wsConfig.js";
 import { gameUtils } from "../../utils/utils.js";
 import NotificationService from "./notificationService.js";
 class UIService {
-  constructor(eventBus, store, templateService, taskService, playerService,swiperService, notificationService) {
+  constructor(eventBus, store, templateService, taskService, playerService, swiperService, notificationService) {
     this.eventBus = eventBus;
     this.store = store;
     this.templateService = templateService;
@@ -35,10 +35,6 @@ class UIService {
         },
         notifications: {
           visible: true,
-          position: "top-right",
-        },
-        modals: {
-          activeModal: null,
         },
         playerInfo: {
           visible: true,
@@ -46,16 +42,95 @@ class UIService {
           error: null,
         },
       },
+      mapRenderType: "ECHARTS", // 默认为Echarts渲染器
+      mapTimeRange: "today", // 默认为今天
+      mapViewMode: "points", // 默认为点状态
+      customStartTime: null, // 自定义开始时间
+      customEndTime: null, // 自定义结束时间
     };
 
     // 初始化状态
-    this.state = this.loadState();
+    this.state = { ...this.defaultState };
+
+    // 记录事件监听器，用于后续清理
+    this._eventListeners = new Map();
+
+    // 定义点击处理器映射
+    this._clickHandlers = {
+      // 登录入口点击处理（处理带有login-entrance类的元素）
+      "login-entrance": (e, element) => {
+        this._handleLoginButtonClick(e);
+      },
+      // 任务卡片点击处理（仅当没有点击卡片内的按钮时）
+      "task-card": (e, element) => {
+        // 如果点击的是按钮，则不处理
+        if (!e.target.closest("button")) {
+          // 如果当前元素同时拥有task-card和active-task类，应该由active-task处理器处理
+          if (element.classList.contains("active-task")) {
+            Logger.debug("UIService", "由active-task处理器处理");
+            return;
+          }
+
+          // 只处理普通任务卡片
+          const taskId = element.dataset.taskId;
+          Logger.debug("UIService", `处理普通任务卡片点击 - ID: ${taskId}`);
+          this.showTaskDetails(taskId);
+        }
+      },
+      // 活动任务卡片处理（处理带有active-task类的元素）
+      "active-task": (e, element) => {
+        // 如果点击的是按钮，则不处理
+        if (!e.target.closest("button")) {
+          const taskId = element.dataset.taskId;
+          Logger.debug("UIService", `处理活动任务卡片点击 - ID: ${taskId}`);
+          this.showCurrentTaskDetails(taskId);
+        }
+      },
+      // 接受任务按钮点击处理
+      "accept-task": (e, element) => {
+        const taskId = element.dataset.taskId || element.closest(".task-card")?.dataset.taskId;
+        Logger.debug("UIService", "处理接受任务按钮点击, taskId:", taskId);
+        if (taskId) {
+          this.handleTaskOperation(taskId, "accept");
+        }
+      },
+      // 放弃任务按钮点击处理
+      "abandon-task": (e, element) => {
+        const taskId = element.dataset.taskId || element.closest(".task-card")?.dataset.taskId;
+        Logger.debug("UIService", "处理放弃任务按钮点击, taskId:", taskId);
+        if (taskId) {
+          this.handleTaskOperation(taskId, "abandon");
+        }
+      },
+      // 提交任务按钮点击处理
+      "submit-task": (e, element) => {
+        const taskId = element.dataset.taskId || element.closest(".task-card")?.dataset.taskId;
+        Logger.debug("UIService", "处理提交任务按钮点击, taskId:", taskId);
+        if (taskId) {
+          this.handleTaskOperation(taskId, "submit");
+        }
+      },
+      // 商城入口点击处理
+      "shop-entrance": (e, element) => {
+        Logger.debug("UIService", "处理商城入口点击");
+        this.eventBus.emit(SHOP_EVENTS.ENTER);
+      },
+      // 带有clickable类的商城入口
+      clickable: (e, element) => {
+        // 只处理商城入口
+        if (element.classList.contains("shop-entrance")) {
+          Logger.debug("UIService", "处理商城入口点击(clickable)");
+          this.eventBus.emit(SHOP_EVENTS.ENTER);
+        }
+        // 处理可能的其他clickable元素...
+      },
+    };
 
     // 设置状态监听
     this.setupStateListeners();
     // 地图相关状态
-    this.mapRenderType = localStorage.getItem('mapType') || 'ECHARTS';
-    this.mapTimeRange = localStorage.getItem('mapTimeRange') || 'today';
+    this.mapRenderType = localStorage.getItem("mapType") || "ECHARTS";
+    this.mapTimeRange = localStorage.getItem("mapTimeRange") || "today";
     this.customStartTime = null;
     this.customEndTime = null;
 
@@ -65,31 +140,31 @@ class UIService {
   // 加载状态
   loadState() {
     const savedState = this.store.getComponentState(this.componentId);
-    return { 
-        ...this.defaultState, 
-        ...savedState,
-        mapRenderType: savedState.mapRenderType || 'ECHARTS',
-        mapTimeRange: savedState.mapTimeRange || 'today',
-        customStartTime: savedState.customStartTime || null,
-        customEndTime: savedState.customEndTime || null,
+    return {
+      ...this.defaultState,
+      ...savedState,
+      mapRenderType: savedState.mapRenderType || "ECHARTS",
+      mapTimeRange: savedState.mapTimeRange || "today",
+      customStartTime: savedState.customStartTime || null,
+      customEndTime: savedState.customEndTime || null,
     };
   }
 
   // 保存状态
   saveState() {
     this.store.setComponentState(this.componentId, {
-        ...this.state,
-        mapRenderType: this.state.mapRenderType,
-        mapTimeRange: this.state.mapTimeRange,
-        customStartTime: this.state.customStartTime,
-        customEndTime: this.state.customEndTime,
+      ...this.state,
+      mapRenderType: this.state.mapRenderType,
+      mapTimeRange: this.state.mapTimeRange,
+      customStartTime: this.state.customStartTime,
+      customEndTime: this.state.customEndTime,
     });
   }
 
   // 设置状态监听器 这个函数在页面刷新时不应该运行的
   setupStateListeners() {
     this.store.subscribe("component", this.componentId, async (newState, oldState) => {
-        Logger.debug("UIService", "状态更新:", { old: oldState, new: newState });
+      Logger.debug("UIService", "状态更新:", { old: oldState, new: newState });
     });
   }
 
@@ -109,82 +184,26 @@ class UIService {
     }
   }
 
-  // 处理任务卡片状态变化
-  handleTaskCardsStateChange(taskCards) {
-    try {
-      // 更新任务卡片UI
-      // this.renderTaskCards(taskCards);
-    } catch (error) {
-      Logger.error("UIService", "处理任务卡片状态变化失败:", error);
-    }
-  }
-
-  // 处理UI组件状态变化
-  handleUIComponentsStateChange(uiComponents) {
-    try {
-      // 更新任务列表可见性
-      if (uiComponents.taskList) {
-        const taskListContainer = document.querySelector(".task-list-container");
-        if (taskListContainer) {
-          taskListContainer.style.display = uiComponents.taskList.visible ? "block" : "none";
-          taskListContainer.classList.toggle("expanded", uiComponents.taskList.expanded);
-        }
-      }
-
-      // 更新通知面板位置
-      if (uiComponents.notifications) {
-        const notificationPanel = document.querySelector(".notification-panel");
-        if (notificationPanel) {
-          notificationPanel.className = `notification-panel ${uiComponents.notifications.position}`;
-          notificationPanel.style.display = uiComponents.notifications.visible ? "block" : "none";
-        }
-      }
-
-      // 处理模态框状态
-      if (uiComponents.modals && uiComponents.modals.activeModal) {
-        this.handleModalState(uiComponents.modals.activeModal);
-      }
-    } catch (error) {
-      Logger.error("UIService", "处理UI组件状态变化失败:", error);
-    }
-  }
-
-  // 处理模态框状态
-  handleModalState(modalState) {
-    try {
-      const { id, visible, data } = modalState;
-      if (visible) {
-        this.showModal(id, data);
-      } else {
-        this.hideModal(id);
-      }
-    } catch (error) {
-      Logger.error("UIService", "处理模态框状态失败:", error);
-    }
-  }
-
   /**
    * 初始化UI服务
-   * @returns {Promise<void>}
    */
   async initialize() {
     Logger.info("UIService", "开始初始化UI服务");
     try {
       // 初始化状态显示元素
       this.initStatusElements();
+
       // 初始化DOM观察器
       this.setupDOMObserver();
+
       // 初始化事件监听
       this.initEvents();
-      // 初始化任务事件
+
+      // 初始化任务事件（只处理时间更新）
       this.initTaskEvents();
+
       // 初始化玩家信息UI
       await this.initPlayerInfoUI();
-
-      this.mapRenderType = this.state.mapRenderType;
-      this.mapTimeRange = this.state.mapTimeRange;
-      this.customStartTime = this.state.customStartTime;
-      this.customEndTime = this.state.customEndTime;
 
       Logger.info("UIService", "UI服务初始化完成");
     } catch (error) {
@@ -198,34 +217,46 @@ class UIService {
    * @private
    */
   initEvents() {
-    Logger.debug("UIService", "初始化事件监听");
+    Logger.info("UIService", "初始化事件监听");
+    try {
+      // 定义需要绑定点击事件的选择器列表
+      const clickSelectors = [
+        "#loginBtn", // 登录按钮
+        ".task-card", // 任务卡片
+        ".active-task", // 活动任务卡片
+        ".accept-task", // 接受任务按钮
+        ".abandon-task", // 放弃任务按钮
+        ".submit-task", // 提交任务按钮
+        ".shop-entrance", // 商城入口
+      ];
 
-    this.setupEventListeners();
-    this.initShopEvents();
-    this.initPlayerEvents();
+      // 为每个选择器绑定点击事件
+      clickSelectors.forEach((selector) => {
+        this._bindClickEvent(selector);
+      });
 
-    Logger.info("UIService", "事件监听初始化完成");
+      Logger.info("UIService", "事件监听初始化完成");
+    } catch (error) {
+      Logger.error("UIService", "事件监听初始化失败:", error);
+      throw error;
+    }
   }
 
   /**
-   * 设置事件监听器
+   * 初始化任务相关事件监听
+   * 注意：此方法不再绑定点击事件，只处理任务卡片的定时器更新
    */
-  setupEventListeners() {
-    Logger.info("UIService", "setupEventListeners", "设置UI事件监听器");
-
+  initTaskEvents() {
+    Logger.info("UIService", "初始化任务卡片时间更新");
     try {
-      // 绑定商城入口点击事件
-      document.addEventListener("click", (e) => {
-        const shopEntrance = e.target.closest(".shop-entrance");
-        if (shopEntrance) {
-          Logger.info("UIService", "handleShopEntranceClick", "点击商城入口");
-          this.eventBus.emit(SHOP_EVENTS.ENTER);
-        }
+      // 为所有已存在的任务卡片初始化时间更新
+      document.querySelectorAll(".task-card").forEach((taskCard) => {
+        this.initializeTaskCard(taskCard);
       });
 
-      // 其他事件监听保持不变
+      Logger.info("UIService", "任务卡片时间更新初始化完成");
     } catch (error) {
-      Logger.error("UIService", "setupEventListeners", "设置UI事件监听器失败:", error);
+      Logger.error("UIService", "任务卡片时间更新初始化失败:", error);
       throw error;
     }
   }
@@ -267,15 +298,148 @@ class UIService {
     const taskObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.type === "childList") {
+          // 用于跟踪已绑定事件的元素，避免重复绑定
+          const boundElements = new Set();
+
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === 1) {
-              // 处理任务卡片
-              if (node.classList?.contains("task-card")) {
-                this.initializeTaskCard(node);
+              // 元素节点
+              // 处理任务卡片，优先处理active-task
+              if (node.classList) {
+                // 先检查active-task类
+                if (node.classList.contains("active-task")) {
+                  // 初始化任务卡片时间更新
+                  this.initializeTaskCard(node);
+
+                  // 为新添加的任务卡片绑定点击事件
+                  const boundHandler = this.handleDocumentClick.bind(this);
+                  node.addEventListener("click", boundHandler);
+
+                  // 记录事件监听器
+                  if (!this._eventListeners.has(".active-task")) {
+                    this._eventListeners.set(".active-task", []);
+                  }
+                  this._eventListeners.get(".active-task").push({
+                    element: node,
+                    handler: boundHandler,
+                  });
+
+                  // 记录已绑定的元素
+                  boundElements.add(node);
+
+                  Logger.debug("UIService", `为新添加的 active-task 绑定点击事件`);
+                }
+                // 然后检查task-card类，但跳过已绑定过的元素
+                else if (node.classList.contains("task-card") && !boundElements.has(node)) {
+                  // 初始化任务卡片时间更新
+                  this.initializeTaskCard(node);
+
+                  // 为新添加的任务卡片绑定点击事件
+                  const boundHandler = this.handleDocumentClick.bind(this);
+                  node.addEventListener("click", boundHandler);
+
+                  // 记录事件监听器
+                  if (!this._eventListeners.has(".task-card")) {
+                    this._eventListeners.set(".task-card", []);
+                  }
+                  this._eventListeners.get(".task-card").push({
+                    element: node,
+                    handler: boundHandler,
+                  });
+
+                  // 记录已绑定的元素
+                  boundElements.add(node);
+
+                  Logger.debug("UIService", `为新添加的 task-card 绑定点击事件`);
+                }
               }
-              // 处理新添加节点中的任务卡片
+
+              // 查找任务卡片内的按钮并绑定事件
+              ["accept-task", "abandon-task", "submit-task"].forEach((btnClass) => {
+                const buttons = node.getElementsByClassName(btnClass);
+                Array.from(buttons).forEach((btn) => {
+                  const boundHandler = this.handleDocumentClick.bind(this);
+                  btn.addEventListener("click", boundHandler);
+
+                  // 记录事件监听器
+                  if (!this._eventListeners.has(`.${btnClass}`)) {
+                    this._eventListeners.set(`.${btnClass}`, []);
+                  }
+                  this._eventListeners.get(`.${btnClass}`).push({
+                    element: btn,
+                    handler: boundHandler,
+                  });
+
+                  Logger.debug("UIService", `为新添加的 ${btnClass} 按钮绑定点击事件`);
+                });
+              });
+
+              // 处理新添加节点中的子任务卡片和活动任务卡片
+              // 先处理active-task类元素
+              const activeTaskCards = node.getElementsByClassName("active-task");
+              Array.from(activeTaskCards).forEach((card) => {
+                // 如果元素已经绑定过事件，跳过
+                if (boundElements.has(card)) {
+                  return;
+                }
+
+                // 初始化任务卡片时间更新
+                this.initializeTaskCard(card);
+
+                // 为新添加的卡片绑定点击事件
+                const boundHandler = this.handleDocumentClick.bind(this);
+                card.addEventListener("click", boundHandler);
+
+                // 记录事件监听器
+                if (!this._eventListeners.has(".active-task")) {
+                  this._eventListeners.set(".active-task", []);
+                }
+                this._eventListeners.get(".active-task").push({
+                  element: card,
+                  handler: boundHandler,
+                });
+
+                // 记录已绑定的元素
+                boundElements.add(card);
+
+                Logger.debug("UIService", `为新添加的 active-task 绑定点击事件`);
+
+                // 绑定按钮事件
+                this._bindButtonsInCard(card);
+              });
+
+              // 再处理task-card类元素，但跳过已绑定过的元素
               const taskCards = node.getElementsByClassName("task-card");
-              Array.from(taskCards).forEach((card) => this.initializeTaskCard(card));
+              Array.from(taskCards).forEach((card) => {
+                // 如果元素已经绑定过事件，跳过
+                if (boundElements.has(card)) {
+                  return;
+                }
+
+                // 初始化任务卡片时间更新
+                this.initializeTaskCard(card);
+
+                // 为新添加的卡片绑定点击事件
+                const boundHandler = this.handleDocumentClick.bind(this);
+                card.addEventListener("click", boundHandler);
+
+                // 记录事件监听器
+                if (!this._eventListeners.has(".task-card")) {
+                  this._eventListeners.set(".task-card", []);
+                }
+                this._eventListeners.get(".task-card").push({
+                  element: card,
+                  handler: boundHandler,
+                });
+
+                // 记录已绑定的元素
+                boundElements.add(card);
+
+                Logger.debug("UIService", `为新添加的 task-card 绑定点击事件`);
+
+                // 绑定按钮事件
+                this._bindButtonsInCard(card);
+              });
             }
           });
         }
@@ -290,12 +454,143 @@ class UIService {
 
     containers.forEach((container) => {
       taskObserver.observe(container, config);
-      // 初始化已存在的任务卡片
-      Array.from(container.getElementsByClassName("task-card")).forEach((card) => this.initializeTaskCard(card));
     });
 
     // 存储观察器实例以便后续清理
     this.observers.set("taskObserver", taskObserver);
+
+    // 重要：为已存在的任务卡片绑定事件（解决从商城返回首页后点击事件失效的问题）
+    this._bindExistingTaskElements();
+
+    Logger.info("UIService", "DOM观察器初始化完成");
+  }
+
+  /**
+   * 为卡片内的按钮绑定事件
+   * @private
+   * @param {HTMLElement} card - 任务卡片DOM元素
+   */
+  _bindButtonsInCard(card) {
+    // 查找卡片内的按钮并绑定事件
+    ["accept-task", "abandon-task", "submit-task"].forEach((btnClass) => {
+      const buttons = card.getElementsByClassName(btnClass);
+      Array.from(buttons).forEach((btn) => {
+        const boundHandler = this.handleDocumentClick.bind(this);
+        btn.addEventListener("click", boundHandler);
+
+        // 记录事件监听器
+        if (!this._eventListeners.has(`.${btnClass}`)) {
+          this._eventListeners.set(`.${btnClass}`, []);
+        }
+        this._eventListeners.get(`.${btnClass}`).push({
+          element: btn,
+          handler: boundHandler,
+        });
+
+        Logger.debug("UIService", `为新添加的 ${btnClass} 按钮绑定点击事件`);
+      });
+    });
+  }
+
+  /**
+   * 为已存在的任务卡片和按钮绑定点击事件
+   * @private
+   */
+  _bindExistingTaskElements() {
+    Logger.debug("UIService", "为已存在的任务卡片绑定事件");
+
+    // 创建一个Set存储已经绑定事件的元素，避免重复绑定
+    const boundElements = new Set();
+
+    // 优先处理active-task，因为这些元素可能同时也有task-card类
+    const activeTaskCards = document.querySelectorAll(".active-task");
+    if (activeTaskCards.length > 0) {
+      Logger.debug("UIService", `找到 ${activeTaskCards.length} 个已存在的 active-task 元素`);
+
+      // 为每个active-task绑定点击事件，并记录已绑定的元素
+      activeTaskCards.forEach((card) => {
+        boundElements.add(card);
+
+        // 绑定点击事件
+        const boundHandler = this.handleDocumentClick.bind(this);
+        card.addEventListener("click", boundHandler);
+
+        // 记录事件监听器
+        if (!this._eventListeners.has(".active-task")) {
+          this._eventListeners.set(".active-task", []);
+        }
+        this._eventListeners.get(".active-task").push({
+          element: card,
+          handler: boundHandler,
+        });
+      });
+
+      Logger.debug("UIService", `已为 ${activeTaskCards.length} 个 active-task 元素绑定点击事件`);
+    }
+
+    // 处理task-card，但跳过已绑定过的元素
+    const taskCards = document.querySelectorAll(".task-card");
+    if (taskCards.length > 0) {
+      let boundCount = 0;
+
+      taskCards.forEach((card) => {
+        // 如果元素已经绑定过事件，跳过
+        if (boundElements.has(card)) {
+          Logger.debug("UIService", "跳过已绑定过的元素", card.className);
+          return;
+        }
+
+        boundElements.add(card);
+        boundCount++;
+
+        // 绑定点击事件
+        const boundHandler = this.handleDocumentClick.bind(this);
+        card.addEventListener("click", boundHandler);
+
+        // 记录事件监听器
+        if (!this._eventListeners.has(".task-card")) {
+          this._eventListeners.set(".task-card", []);
+        }
+        this._eventListeners.get(".task-card").push({
+          element: card,
+          handler: boundHandler,
+        });
+      });
+
+      Logger.debug("UIService", `找到 ${taskCards.length} 个已存在的 task-card 元素，实际绑定了 ${boundCount} 个`);
+    }
+
+    // 绑定所有任务按钮
+    ["accept-task", "abandon-task", "submit-task"].forEach((btnClass) => {
+      const buttons = document.querySelectorAll(`.${btnClass}`);
+      if (buttons.length > 0) {
+        Logger.debug("UIService", `找到 ${buttons.length} 个已存在的 ${btnClass} 按钮`);
+
+        buttons.forEach((btn) => {
+          // 绑定点击事件
+          const boundHandler = this.handleDocumentClick.bind(this);
+          btn.addEventListener("click", boundHandler);
+
+          // 记录事件监听器
+          if (!this._eventListeners.has(`.${btnClass}`)) {
+            this._eventListeners.set(`.${btnClass}`, []);
+          }
+          this._eventListeners.get(`.${btnClass}`).push({
+            element: btn,
+            handler: boundHandler,
+          });
+        });
+
+        Logger.debug("UIService", `已为 ${buttons.length} 个 ${btnClass} 按钮绑定点击事件`);
+      }
+    });
+
+    // 初始化所有任务卡片的时间更新
+    document.querySelectorAll(".task-card, .active-task").forEach((card) => {
+      this.initializeTaskCard(card);
+    });
+
+    Logger.info("UIService", "已为所有现有任务卡片和按钮绑定事件");
   }
 
   /**
@@ -317,25 +612,6 @@ class UIService {
         taskCard.classList.add("expired");
       }
     }, 1000);
-  }
-
-  /**
-   * 清理所有观察器
-   * @public
-   */
-  destroy() {
-    Logger.info("UIService", "开始清理UI服务");
-
-    // 清理所有观察器
-    this.observers.forEach((observer) => observer.disconnect());
-    this.observers.clear();
-
-    Logger.info("UIService", "UI服务清理完成");
-  }
-
-  updateTaskList(tasks) {
-    Logger.debug("UIService", "更新任务列表UI");
-    // 任务列表更新逻辑
   }
 
   /**
@@ -379,11 +655,11 @@ class UIService {
             acceptBtn.on("click", () => {
               this.showConfirmDialog({
                 title: "确认接受",
-                  content: "确定要接受这个任务吗？",
-                  onConfirm: () => {
-                    this.eventBus.emit(TASK_EVENTS.ACCEPT, { taskId, playerId: this.playerService.getPlayerId() });
-                    layer.closeAll();
-                  },
+                content: "确定要接受这个任务吗？",
+                onConfirm: () => {
+                  this.eventBus.emit(TASK_EVENTS.ACCEPT, { taskId, playerId: this.playerService.getPlayerId() });
+                  layer.closeAll();
+                },
               });
             });
           }
@@ -421,11 +697,33 @@ class UIService {
   async showCurrentTaskDetails(taskId) {
     Logger.info("UIService", "显示当前任务详情:", taskId);
 
+    // 防止重复弹窗
+    const now = Date.now();
+    const taskKey = `task_${taskId}`;
+
+    if (this._lastTaskOpened && this._lastTaskOpened.id === taskKey && now - this._lastTaskOpened.time < 500) {
+      // 500毫秒内不重复打开
+      Logger.debug("UIService", "忽略短时间内重复打开的任务详情:", taskId);
+      return;
+    }
+
+    // 记录本次打开
+    this._lastTaskOpened = {
+      id: taskKey,
+      time: now,
+    };
+
     try {
       // 从store中获取当前任务数据
       const currentTasks = this.store.state.currentTasks || [];
-      Logger.info('UIService',"currentTasks:", currentTasks);
-      const task = currentTasks.find(t => t.id.toString() === taskId.toString());
+      Logger.info("UIService", "currentTasks:", currentTasks);
+      const task = currentTasks.find((t) => t.id.toString() === taskId.toString());
+
+      // 已经存在相同ID的任务详情弹窗，直接返回
+      if (layer.index > 0 && document.querySelector(`.layui-layer[data-task-id="${taskId}"]`)) {
+        Logger.debug("UIService", "任务详情弹窗已存在:", taskId);
+        return;
+      }
 
       if (!task) {
         // 如果任务不在当前任务列表中，则从API获取
@@ -438,6 +736,13 @@ class UIService {
             content: await this.templateService.createCurrentTaskDetailTemplate(taskDetails),
             area: ["50vw", "60vh"],
             shadeClose: true,
+            success: (layero) => {
+              // 标记弹窗，便于后续检查是否存在
+              $(layero).attr("data-task-id", taskId);
+
+              // 绑定当前任务的按钮事件
+              this._bindCurrentTaskButtons(layero, taskId);
+            },
           });
         } else {
           Logger.error("UIService", "未找到任务数据:", taskId);
@@ -450,10 +755,68 @@ class UIService {
           content: await this.templateService.createCurrentTaskDetailTemplate(task),
           area: ["50vw", "60vh"],
           shadeClose: true,
+          success: (layero) => {
+            // 标记弹窗，便于后续检查是否存在
+            $(layero).attr("data-task-id", taskId);
+
+            // 绑定当前任务的按钮事件
+            this._bindCurrentTaskButtons(layero, taskId);
+          },
         });
       }
     } catch (error) {
       Logger.error("UIService", "显示当前任务详情失败:", error);
+    }
+  }
+
+  /**
+   * 绑定当前任务详情弹窗中的按钮事件
+   * @param {HTMLElement} layero 弹窗元素
+   * @param {string} taskId 任务ID
+   * @private
+   */
+  _bindCurrentTaskButtons(layero, taskId) {
+    // 确保layero是jQuery对象
+    const $layero = $(layero);
+
+    // 绑定提交任务按钮事件
+    const submitBtn = $layero.find(".submit-task");
+    if (submitBtn.length) {
+      // 先移除可能存在的旧事件
+      submitBtn.off("click");
+      submitBtn.on("click", (e) => {
+        e.stopPropagation(); // 阻止事件冒泡
+        Logger.debug("UIService", "点击提交任务按钮");
+        this.showConfirmDialog({
+          title: "确认提交",
+          content: "确定要提交这个任务吗？",
+          onConfirm: () => {
+            this.eventBus.emit(TASK_EVENTS.SUBMIT, { taskId, playerId: this.playerService.getPlayerId() });
+            layer.closeAll();
+          },
+        });
+      });
+      Logger.debug("UIService", "已绑定提交任务按钮事件");
+    }
+
+    // 绑定放弃任务按钮事件
+    const abandonBtn = $layero.find(".abandon-task");
+    if (abandonBtn.length) {
+      // 先移除可能存在的旧事件
+      abandonBtn.off("click");
+      abandonBtn.on("click", (e) => {
+        e.stopPropagation(); // 阻止事件冒泡
+        Logger.debug("UIService", "点击放弃任务按钮");
+        this.showConfirmDialog({
+          title: "确认放弃",
+          content: "确定要放弃这个任务吗？",
+          onConfirm: () => {
+            this.eventBus.emit(TASK_EVENTS.ABANDONED, { taskId, playerId: this.playerService.getPlayerId() });
+            layer.closeAll();
+          },
+        });
+      });
+      Logger.debug("UIService", "已绑定放弃任务按钮事件");
     }
   }
 
@@ -504,7 +867,6 @@ class UIService {
     return iconMap[type] || 6;
   }
 
-
   /**
    * 显示确认对话框
    * @param {Object} options 对话框配置
@@ -534,7 +896,6 @@ class UIService {
       }
     );
   }
-
 
   /**
    * 显示错误消息
@@ -643,71 +1004,6 @@ class UIService {
       this.renderTaskList(this.store.state.taskList);
       this.renderCurrentTasks(this.store.state.currentTasks);
       return;
-      // 获取任务容器
-      const container = document.querySelector(".active-tasks-swiper .swiper-wrapper");
-      if (!container) {
-        Logger.error("UIService", "找不到任务容器");
-        return;
-      }
-
-      // 查找对应的任务卡片
-      const taskCard = container.querySelector(`[data-task-id="${data.id}"]`);
-      if (!taskCard) {
-        Logger.warn("UIService", `未找到任务卡片: ${data.id}`);
-        return;
-      }
-
-      // 根据任务状态更新UI
-      switch (data.status) {
-        case "COMPLETE":
-        case "ABANDONED":
-          Logger.debug("UIService", `移除已完成/放弃的任务卡片: ${data.id}`);
-          const slideElement = taskCard.closest(".swiper-slide");
-          if (slideElement) {
-            // 添加淡出动画
-            slideElement.style.transition = "opacity 0.5s";
-            slideElement.style.opacity = "0";
-            // 等待动画完成后移除
-            setTimeout(() => {
-              slideElement.remove();
-              // 检查是否需要显示空任务提示
-              if (!container.children.length) {
-                container.innerHTML = this.templateService.getEmptyTaskTemplate();
-              }
-            }, 500);
-          }
-          break;
-
-        case "CHECKING":
-          Logger.debug("UIService", `更新任务状态为审核中: ${data.id}`);
-          taskCard.classList.add("checking");
-          const statusElement = taskCard.querySelector(".task-status");
-          if (statusElement) {
-            statusElement.textContent = "审核中";
-            statusElement.classList.add("checking");
-          }
-          break;
-
-        case "REJECTED":
-          Logger.debug("UIService", `更新任务状态为已驳回: ${data.id}`);
-          taskCard.classList.add("rejected");
-          const rejectStatusElement = taskCard.querySelector(".task-status");
-          if (rejectStatusElement) {
-            rejectStatusElement.textContent = "已驳回";
-            rejectStatusElement.classList.add("rejected");
-          }
-          break;
-
-        default:
-          Logger.debug("UIService", `更新任务状态: ${data.status}`);
-          // 更新任务卡片内容
-          const newCard = this.templateService.createActiveTaskCard(data);
-          if (newCard) {
-            taskCard.innerHTML = newCard.innerHTML;
-          }
-      }
-
-      Logger.info("UIService", "任务状态UI更新完成");
     } catch (error) {
       Logger.error("UIService", "更新任务状态UI失败:", error);
       this.showNotification({
@@ -777,179 +1073,126 @@ class UIService {
   }
 
   /**
-   * 初始化任务相关事件监听
-   */
-  initTaskEvents() {
-    Logger.info("UIService", "initTaskEvents", "初始化任务事件");
-    try {
-      // 绑定任务相关事件
-      document.querySelectorAll(".task-card").forEach((taskCard) => {
-        this.initializeTaskCard(taskCard);
-      });
-      // 绑定全局任务事件
-      document.addEventListener("click", (e) => this.handleDocumentClick(e));
-
-      Logger.info("UIService", "initTaskEvents", "任务事件初始化完成");
-    } catch (error) {
-      Logger.error("UIService", "initTaskEvents", "任务事件初始化失败:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 移除任务事件
-   */
-  removeTaskEvents() {
-    Logger.info("UIService", "removeTaskEvents", "移除任务事件");
-    try {
-      // 移除所有任务卡片的事件监听
-      document.querySelectorAll(".task-card").forEach((taskCard) => {
-        const acceptBtn = taskCard.querySelector(".accept-task");
-        const abandonBtn = taskCard.querySelector(".abandon-task");
-        const submitBtn = taskCard.querySelector(".submit-task");
-        if (acceptBtn) {
-          acceptBtn.removeEventListener("click", this.handleTaskAccept);
-        }
-        if (abandonBtn) {
-          abandonBtn.removeEventListener("click", this.handleTaskAbandon);
-        }
-        if (submitBtn) {
-          submitBtn.removeEventListener("click", this.handleTaskSubmit);
-        }
-        taskCard.removeEventListener("click", this.handleTaskClick);
-      });
-
-      // 移除全局任务事件
-      document.removeEventListener("click", this.handleDocumentClick);
-
-      Logger.info("UIService", "removeTaskEvents", "任务事件移除完成");
-    } catch (error) {
-      Logger.error("UIService", "removeTaskEvents", "任务事件移除失败:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 处理任务接受事件
+   * 统一处理任务操作（接受、放弃、提交）
    * @param {string} taskId 任务ID
+   * @param {string} operation 操作类型: 'accept', 'abandon', 'submit'
    */
-  async handleTaskAccept(taskId) {
-    Logger.info("UIService", `处理接受任务: ${taskId}`);
+  async handleTaskOperation(taskId, operation) {
+    const operationMap = {
+      accept: {
+        name: "接受",
+        event: TASK_EVENTS.ACCEPTED,
+        sound: "ACCEPT",
+        needConfirm: false,
+        message: "确定要接受这个任务吗？",
+        title: "接受任务",
+        directCall: true, // 是否直接调用任务服务而不是发送事件
+      },
+      abandon: {
+        name: "放弃",
+        event: TASK_EVENTS.ABANDONED,
+        sound: "CANCEL",
+        needConfirm: true,
+        message: "确定要放弃这个任务吗？放弃后将无法恢复。",
+        title: "放弃任务",
+      },
+      submit: {
+        name: "提交",
+        event: TASK_EVENTS.SUBMIT,
+        sound: "SUBMIT",
+        needConfirm: true,
+        message: "确定要提交这个任务吗？",
+        title: "提交任务",
+      },
+    };
+
+    const config = operationMap[operation];
+    if (!config) {
+      Logger.error("UIService", `无效的任务操作类型: ${operation}`);
+      return;
+    }
+
+    Logger.info("UIService", `处理${config.name}任务: ${taskId}`);
 
     try {
-      // 直接调用任务服务接受任务
-      const result = await this.taskService.handleTaskAccept(taskId);
-      Logger.info("UIService", "接受任务结果:", result);
-      
-      if (result.code === 0) {
-        // 只在成功接受的情况下触发事件和播放音效
-        this.showNotification({
-          type: "SUCCESS",
-          message: "任务接受成功",
-        });
-        // 任务接受完成，更新任务状态
-        this.eventBus.emit(TASK_EVENTS.ACCEPTED, {
+      // 对于需要确认的操作，显示确认对话框
+      if (config.needConfirm) {
+        layer.confirm(
+          config.message,
+          {
+            title: config.title,
+            btn: ["确定", "取消"],
+            icon: 3,
+          },
+          () => {
+            try {
+              // 用户点击确定后触发相应事件
+              this.eventBus.emit(config.event, {
+                taskId: taskId,
+                playerId: this.playerService.getPlayerId(),
+              });
+              layer.closeAll();
+            } catch (error) {
+              Logger.error("UIService", `${config.name}任务失败:`, error);
+              this.showErrorMessage(`${config.name}任务失败: ${error.message}`);
+            }
+          }
+        );
+        return;
+      }
+
+      // 接受任务需要直接调用任务服务
+      if (config.directCall) {
+        const result = await this.taskService.handleTaskAccept(taskId);
+        Logger.info("UIService", `${config.name}任务结果:`, result);
+
+        if (result.code === 0) {
+          // 只在成功接受的情况下触发事件和播放音效
+          this.showNotification({
+            type: "SUCCESS",
+            message: `任务${config.name}成功`,
+          });
+          // 任务操作完成，更新任务状态
+          this.eventBus.emit(config.event, {
+            taskId: taskId,
+            playerId: this.playerService.getPlayerId(),
+          });
+          // 发送音频播放事件
+          this.eventBus.emit(AUDIO_EVENTS.PLAY, config.sound);
+        } else {
+          Logger.error("UIService", `${config.name}任务失败:`, result);
+          // 其他情况只显示提示信息
+          this.showNotification({
+            type: "INFO",
+            message: result.msg || `无法${config.name}该任务`,
+          });
+        }
+      } else {
+        // 直接触发事件
+        this.eventBus.emit(config.event, {
           taskId: taskId,
           playerId: this.playerService.getPlayerId(),
         });
-        // 发送音频播放事件
-        this.eventBus.emit(AUDIO_EVENTS.PLAY, "ACCEPT");
-      } else {
-        Logger.error("UIService", "接受任务失败:", result);
-        // 其他情况只显示提示信息
+
         this.showNotification({
-          type: "INFO",
-          message: result.msg || "无法接受该任务",
+          type: "SUCCESS",
+          message: `任务${config.name}成功`,
         });
+
+        // 发送音频播放事件
+        this.eventBus.emit(AUDIO_EVENTS.PLAY, config.sound);
       }
     } catch (error) {
-      Logger.error("UIService", "处理任务接受失败:", error);
+      Logger.error("UIService", `处理${config.name}任务失败:`, error);
       this.showNotification({
         type: "ERROR",
-        message: error.message || "接受任务失败",
+        message: error.message || `${config.name}任务失败`,
       });
       // 发送错误音频事件
       this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
     }
   }
 
-  /**
-   * 处理任务放弃事件
-   * @param {Object} data 任务数据
-   */
-  async handleTaskAbandon(taskId) {
-    Logger.info("UIService", "处理放弃任务:", taskId);
-    try {
-      // 显示确认对话框
-      layer.confirm(
-        "确定要放弃这个任务吗？放弃后将无法恢复。",
-        {
-          title: "放弃任务",
-          btn: ["确定", "取消"],
-          icon: 3,
-        },
-        () => {
-          try {
-            // 用户点击确定后触发任务放弃事件
-            this.eventBus.emit(TASK_EVENTS.ABANDONED, {
-              taskId: taskId,
-              playerId: this.playerService.getPlayerId(),
-            });
-            layer.closeAll();
-          } catch (error) {
-            Logger.error("UIService", "放弃任务失败:", error);
-            this.showErrorMessage("放弃任务失败: " + error.message);
-          }
-        }
-      );
-    } catch (error) {
-      Logger.error("UIService", "放弃任务失败:", error);
-      this.showNotification({
-        type: "ERROR",
-        message: "放弃任务失败",
-      });
-      this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
-    }
-  }
-
-  /**
-   * 处理任务提交事件
-   * @param {string} taskId 任务ID
-   */
-  async handleTaskSubmit(taskId) {
-    Logger.info("UIService", "处理提交任务:", taskId);
-    try {
-      // 显示确认对话框
-      layer.confirm(
-        "确定要提交这个任务吗？",
-        {
-          title: "提交任务",
-          btn: ["确定", "取消"],
-          icon: 3,
-        },
-        () => {
-          try {
-            // 用户点击确定后触发任务提交事件
-            this.eventBus.emit(TASK_EVENTS.SUBMIT, {
-              taskId: taskId,
-              playerId: this.playerService.getPlayerId(),
-            });
-            layer.closeAll();
-          } catch (error) {
-            Logger.error("UIService", "提交任务失败:", error);
-            this.showErrorMessage("提交任务失败: " + error.message);
-          }
-        }
-      );
-    } catch (error) {
-      Logger.error("UIService", "提交任务失败:", error);
-      this.showNotification({
-        type: "ERROR",
-        message: "uiservice:提交任务失败",
-      });
-      this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
-    }
-  }
   // ... 其他UI相关方法
   // 优化地图渲染器变更处理方法
   updatePlayerInfo(playerData) {
@@ -1019,272 +1262,151 @@ class UIService {
     }
   }
 
-  /**
-   * 处理任务完成事件
-   * @param {Object} taskData 任务数据
-   */
-  handleTaskComplete(taskData) {
-    Logger.info("UIService", "处理任务完成事件:", taskData);
-    try {
-      // 更新UI显示
-      this.showNotification({
-        type: "SUCCESS",
-        message: `任务完成！获得 ${taskData.rewards?.points || 0} 点经验`,
-      });
-
-      // 播放完成音效
-      this.eventBus.emit(AUDIO_EVENTS.PLAY, "COMPLETE");
-
-      // 刷新任务列表
-      this.taskService.refreshTasks().then(() => {
-        Logger.debug("UIService", "任务列表已刷新");
-      });
-    } catch (error) {
-      Logger.error("UIService", "处理任务完成事件失败:", error);
-      this.showNotification({
-        type: "ERROR",
-        message: "处理任务完成失败",
-      });
-    }
-  }
-
-  // 处理任务错误
-  handleTaskError(error) {
-    Logger.error("UIService", "任务错误:", error);
-    this.showNotification({
-      type: "ERROR",
-      message: error.message || "任务操作失败",
-    });
-    this.eventBus.emit(AUDIO_EVENTS.PLAY, "ERROR");
-  }
-
   // 处理任务点击
   handleTaskClick(taskData) {
     Logger.debug("UIService", "处理任务点击:", taskData);
     this.showTaskDetails(taskData);
   }
 
-  // 处理当前任务更新
-  handleCurrentTasksUpdated(tasks) {
-    Logger.info("UIService", "当前任务更新:", tasks);
-    this.renderCurrentTasks(tasks);
-  }
-
-  // 处理文档点击事件的函数
-
+  /**
+   * 处理文档点击事件，作为所有点击事件的统一入口
+   * @param {Event} e 点击事件对象
+   */
   handleDocumentClick(e) {
-    const target = e.target;
-    // 处理返回首页点击
-    if (target.classList.contains("back-home-btn")) {
-      this.eventBus.emit(ROUTE_EVENTS.CHANGED, { from: window.location.pathname, to: '/' });
+    // 阻止默认行为和事件冒泡，避免重复触发
+    e.preventDefault();
+    e.stopPropagation();
+
+    // 获取当前被点击的元素
+    const currentTarget = e.currentTarget;
+    const allClasses = currentTarget.className ? currentTarget.className.toString() : "";
+    const dataAttrs = currentTarget.dataset ? JSON.stringify(currentTarget.dataset) : "{}";
+
+    Logger.debug("UIService", "处理点击事件:", currentTarget.tagName, `[ID:${currentTarget.id || "none"}]`, `[CLASS:${allClasses}]`, `[DATA:${dataAttrs}]`);
+
+    // 防止点击事件重复触发的标记
+    if (e._handled) {
+      Logger.debug("UIService", "点击事件已处理，忽略重复处理");
+      return;
+    }
+    e._handled = true;
+
+    // 查找匹配的处理函数并调用
+    let handled = false;
+
+    // 特殊处理任务卡片：如果是带有active-task类的任务卡片，优先使用active-task处理器
+    if (currentTarget.classList && currentTarget.classList.contains("task-card") && currentTarget.classList.contains("active-task")) {
+      const activeTaskHandler = this._clickHandlers["active-task"];
+      if (activeTaskHandler) {
+        Logger.debug("UIService", "优先使用active-task处理器");
+        activeTaskHandler(e, currentTarget);
+        return;
+      }
     }
 
-    // 处理任务卡片点击 需要判断是进行中的任务还是可用任务    
-    const taskCard = target.closest(".task-card");
-    if (taskCard && !target.closest("button")) {
-        const taskId = taskCard.dataset.taskId;
-        if (taskId) {
-            // 判断任务类型
-            const isActiveTask = taskCard.closest(".active-tasks-container") !== null;
-            const isAvailableTask = taskCard.closest(".task-list-swiper") !== null;
-            
-            Logger.debug("UIService", `处理任务卡片点击 - ${isActiveTask ? '进行中任务' : isAvailableTask ? '可用任务' : '未知类型任务'} ID: ${taskId}`);
-            if(isActiveTask){
-              this.showCurrentTaskDetails(taskId);
-            }else{
-              this.showTaskDetails(taskId);
-            }
+    // 遍历所有处理器，查找匹配的
+    for (const [selector, handler] of Object.entries(this._clickHandlers)) {
+      // 检查是否为ID选择器
+      if (selector.startsWith("#")) {
+        const id = selector.substring(1);
+        if (currentTarget.id === id) {
+          Logger.debug("UIService", `找到ID匹配: #${id}`);
+          handler(e, currentTarget);
+          handled = true;
+          break;
         }
-    }
-
-    // 处理接受任务按钮点击
-    if (target.classList.contains(".accept-task")) {
-      const taskId =target.dataset.taskId;
-      Logger.debug("UIService", "处理接受任务按钮点击::, taskId ", taskId);
-      if (taskId) {
-        this.handleTaskAccept(taskId);
+      }
+      // 检查是否为类选择器
+      else if (selector.startsWith(".")) {
+        const className = selector.substring(1); // 移除开头的点号
+        // 检查元素是否包含该类名 - 使用classList.contains更准确
+        if (currentTarget.classList && currentTarget.classList.contains(className)) {
+          Logger.debug("UIService", `找到类名匹配: .${className}, 使用处理器: ${selector}`);
+          handler(e, currentTarget);
+          handled = true;
+          break;
+        }
+      }
+      // 直接匹配类名（无点号前缀的选择器）
+      else if (currentTarget.classList && currentTarget.classList.contains(selector)) {
+        Logger.debug("UIService", `找到直接类名匹配: ${selector}`);
+        handler(e, currentTarget);
+        handled = true;
+        break;
+      }
+      // 其他选择器（如标签名）
+      else if (currentTarget.matches && currentTarget.matches(selector)) {
+        Logger.debug("UIService", `找到选择器匹配: ${selector}`);
+        handler(e, currentTarget);
+        handled = true;
+        break;
+      }
+      // 祖先元素选择器
+      else if (currentTarget.closest && currentTarget.closest(selector)) {
+        const matchedElement = currentTarget.closest(selector);
+        Logger.debug("UIService", `找到祖先元素匹配: ${selector}`);
+        handler(e, matchedElement);
+        handled = true;
+        break;
       }
     }
 
-    // 处理放弃任务按钮点击
-    if (target.classList.contains('abandon-task')) {
-      const taskId = target.dataset.taskId;
-      Logger.debug("UIService", "处理放弃任务按钮点击::, taskId ", taskId);
-      if (taskId) {
-        this.handleTaskAbandon(taskId);
-      }
-    }
-    // 处理提交任务按钮点击
-    if (target.classList.contains('submit-task')) {
-      const taskId = target.dataset.taskId;
-      Logger.debug("UIService", "处理提交任务按钮点击::, taskId ", taskId);
-      if (taskId) {
-        this.handleTaskSubmit(taskId);
-      }
+    if (!handled) {
+      Logger.debug("UIService", "未找到匹配的点击处理器:", `元素: ${currentTarget.tagName}`, `[ID:${currentTarget.id || "none"}]`, `[CLASS:${allClasses}]`);
     }
   }
 
   /**
-   * 初始化地图UI组件
+   * 绑定点击事件到指定选择器的元素
+   * @param {string} selector 要绑定的元素选择器
+   * @private
    */
-  async initializeMapUI() {
-    Logger.info("UIService", "初始化地图UI组件");
-    try {
-      Logger.debug("UIService", "开始初始化各个UI组件");
-      this.initMapSwitchButton();
-      this.initTimeRangeSelector();
-      this.initCustomTimeRange();
-      this.initDisplayModeButton();
-      Logger.info("UIService", "地图UI组件初始化完成");
-    } catch (error) {
-      Logger.error("UIService", "初始化地图UI组件失败:", error);
-      this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-        type: "ERROR",
-        message: "初始化地图控件失败",
-      });
-      throw error; // 抛出错误以便上层处理
-    }
-  }
-
-  /**
-   * 初始化地图切换按钮
-   */
-  initMapSwitchButton() {
-    Logger.debug("UIService", "初始化地图切换按钮");
-    const mapSwitchBtn = document.getElementById("switchMapType");
-    if (!mapSwitchBtn) {
-      Logger.error("UIService", "找不到地图切换按钮");
-      return;
-    }
-
+  _bindClickEvent(selector) {
     // 移除可能存在的旧事件监听器
-    mapSwitchBtn.removeEventListener("click", this.handleMapSwitchClick);
+    this.removeEventListeners(selector);
 
-    // 使用箭头函数保持this上下文
-    this.handleMapSwitchClick = () => {
-      const currentType = localStorage.getItem("mapType") || "ECHARTS";
-      const newType = currentType === "AMAP" ? "ECHARTS" : "AMAP";
-      Logger.debug("UIService", "触发地图切换事件:", newType);
-      this.eventBus.emit(MAP_EVENTS.RENDERER_CHANGED, newType);
-    };
-
-    mapSwitchBtn.addEventListener("click", this.handleMapSwitchClick);
-  }
-
-  /**
-   * 初始化时间范围选择器
-   */
-  initTimeRangeSelector() {
-    Logger.debug("UIService", "初始化时间范围选择器");
-    const timeRangeSelect = document.getElementById("timeRangeSelect");
-
-    if (!timeRangeSelect) {
-      Logger.warn("UIService", "找不到时间范围选择器");
+    // 查找所有匹配的元素
+    const elements = document.querySelectorAll(selector);
+    if (elements.length === 0) {
+      Logger.debug("UIService", `未找到匹配选择器 ${selector} 的元素`);
       return;
     }
 
-    try {
-      // 设置选择器的值
-      timeRangeSelect.value = this.mapTimeRange;
+    Logger.debug("UIService", `为 ${elements.length} 个 ${selector} 元素绑定点击事件`);
 
-      // 添加change事件监听
-      timeRangeSelect.addEventListener("change", (e) => {
-        const newValue = e.target.value;
-        Logger.debug("UIService", `时间范围变更为: ${newValue}`);
-        this.mapTimeRange = newValue;
-        this.store.setComponentState(this.componentId, { mapTimeRange: newValue }); // 更新到store
-        // mapTimeRange是否需要同步更新到localstorage
+    // 为每个元素绑定点击事件
+    elements.forEach((element) => {
+      // 使用handleDocumentClick处理点击事件
+      const boundHandler = this.handleDocumentClick.bind(this);
+      element.addEventListener("click", boundHandler);
 
-        this.eventBus.emit(MAP_EVENTS.TIME_RANGE_CHANGED, newValue);
-      });
-
-      this.updateCustomTimeRangeVisibility();
-    } catch (error) {
-      Logger.error("UIService", "初始化时间范围选择器失败:", error);
-    }
-  }
-
-  /**
-   * 初始化自定义时间范围
-   */
-  initCustomTimeRange() {
-    const startInput = document.getElementById("startTime");
-    const endInput = document.getElementById("endTime");
-    const applyButton = document.getElementById("applyCustomRange");
-
-    if (startInput && endInput) {
-      if (this.mapTimeRange === "custom" && this.customStartTime && this.customEndTime) {
-        startInput.value = this.customStartTime;
-        endInput.value = this.customEndTime;
+      // 记录事件监听器，用于后续清理
+      if (!this._eventListeners.has(selector)) {
+        this._eventListeners.set(selector, []);
       }
-
-      startInput.addEventListener("change", () => {
-        this.customStartTime = startInput.value;
+      this._eventListeners.get(selector).push({
+        element,
+        handler: boundHandler,
       });
-
-      endInput.addEventListener("change", () => {
-        this.customEndTime = endInput.value;
-      });
-
-      if (applyButton) {
-        applyButton.addEventListener("click", () => {
-          if (!this.validateTimeRange(startInput.value, endInput.value)) {
-            this.eventBus.emit(UI_EVENTS.NOTIFICATION_SHOW, {
-              type: "WARNING",
-              message: "请选择有效的时间范围",
-            });
-            return;
-          }
-
-          this.customStartTime = startInput.value;
-          this.customEndTime = endInput.value;
-          this.eventBus.emit(MAP_EVENTS.TIME_RANGE_CHANGED, "custom");
-        });
-      }
-    }
-
-    this.updateCustomTimeRangeVisibility();
-  }
-
-  /**
-   * 初始化显示模式按钮
-   */
-  initDisplayModeButton() {
-    Logger.debug("UIService", "初始化显示模式切换按钮");
-    const displayModeSwitchBtn = document.getElementById("switchDisplayMode");
-    if (!displayModeSwitchBtn) {
-      Logger.warn("UIService", "找不到显示模式切换按钮");
-      return;
-    }
-
-    displayModeSwitchBtn.addEventListener("click", () => {
-      this.eventBus.emit(MAP_EVENTS.DISPLAY_MODE_CHANGED);
     });
   }
 
   /**
-   * 更新自定义时间范围的显示状态
+   * 移除指定选择器的事件监听器
+   * @param {string} selector 选择器
    */
-  updateCustomTimeRangeVisibility() {
-    const customDateRange = document.getElementById("customDateRange");
-    if (customDateRange) {
-      customDateRange.style.display = this.mapTimeRange === "custom" ? "block" : "none";
+  removeEventListeners(selector) {
+    if (!this._eventListeners.has(selector)) {
+      return;
     }
-  }
 
-  /**
-   * 验证时间范围
-   */
-  validateTimeRange(start, end) {
-    if (!start || !end) return false;
+    const listeners = this._eventListeners.get(selector);
+    listeners.forEach(({ element, handler }) => {
+      element.removeEventListener("click", handler);
+    });
 
-    const startTime = new Date(start);
-    const endTime = new Date(end);
-
-    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) return false;
-    if (startTime >= endTime) return false;
-
-    return true;
+    this._eventListeners.delete(selector);
+    Logger.debug("UIService", `已移除 ${listeners.length} 个 ${selector} 元素的点击事件监听器`);
   }
 
   /**
@@ -1359,24 +1481,7 @@ class UIService {
     itemElement.className = "shop-item";
     itemElement.setAttribute("data-item-id", item.id);
 
-    // 使用base64默认图片
-    const DEFAULT_ITEM_IMAGE ='/static/img/shop/default_item.svg';
-
-    itemElement.innerHTML = `
-        <div class="item-image">
-            <img src="${item.image_url || DEFAULT_ITEM_IMAGE}" alt="${item.name}" 
-                 onerror="this.src='${DEFAULT_ITEM_IMAGE}'">
-        </div>
-        <div class="item-info">
-            <div class="item-name">${item.name}</div>
-            <div class="item-description">${item.description}</div>
-            <div class="item-price">
-                <img src="/static/img/points.png" alt="积分">
-                <span>${item.price}</span>
-            </div>
-            <div class="item-stock">库存: ${item.stock}</div>
-        </div>
-    `;
+    itemElement.innerHTML = this.templateService.renderShopItemCard(item);
 
     // 点击商品卡片显示详情
     itemElement.addEventListener("click", () => {
@@ -1399,31 +1504,7 @@ class UIService {
     const totalPrice = quantity * item.price;
 
     // 构建确认框内容
-    const content = `
-      <div class="purchase-confirm-content">
-        <div class="item-info">
-          <img src="${item.image_url}" alt="${item.name}" class="item-image">
-          <div class="item-details">
-            <h3>${item.name}</h3>
-            <p class="item-description">${item.description}</p>
-          </div>
-        </div>
-        <div class="purchase-details">
-          <div class="detail-row">
-            <span>购买数量：</span>
-            <span class="value">${quantity}</span>
-          </div>
-          <div class="detail-row">
-            <span>单价：</span>
-            <span class="value">${item.price} 积分</span>
-          </div>
-          <div class="detail-row total">
-            <span>总价：</span>
-            <span class="value">${totalPrice} 积分</span>
-          </div>
-        </div>
-      </div>
-    `;
+    const content = this.templateService.renderPurchaseConfirmDialog(item, quantity, totalPrice);
 
     layer.confirm(
       content,
@@ -1432,62 +1513,6 @@ class UIService {
         btn: ["确认购买", "取消"],
         area: ["400px", "500px"],
         skin: "purchase-confirm-dialog",
-        success: (layero) => {
-          // 添加自定义样式
-          const style = document.createElement("style");
-          style.textContent = `
-          .purchase-confirm-dialog .layui-layer-content {
-            padding: 20px;
-          }
-          .purchase-confirm-content {
-            color: #b0b6c2;
-          }
-          .purchase-confirm-content .item-info {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-          }
-          .purchase-confirm-content .item-image {
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 8px;
-          }
-          .purchase-confirm-content .item-details h3 {
-            margin: 0 0 10px;
-            color: #57CAFF;
-            font-size: 16px;
-          }
-          .purchase-confirm-content .item-description {
-            font-size: 14px;
-            margin: 0;
-            color: rgba(176, 182, 194, 0.8);
-          }
-          .purchase-confirm-content .purchase-details {
-            background: rgba(27, 39, 53, 0.5);
-            border-radius: 8px;
-            padding: 15px;
-          }
-          .purchase-confirm-content .detail-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-          }
-          .purchase-confirm-content .detail-row:last-child {
-            margin-bottom: 0;
-          }
-          .purchase-confirm-content .detail-row.total {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid rgba(87, 202, 255, 0.2);
-          }
-          .purchase-confirm-content .detail-row .value {
-            color: #57CAFF;
-            font-weight: bold;
-          }
-        `;
-          document.head.appendChild(style);
-        },
       },
       (index) => {
         // 确认回调
@@ -1636,8 +1661,17 @@ class UIService {
           },
         },
       });
-
       Logger.info("UIService", "玩家信息UI初始化完成");
+      // 检查登录状态并更新登录按钮
+      const isLoggedIn = this.playerService.isLoggedIn();
+      const playerName = playerData ? playerData.name : "";
+      this.updateLoginButton(isLoggedIn, playerName);
+
+      // 确保登录按钮的点击事件被正确绑定
+      this._bindClickEvent("#loginBtn");
+      this._bindClickEvent(".login-entrance");
+      this._bindClickEvent(".shop-entrance");
+      Logger.debug("UIService", "玩家信息UI点击事件绑定成功");
     } catch (error) {
       Logger.error("UIService", "初始化玩家信息UI失败:", error);
       this.updateState({
@@ -1662,25 +1696,8 @@ class UIService {
   }
 
   /**
-   * 初始化玩家相关事件
+   * 清理UI服务
    */
-  initPlayerEvents() {
-    Logger.info("UIService", "初始化玩家事件监听");
-
-    // 监听玩家信息更新事件
-    this.eventBus.on(PLAYER_EVENTS.INFO_UPDATED, (playerData) => {
-      this.updatePlayerInfo(playerData);
-    });
-
-    // 监听经验值更新事件
-    this.eventBus.on(PLAYER_EVENTS.EXP_UPDATED, (data) => {
-      const playerData = this.playerService.getPlayerData();
-      if (playerData) {
-        this.updateLevelAndExp(playerData);
-      }
-    });
-  }
-
   cleanup() {
     Logger.info("UIService", "清理UI服务");
     try {
@@ -1690,9 +1707,12 @@ class UIService {
       // 取消状态订阅
       this.store.unsubscribe("component", this.componentId);
 
-      // 清理DOM事件监听器
-      this.removeTaskEvents();
-      this.removeShopEvents();
+      // 清理所有事件监听器
+      this.removeEventListeners();
+
+      // 清理所有观察器
+      this.observers.forEach((observer) => observer.disconnect());
+      this.observers.clear();
 
       // 清理所有模态框
       this.state.modals.forEach((modal, id) => {
@@ -1717,6 +1737,37 @@ class UIService {
       Logger.error("UIService", "UI服务清理失败:", error);
     }
   }
+
+  /**
+   * 移除所有或指定的事件监听器
+   * @param {string} [selector] 可选的选择器，如果提供则只移除该选择器相关的监听器
+   */
+  removeEventListeners(selector) {
+    if (selector) {
+      // 移除特定选择器的监听器
+      if (this._eventListeners.has(selector)) {
+        const listeners = this._eventListeners.get(selector);
+        listeners.forEach(({ element, handler }) => {
+          element.removeEventListener("click", handler);
+        });
+
+        this._eventListeners.delete(selector);
+        Logger.debug("UIService", `已移除 ${listeners.length} 个 ${selector} 元素的点击事件监听器`);
+      }
+    } else {
+      // 移除所有监听器
+      this._eventListeners.forEach((listeners, selector) => {
+        listeners.forEach(({ element, handler }) => {
+          element.removeEventListener("click", handler);
+        });
+        Logger.debug("UIService", `已移除 ${listeners.length} 个 ${selector} 元素的点击事件监听器`);
+      });
+
+      this._eventListeners.clear();
+      Logger.info("UIService", "已移除所有事件监听器");
+    }
+  }
+
   // 这个函数是store用来渲染通知列表的
   renderNotifications(notifications) {
     Logger.info("UIService", "开始渲染通知列表");
@@ -1741,6 +1792,203 @@ class UIService {
     } catch (error) {
       Logger.error("UIService", "渲染通知列表失败:", error);
       container.innerHTML = '<div class="error-notification">加载通知失败</div>';
+    }
+  }
+
+  // 更新登录按钮状态
+  updateLoginButton(isLoggedIn, playerName = "") {
+    const loginBtn = document.getElementById("loginBtn");
+    if (!loginBtn) {
+      Logger.warn("UIService", "未找到登录按钮元素");
+      return;
+    }
+
+    const loginText = loginBtn.querySelector(".login-text");
+    const loginIcon = loginBtn.querySelector(".layui-icon");
+
+    if (isLoggedIn) {
+      loginBtn.classList.add("logged-in");
+      loginText.textContent = playerName || "已登录";
+      loginIcon.classList.remove("layui-icon-user");
+      loginIcon.classList.add("layui-icon-logout");
+      // 更新按钮提示
+      loginBtn.setAttribute("title", "点击登出");
+    } else {
+      loginBtn.classList.remove("logged-in");
+      loginText.textContent = "登录";
+      loginIcon.classList.remove("layui-icon-logout");
+      loginIcon.classList.add("layui-icon-user");
+      // 更新按钮提示
+      loginBtn.setAttribute("title", "点击登录");
+    }
+
+    Logger.debug("UIService", `登录按钮状态已更新: ${isLoggedIn ? "已登录" : "未登录"}`);
+  }
+
+  /**
+   * 处理登录按钮点击
+   * @param {Event} e 点击事件对象
+   * @private
+   */
+  _handleLoginButtonClick(e) {
+    e.preventDefault();
+    e.stopPropagation(); // 阻止事件冒泡
+
+    Logger.info("UIService", "处理登录按钮点击");
+
+    if (this.playerService.isLoggedIn()) {
+      // 如果已登录，则执行登出
+      try {
+        const loadingIndex = layer.load(1, {
+          shade: [0.2, "#000"],
+        });
+
+        this.playerService
+          .logout()
+          .then(() => {
+            layer.close(loadingIndex);
+
+            // 播放音效
+            this.eventBus.emit(AUDIO_EVENTS.PLAY, "CLICK");
+
+            // 显示提示
+            layer.msg("登出成功", { icon: 1 });
+            this.updateLoginButton(false);
+          })
+          .catch((error) => {
+            layer.close(loadingIndex);
+            layer.msg(error.message || "登出失败", { icon: 2 });
+          });
+      } catch (error) {
+        layer.msg(error.message || "登出失败", { icon: 2 });
+      }
+    } else {
+      // 如果未登录，显示登录对话框
+      this.handleLoginClick();
+    }
+  }
+
+  /**
+   * 处理登录点击事件，显示登录对话框
+   */
+  async handleLoginClick() {
+    Logger.info("UIService", "显示登录对话框");
+    try {
+      // 关闭可能存在的其他对话框
+      layer.closeAll();
+
+      // 获取玩家列表
+      const response = await this.playerService.api.request("/api/get_players");
+      if (response.code !== 0) {
+        throw new Error(response.msg || "获取玩家列表失败");
+      }
+
+      const players = response.data;
+      if (!players || players.length === 0) {
+        layer.msg("暂无可用角色", { icon: 2 });
+        return;
+      }
+
+      // 创建登录表单
+      const loginFormHtml = this.templateService.createLoginDialogTemplate(players);
+
+      layer.open({
+        type: 1,
+        title: "登录",
+        content: loginFormHtml,
+        area: ["500px", "auto"],
+        shadeClose: false,
+        success: (layero) => {
+          const form = layui.form;
+          // 渲染表单组件
+          form.render();
+
+          // 保存this引用，解决回调中this指向问题
+          const self = this;
+
+          // 监听表单提交
+          form.on("submit(login-submit)", function (data) {
+            try {
+              let formData = data.field;
+
+              // 修改：优先使用保存在弹窗数据中的已选玩家ID
+              let playerId = layero.data("selected-player-id");
+
+              // 如果没有通过data属性获取到，则尝试从选中的radio获取
+              if (!playerId) {
+                const selectedRadio = layero.find("input[type=radio][lay-ignore]:checked");
+                if (selectedRadio.length > 0) {
+                  playerId = selectedRadio.val();
+                }
+              }
+
+              // 记录详细日志，帮助调试
+              Logger.debug("UIService", "登录表单提交:", {
+                playerId: playerId,
+                selectedFromForm: formData.playerId,
+                password: "******", // 不记录实际密码
+              });
+
+              // 开始登录流程，使用保存的self引用
+              self.playerService
+                .login(playerId, formData.password)
+                .then(() => {
+                  if (window.GameManager) {
+                    window.GameManager.initializeServices();
+                    window.GameManager.initializeApplication();
+                    Logger.info("UIService", "登录成功，应用重新初始化完成");
+                  }
+                  // 关闭登录弹窗
+                  layer.closeAll();
+                })
+                .catch((error) => {
+                  Logger.error("UIService", "登录失败:", error);
+                  layer.msg(error.message || "登录失败", { icon: 2 });
+                });
+            } catch (error) {
+              Logger.error("UIService", "处理登录表单提交失败:", error);
+              layer.msg(error.message || "登录处理失败", { icon: 2 });
+            }
+            return false; // 阻止表单默认提交
+          });
+
+          // 为表单添加必要的layui交互效果
+          const playerRadios = layero.find("[lay-radio]");
+          playerRadios.on("click", function () {
+            // 修改：直接获取当前卡片上的data-player-id属性，确保选择正确的玩家ID
+            const playerId = $(this).attr("data-player-id");
+            const playerName = $(this).attr("data-player-name");
+
+            // 获取关联的radio输入元素 - 确保选择正确的radio按钮
+            const input = layero.find(`input[type=radio][value="${playerId}"]`);
+
+            // 移除所有卡片的选中状态
+            layero.find("[lay-radio]").removeClass("selected");
+
+            // 取消选中所有radio按钮
+            layero.find("input[type=radio][lay-ignore]").prop("checked", false);
+
+            // 添加当前卡片的选中状态
+            $(this).addClass("selected");
+
+            // 选中关联的radio按钮
+            input.prop("checked", true);
+
+            // 保存选中的玩家ID到一个全局变量，确保提交时使用正确的ID
+            layero.data("selected-player-id", playerId);
+
+            Logger.debug("UIService", "选择玩家:", playerId, playerName);
+          });
+
+          // 默认选中第一个玩家
+          if (playerRadios.length > 0) {
+            playerRadios.first().click();
+          }
+        },
+      });
+    } catch (error) {
+      Logger.error("UIService", "显示登录对话框失败:", error);
+      layer.msg(error.message || "获取玩家列表失败", { icon: 2 });
     }
   }
 }

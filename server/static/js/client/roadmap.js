@@ -527,37 +527,131 @@ layui.use(["jquery", "layer", "form", "laytpl"], function () {
     });
   }
 
-  // 添加任务
-  $(".add-task-btn").on("click", function () {
+  // 添加节流函数
+  function throttle(func, wait) {
+    let timeout = null;
+    let previous = 0;
+    
+    return function(...args) {
+      const now = Date.now();
+      const remaining = wait - (now - previous);
+      
+      if (remaining <= 0 || remaining > wait) {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
+        previous = now;
+        func.apply(this, args);
+      } else if (!timeout) {
+        timeout = setTimeout(() => {
+          previous = Date.now();
+          timeout = null;
+          func.apply(this, args);
+        }, remaining);
+      }
+    };
+  }
+
+  // 修改添加任务的处理逻辑
+  $(".add-task-btn").on("click", throttle(function() {
     const status = $(this).data("status");
     console.log("[Roadmap] Opening add task dialog for status:", status);
 
-    openTaskForm("添加任务", { status }, function (formData) {
+    openTaskForm("添加任务", { status }, function(formData) {
       formData.status = status;
       formData.playerId = localStorage.getItem("Roadmap_PlayerId");
+      
+      // 生成临时ID
+      const tempId = 'temp_' + Date.now();
+      
+      // 创建临时任务卡片并立即显示
+      const tempTask = {
+        id: tempId,
+        name: formData.name,
+        description: formData.description,
+        color: formData.color,
+        status: status,
+        order: $(`#${status.toLowerCase()}-list .task-card`).length // 添加到列表末尾
+      };
+      
+      // 关闭表单
+      layer.closeAll();
+      
+      // 立即在界面上添加任务卡片
+      const $tempCard = createTaskCard(tempTask);
+      $tempCard.addClass('task-card-pending'); // 添加待处理样式
+      $(`#${status.toLowerCase()}-list`).append($tempCard);
+      updateTaskCounts();
+
+      // 发送异步请求
       $.ajax({
         url: "/api/roadmap/add",
         method: "POST",
         contentType: "application/json",
         data: JSON.stringify(formData),
-        success: function (res) {
+        success: function(res) {
           try {
             const data = typeof res === "string" ? JSON.parse(res) : res;
             if (data.code === 0) {
-              layer.closeAll();
-              loadTasks();
+              // 更新临时卡片的ID和其他服务器返回的数据
+              $tempCard
+                .removeClass('task-card-pending')
+                .attr('data-id', data.data.id)
+                .data('task', data.data);
+              
               layer.msg("添加成功", { icon: 1 });
             } else {
+              // 添加失败，移除临时卡片
+              $tempCard.remove();
+              updateTaskCounts();
               layer.msg("添加失败: " + data.msg, { icon: 2 });
             }
           } catch (e) {
             console.error("[Roadmap] Error parsing response:", e);
+            // 添加失败，移除临时卡片
+            $tempCard.remove();
+            updateTaskCounts();
             layer.msg("数据解析错误", { icon: 2 });
           }
         },
+        error: function() {
+          // 请求失败，移除临时卡片
+          $tempCard.remove();
+          updateTaskCounts();
+          layer.msg("网络请求失败", { icon: 2 });
+        }
       });
     });
-  });
+  }, 1000)); // 1秒的节流时间
+
+  // 添加待处理状态的样式到CSS
+  const style = document.createElement('style');
+  style.textContent = `
+    .task-card-pending {
+      opacity: 0.7;
+      position: relative;
+    }
+    .task-card-pending::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      border: 2px solid #1E9FFF;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      to {
+        transform: translate(-50%, -50%) rotate(360deg);
+      }
+    }
+  `;
+  document.head.appendChild(style);
 
   // 编辑任务
   $(document).on("click", ".edit-task", function (e) {

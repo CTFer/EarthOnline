@@ -4,7 +4,7 @@ from admin import admin_required
 import logging
 from utils.response_handler import ResponseHandler, StatusCode, api_response
 from function.ShopService import shop_service
-
+from function.PlayerService import player_service
 # 配置日志
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -114,6 +114,7 @@ def delete_item(item_id):
 
 @shop_bp.route('/api/shop/purchase', methods=['POST'])
 @api_response
+@player_service.player_required
 def purchase():
     """购买商品"""
     try:

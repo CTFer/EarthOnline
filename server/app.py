@@ -906,10 +906,10 @@ def get_amap_security_config():
     })
 
 # 勋章 词云相关接口
-@app.route('/api/wordcloud', methods=['GET'])
-def get_wordcloud():
+@app.route('/api/player/<int:player_id>/wordcloud', methods=['GET'])
+def get_wordcloud(player_id):
     """获取词云数据 - 展示中的勋章"""
-    return medal_service.get_wordcloud_medals()
+    return medal_service.get_wordcloud_medals(player_id)
 
 # 获取勋章列表
 @app.route('/api/medals', methods=['GET'])

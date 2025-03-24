@@ -70,7 +70,7 @@ class EventManager {
       this.initializeShopEvents();
 
       // 初始化UI组件
-      this.uiService.initializeMapUI();
+      this.mapService.initializeMapUI();
 
       Logger.info("EventManager", "initializeEventListeners:85", "事件监听器设置完成");
     } catch (error) {
@@ -158,7 +158,7 @@ class EventManager {
       // 2. 初始化地图服务
       if (this.mapService) {
         await this.mapService.initialize();
-        this.uiService.initializeMapUI();
+        this.mapService.initializeMapUI();
       }
 
       // 3. 初始化任务服务
@@ -216,7 +216,9 @@ class EventManager {
 
       // 1. 清理任务相关
       if (this.uiService) {
-        this.uiService.removeTaskEvents();
+        // 移除DOM观察器
+        this.uiService.cleanup();
+
       }
 
       // 2. 清理地图相关
@@ -304,9 +306,16 @@ class EventManager {
       this.handleError("任务放弃", error, "放弃任务失败");
     }
   }
+  /**
+   * 处理任务接受事件
+   * @param {object} data 任务数据
+   * @param {string} data.taskId 任务ID
+   * @param {string} data.playerId 玩家ID
+   */
   async handleTaskAccept(data) {
     try {
-      await this.uiService.handleTaskAccept(data);
+      Logger.info("EventManager", "handleTaskAccept", "处理任务接受:", data);
+      await this.uiService.handleTaskOperation(data.taskId, 'accept');;
     } catch (error) {
       this.handleError("任务接受", error, "接受任务失败");
     }
@@ -333,7 +342,6 @@ class EventManager {
       this.handleError("处理任务完成", error, "更新文字云失败");
     }
   }
-
   initializeTaskEvents() {
     this.eventBus.on(TASK_EVENTS.COMPLETED, this.handleTaskCompleted.bind(this));
     this.eventBus.on(TASK_EVENTS.STATUS_UPDATED, this.handleTaskStatusUpdate.bind(this));

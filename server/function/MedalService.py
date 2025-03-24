@@ -255,9 +255,10 @@ class MedalService:
                 msg=f'获取图标列表失败: {str(e)}'
             )
 
-    def get_wordcloud_medals(self) -> Dict:
+    def get_wordcloud_medals(self, player_id: int) -> Dict:
         """
         获取用于词云显示的勋章数据
+        :param player_id: 玩家ID
         :return: 包含勋章名称列表的字典
         """
         try:
@@ -269,8 +270,8 @@ class MedalService:
                 SELECT m.name, pm.level
                 FROM player_medal pm
                 JOIN medal m ON pm.medal_id = m.id
-                WHERE pm.show = 1
-            ''')
+                WHERE pm.show = 1 AND pm.player_id = ?
+            ''', (player_id,))
             
             # 获取所有勋章名称
             medals = [(row['name'], row['level']) for row in cursor.fetchall()]

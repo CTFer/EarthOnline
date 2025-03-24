@@ -91,17 +91,17 @@ class TaskService {
     return result.data;
   }
 
-  async handleTaskAccept(data) {
+  async handleTaskAccept(taskId) {
     const playerId = this.playerService.getPlayerId();
-    Logger.info("TaskService", `接受任务: ${data.taskId} 玩家ID: ${playerId}`);
+    Logger.info("TaskService", `接受任务: ${taskId} 玩家ID: ${playerId}`);
 
     try {
-      const response = await this.api.acceptTask(data.taskId, playerId);
+      const response = await this.api.acceptTask(taskId, playerId);
       Logger.debug("TaskService", "接受任务响应:", response);
       if (response.code === 0) {
         // 更新任务状态
         const taskStatus = {
-          id: data.taskId,
+          id: taskId,
           status: "ACCEPTED",
         };
 

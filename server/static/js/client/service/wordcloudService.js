@@ -8,8 +8,6 @@ class WordcloudService {
         this.eventBus = eventBus;
         this.store = store;
         this.playerService = playerService;
-        this.playerId = this.playerService.getPlayerId();
-        this.playerData = null;
         this.wordCloudChart = null;
         this.initialized = false;
         
@@ -95,7 +93,7 @@ class WordcloudService {
             this.wordCloudChart = echarts.init(container);
             
             // 从后端获取勋章数据
-            const response = await this.api.request('/api/wordcloud');
+            const response = await this.api.getWordCloud(this.playerService.getPlayerId());
             if (response.code === 0 && response.data) {
                 // 转换数据格式
                 const wordCloudData = this.transformMedalsToWordCloudData(response.data);
@@ -147,7 +145,7 @@ class WordcloudService {
                 return;
             }
 
-            const response = await this.api.get('/api/wordcloud');
+            const response = await this.api.getWordCloud(this.playerService.getPlayerId());
             if (response.code === 0 && response.data) {
                 const wordCloudData = this.transformMedalsToWordCloudData(response.data);
                 this.wordCloudChart.setOption({
@@ -170,6 +168,7 @@ class WordcloudService {
         try {
             if (this.initialized) {
                 Logger.info('WordcloudService', '服务已经初始化');
+                this.updateWordCloud();
                 return;
             }
 

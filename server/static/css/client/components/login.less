@@ -1,35 +1,80 @@
+// out: false
 /* 登录弹窗样式 */
 .login-dialog {
-    padding: 20px;
+    padding: 30px;
+    background: rgba(15, 25, 45, 0.95);
+    border-radius: 12px;
+    color: #fff;
+    max-width: 600px;
+    margin: 0 auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .login-form {
-    max-width: 600px;
-    margin: 0 auto;
+    // 隐藏原始的layui radio样式
+    .layui-form-radio {
+        display: none !important;
+    }
+    
+    .layui-form-label {
+        color: #fff;
+        font-weight: 500;
+    }
+
+    .layui-input-block {
+        margin-left: 110px;
+    }
+
+    .layui-input {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border-radius: 6px;
+        height: 40px;
+        transition: all 0.3s ease;
+
+        &:focus {
+            border-color: #2196F3;
+            background: rgba(33, 150, 243, 0.1);
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+        }
+
+        &::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+    }
 }
 
 /* 玩家选择容器样式 */
 .player-type-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
-    padding: 10px 0;
+    gap: 15px;
+    padding: 15px 0;
+    justify-content: flex-start;
 }
 
 /* 复用卡片风格的单选框样式 */
 .lay-skin-taskcard {
-    display: flex;
-    padding: 12px;
-    border-radius: 4px;
-    border: 2px solid #e5e5e5;
-    color: #000;
-    background-color: #fff;
-    transition: all .3s;
+    display: flex !important;
+    padding: 15px;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
     cursor: pointer;
     position: relative;
-    width: 120px;
+    width: 140px;
     text-align: center;
-    margin: 5px;
+    margin: 0;
+
+    &:hover {
+        border-color: #2196F3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
+        background: rgba(33, 150, 243, 0.1);
+    }
 }
 
 .lay-skin-taskcard-detail {
@@ -37,57 +82,99 @@
 }
 
 .lay-skin-taskcard-header {
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 500;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
     padding: 5px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    .layui-icon {
+        font-size: 20px;
+        color: #2196F3;
+    }
 }
 
 .lay-skin-taskcard-description {
-    font-size: 12px;
-    color: #666;
-}
-
-/* 悬停效果 */
-.lay-skin-taskcard:hover {
-    border-color: #2196F3;
-    transform: translateY(-2px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
 }
 
 /* 选中状态样式 */
 .lay-skin-taskcard.selected {
-    color: #fff;
     border-color: #2196F3;
-    background-color: rgb(33 150 243 / 10%);
+    background: rgba(33, 150, 243, 0.15);
     transform: translateY(-2px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
 
-/* 选中状态的角标样式 */
-.lay-skin-taskcard.selected:after {
-    position: absolute;
-    content: "";
-    bottom: 2px;
-    right: 2px;
-    width: 0;
-    height: 0;
-    display: inline-block;
-    vertical-align: middle;
-    border: 10px solid transparent;
-    border-radius: 0 0 6px 0;
-    border-right-color: #2196F3;
-    border-bottom-color: #2196F3;
-    overflow: hidden;
+    &:after {
+        content: "";
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        width: 0;
+        height: 0;
+        border: 10px solid transparent;
+        border-radius: 0 0 6px 0;
+        border-right-color: #2196F3;
+        border-bottom-color: #2196F3;
+    }
+
+    .layui-icon {
+        color: #fff;
+    }
 }
 
 /* 隐藏原始的radio按钮 */
 input[type="radio"][lay-skin="none"] {
-    display: none;
+    position: absolute;
+    opacity: 0;
+    z-index: -1;
+}
+
+/* 表单按钮样式 */
+.layui-form-item {
+    margin-bottom: 25px;
+
+    .layui-btn {
+        height: 44px;
+        line-height: 44px;
+        padding: 0 35px;
+        font-size: 16px;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+        
+        &:not(.layui-btn-primary) {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            border: none;
+            
+            &:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+            }
+        }
+        
+        &.layui-btn-primary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            
+            &:hover {
+                background: rgba(255, 255, 255, 0.15);
+                border-color: rgba(255, 255, 255, 0.3);
+            }
+        }
+    }
 }
 
 /* 响应式布局调整 */
 @media screen and (max-width: 768px) {
+    .login-dialog {
+        padding: 20px;
+    }
+
     .player-type-container {
         justify-content: center;
     }
@@ -95,15 +182,23 @@ input[type="radio"][lay-skin="none"] {
     .lay-skin-taskcard {
         width: calc(50% - 20px);
     }
+
+    .layui-form-label {
+        padding: 9px 0;
+    }
+
+    .layui-input-block {
+        margin-left: 0 !important;
+    }
 }
 
-/* 密码输入框样式优化 */
-.form-group {
-    margin-bottom: 20px;
-}
-
+/* 表单提示信息样式 */
 .form-tips {
     color: #ff5722;
     margin-top: 10px;
     text-align: center;
+    font-size: 14px;
+    padding: 8px;
+    background: rgba(255, 87, 34, 0.1);
+    border-radius: 4px;
 }
