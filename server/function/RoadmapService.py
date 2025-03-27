@@ -292,6 +292,12 @@ class RoadmapService:
     def sync_data(self):
         """提供数据同步接口（仅在生产环境可用）"""
         conn = None
+        # 记录请求信息，用于调试
+        print("\n[Sync] ==== 收到同步请求 ====")
+        print(f"[Sync] 远程地址: {request.remote_addr}")
+        print(f"[Sync] 请求方法: {request.method}")
+        print(f"[Sync] 请求路径: {request.path}")
+        print(f"[Sync] 请求头: {dict(request.headers)}")
         if ENV != 'prod':
             return json.dumps({
                 'code': 403,
@@ -303,6 +309,7 @@ class RoadmapService:
             # 验证API密钥
             api_key = request.headers.get('X-API-Key')
             if not api_key or api_key != PROD_SERVER['API_KEY']:
+                print(f"[Sync] API密钥验证失败: 收到 {api_key}, 期望 {PROD_SERVER['API_KEY']}")
                 return json.dumps({
                     'code': 401,
                     'msg': 'API密钥无效',
@@ -311,6 +318,7 @@ class RoadmapService:
 
             # 获取上次同步时间
             last_sync_time = int(request.headers.get('X-Sync-Time', 0))
+            print(f"[Sync] 收到同步请求，上次同步时间: {last_sync_time}")
             
             # 获取数据库连接
             conn = self.get_db()

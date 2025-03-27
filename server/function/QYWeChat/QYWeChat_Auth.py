@@ -101,65 +101,65 @@ class QYWeChatAuth:
         返回msg字段的明文内容
         """
         try:
-            logger.info(f"[QYWeChatAuth] ============ 消息解密开始 ============")
-            logger.info(f"[QYWeChatAuth] 待解密的消息: {encrypted_msg}")
+            # logger.info(f"[QYWeChatAuth] ============ 消息解密开始 ============")
+            # logger.info(f"[QYWeChatAuth] 待解密的消息: {encrypted_msg}")
             
             # 1. Base64解码
             encrypted_data = base64.b64decode(encrypted_msg)
-            logger.info(f"[QYWeChatAuth] Base64解码后数据长度: {len(encrypted_data)} 字节")
-            logger.info(f"[QYWeChatAuth] Base64解码后数据(hex): {encrypted_data.hex()}")
+            # logger.info(f"[QYWeChatAuth] Base64解码后数据长度: {len(encrypted_data)} 字节")
+            # logger.info(f"[QYWeChatAuth] Base64解码后数据(hex): {encrypted_data.hex()}")
             
             # 2. AES解密
             key = base64.b64decode(self.encoding_aes_key + '=')
             cipher = AES.new(key, AES.MODE_CBC, iv=key[:16])
             decrypted_data = cipher.decrypt(encrypted_data)
-            logger.info(f"[QYWeChatAuth] AES解密后数据长度: {len(decrypted_data)} 字节")
-            logger.info(f"[QYWeChatAuth] AES解密后数据(hex): {decrypted_data.hex()}")
+            # logger.info(f"[QYWeChatAuth] AES解密后数据长度: {len(decrypted_data)} 字节")
+            # logger.info(f"[QYWeChatAuth] AES解密后数据(hex): {decrypted_data.hex()}")
             
             # 3. 处理PKCS7填充
             pad = decrypted_data[-1]
             if not isinstance(pad, int):
                 pad = ord(pad)
             content = decrypted_data[:-pad]
-            logger.info(f"[QYWeChatAuth] 去除PKCS7填充后数据长度: {len(content)} 字节")
-            logger.info(f"[QYWeChatAuth] 去除填充后数据(hex): {content.hex()}")
+            # logger.info(f"[QYWeChatAuth] 去除PKCS7填充后数据长度: {len(content)} 字节")
+            # logger.info(f"[QYWeChatAuth] 去除填充后数据(hex): {content.hex()}")
             
             # 4. 解析数据结构
-            logger.info(f"[QYWeChatAuth] -------- 解密后数据结构解析 --------")
+            # logger.info(f"[QYWeChatAuth] -------- 解密后数据结构解析 --------")
             
             # a) 16字节随机字符串(random)
             random_str = content[:16]
-            logger.info(f"[QYWeChatAuth] [字段1] random (16字节): {random_str.hex()}")
+            # logger.info(f"[QYWeChatAuth] [字段1] random (16字节): {random_str.hex()}")
             
             # b) 4字节消息长度(msg_len)
             msg_len = struct.unpack('>I', content[16:20])[0]
-            logger.info(f"[QYWeChatAuth] [字段2] msg_len (4字节): {msg_len}")
+            # logger.info(f"[QYWeChatAuth] [字段2] msg_len (4字节): {msg_len}")
             
             # c) 消息内容(msg)
             msg_content = content[20:20+msg_len]
             try:
                 msg_text = msg_content.decode('utf-8')
-                logger.info(f"[QYWeChatAuth] [字段3] msg (消息内容): {msg_text}")
+                # logger.info(f"[QYWeChatAuth] [字段3] msg (消息内容): {msg_text}")
             except UnicodeDecodeError:
                 logger.info(f"[QYWeChatAuth] [字段3] msg (消息内容,hex): {msg_content.hex()}")
             
             # d) 企业ID(receiveid)
             receiveid = content[20+msg_len:].decode('utf-8')
-            logger.info(f"[QYWeChatAuth] [字段4] receiveid (企业ID): {receiveid}")
-            logger.info(f"[QYWeChatAuth] [字段4] 配置的企业ID: {self.corp_id}")
-            logger.info(f"[QYWeChatAuth] --------------------------------")
+            # logger.info(f"[QYWeChatAuth] [字段4] receiveid (企业ID): {receiveid}")
+            # logger.info(f"[QYWeChatAuth] [字段4] 配置的企业ID: {self.corp_id}")
+            # logger.info(f"[QYWeChatAuth] --------------------------------")
             
             # 5. 验证企业ID
             if receiveid != self.corp_id:
-                logger.error(f"[QYWeChatAuth] 企业ID不匹配")
-                logger.error(f"[QYWeChatAuth] - 接收到的企业ID: {receiveid}")
-                logger.error(f"[QYWeChatAuth] - 配置的企业ID: {self.corp_id}")
+                # logger.error(f"[QYWeChatAuth] 企业ID不匹配")
+                # logger.error(f"[QYWeChatAuth] - 接收到的企业ID: {receiveid}")
+                # logger.error(f"[QYWeChatAuth] - 配置的企业ID: {self.corp_id}")
                 logger.error(f"[QYWeChatAuth] ============ 消息解密失败 ============")
                 raise ValueError(f"企业ID不匹配: {receiveid} != {self.corp_id}")
             
             # 6. 返回消息内容
-            logger.info(f"[QYWeChatAuth] 解密成功，返回消息内容: {msg_text}")
-            logger.info(f"[QYWeChatAuth] ============ 消息解密结束 ============")
+            # logger.info(f"[QYWeChatAuth] 解密成功，返回消息内容: {msg_text}")
+            # logger.info(f"[QYWeChatAuth] ============ 消息解密结束 ============")
             return msg_text
                 
         except Exception as e:
@@ -170,36 +170,36 @@ class QYWeChatAuth:
     def encrypt_message(self, reply_msg):
         """加密消息"""
         try:
-            logger.info(f"[QYWeChatAuth] ============ 消息加密开始 ============")
-            logger.info(f"[QYWeChatAuth] 待加密的消息: {reply_msg}")
+            # logger.info(f"[QYWeChatAuth] ============ 消息加密开始 ============")
+            # logger.info(f"[QYWeChatAuth] 待加密的消息: {reply_msg}")
             
             # 生成16位随机字符串
             random_str = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
-            logger.info(f"[QYWeChatAuth] 生成的随机字符串: {random_str}")
+            # logger.info(f"[QYWeChatAuth] 生成的随机字符串: {random_str}")
             
             # 生成密文
             msg_len = struct.pack('!I', len(reply_msg.encode('utf-8')))
             text = random_str.encode('utf-8') + msg_len + reply_msg.encode('utf-8') + self.corp_id.encode('utf-8')
-            logger.info(f"[QYWeChatAuth] 拼接后的数据(hex): {text.hex()}")
+            # logger.info(f"[QYWeChatAuth] 拼接后的数据(hex): {text.hex()}")
             
             # 补位
             pad_num = 32 - (len(text) % 32)
             text += bytes([pad_num] * pad_num)
-            logger.info(f"[QYWeChatAuth] PKCS7填充后数据长度: {len(text)} 字节")
-            logger.info(f"[QYWeChatAuth] 填充后数据(hex): {text.hex()}")
+            # logger.info(f"[QYWeChatAuth] PKCS7填充后数据长度: {len(text)} 字节")
+            # logger.info(f"[QYWeChatAuth] 填充后数据(hex): {text.hex()}")
             
             # 创建加密器
             cipher = self._create_cipher()
             
             # AES加密
             encrypted_text = cipher.encrypt(text)
-            logger.info(f"[QYWeChatAuth] AES加密后数据长度: {len(encrypted_text)} 字节")
-            logger.info(f"[QYWeChatAuth] AES加密后数据(hex): {encrypted_text.hex()}")
+            # logger.info(f"[QYWeChatAuth] AES加密后数据长度: {len(encrypted_text)} 字节")
+            # logger.info(f"[QYWeChatAuth] AES加密后数据(hex): {encrypted_text.hex()}")
             
             # Base64编码
             base64_text = base64.b64encode(encrypted_text).decode('utf-8')
-            logger.info(f"[QYWeChatAuth] Base64编码后: {base64_text}")
-            logger.info(f"[QYWeChatAuth] ============ 消息加密结束 ============")
+            # logger.info(f"[QYWeChatAuth] Base64编码后: {base64_text}")
+            # logger.info(f"[QYWeChatAuth] ============ 消息加密结束 ============")
             
             return base64_text
             

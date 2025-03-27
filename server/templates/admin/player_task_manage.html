@@ -212,6 +212,8 @@
                 IN_PROGRESS: '<span class="layui-badge layui-bg-orange">进行中</span>',
                 COMPLETED: '<span class="layui-badge layui-bg-green">已完成</span>',
                 UNFINISH: '<span class="layui-badge layui-bg-black">未完成</span>',
+                CHECK: '<span class="layui-badge layui-bg-orange">待检查</span>',
+                REJECT: '<span class="layui-badge layui-bg-red">已驳回</span>',
                 ABANDONED: '<span class="layui-badge layui-bg-red">已放弃</span>',
               };
               return statusMap[d.status] || d.status;
@@ -327,6 +329,9 @@
                                     <option value="available" ${data.status === "available" ? "selected" : ""}>可用</option>
                                     <option value="IN_PROGRESS" ${data.status === "IN_PROGRESS" ? "selected" : ""}>进行中</option>
                                     <option value="COMPLETED" ${data.status === "COMPLETED" ? "selected" : ""}>已完成</option>
+                                    <option value="CHECK" ${data.status === "CHECK" ? "selected" : ""}>待检查</option>
+                                    <option value="REJECT" ${data.status === "REJECT" ? "selected" : ""}>已驳回</option>
+                                    <option value="ABANDONED" ${data.status === "ABANDONED" ? "selected" : ""}>已放弃</option>
                                 </select>
                             </div>
                         </div>

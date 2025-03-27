@@ -5,7 +5,7 @@
 import logging
 import time
 from collections import defaultdict
-from config.config import SECURITY
+from config.config import SECURITY, PROD_SERVER
 from flask import request, jsonify
 from utils.response_handler import ResponseHandler, StatusCode
 
@@ -28,53 +28,109 @@ class RateLimitService:
             
     def _clean_old_requests(self, ip):
         """清理过期的请求记录"""
+        if ip not in self.request_counts:
+            self.request_counts[ip] = []
+            return
+            
         now = time.time()
         window = SECURITY['rate_limit']['window']
-        self.request_counts[ip] = [
-            (ts, count) for ts, count in self.request_counts[ip]
-            if now - ts < window
-        ]
+        cutoff = now - window
         
-    def check_rate_limit(self, ip):
-        """检查是否超过速率限制"""
-        if not SECURITY['rate_limit']['enabled']:
-            return True
+        # 保留最近 window 秒内的记录
+        self.request_counts[ip] = [t for t in self.request_counts[ip] if t > cutoff]
+        
+    def is_enabled(self):
+        """检查速率限制是否启用"""
+        return SECURITY['rate_limit']['enabled']
+        
+    def check_rate_limit(self, request):
+        """
+        检查请求是否超过速率限制
+        
+        Args:
+            request: Flask 请求对象
+        
+        Returns:
+            如果超过限制，返回 429 响应；否则返回 None
+        """
+        if not self.is_enabled() or request.method == 'OPTIONS':
+            return None
+        
+        # 获取客户端 IP
+        client_ip = request.remote_addr
+        
+        # 检查白名单
+        if client_ip in SECURITY.get('white_ips', []):
+            return None
+            
+        # 检查是否有效的API密钥
+        api_key = request.headers.get('X-API-Key')
+        if api_key and api_key == PROD_SERVER['API_KEY']:
+            return None
+        
+        # 获取当前时间
+        current_time = int(time.time())
+        
+        # 获取该 IP 的请求记录
+        if client_ip not in self.request_counts:
+            self.request_counts[client_ip] = []
+        
+        # 清理过期的请求记录
+        window_start = current_time - SECURITY['rate_limit']['window']
+        self.request_counts[client_ip] = [t for t in self.request_counts[client_ip] if t >= window_start]
+        
+        # 检查是否超过限制
+        if len(self.request_counts[client_ip]) >= SECURITY['rate_limit']['limit']:
+            # 超过限制，返回 429 响应
+            logger.warning(f"IP {client_ip} 请求过于频繁，已被限制")
+            return jsonify({
+                'code': 429,
+                'msg': '请求过于频繁，请稍后再试'
+            }), 429
+        
+        # 记录本次请求
+        self.request_counts[client_ip].append(current_time)
+        
+        # 未超过限制，返回 None
+        return None
+        
+    def get_remaining_requests(self, ip):
+        """获取剩余请求数量"""
+        if not self.is_enabled():
+            return None
             
         self._clean_old_requests(ip)
         
         now = time.time()
-        current_count = sum(count for _, count in self.request_counts[ip])
+        current_count = sum(1 for t in self.request_counts[ip] if t > now - SECURITY['rate_limit']['window'])
         
-        if current_count >= SECURITY['rate_limit']['limit']:
-            logger.warning(f"IP {ip} 超过速率限制")
-            return False
-            
-        # 添加新的请求记录
-        self.request_counts[ip].append((now, 1))
-        return True
+        return SECURITY['rate_limit']['limit'] - current_count
         
-    def get_remaining_requests(self, ip):
-        """获取剩余可用请求数"""
-        if not SECURITY['rate_limit']['enabled']:
-            return float('inf')
-            
-        self._clean_old_requests(ip)
-        current_count = sum(count for _, count in self.request_counts[ip])
-        return max(0, SECURITY['rate_limit']['limit'] - current_count)
+    def handle_rate_limit(self, request):
+        """处理速率限制
         
-    def handle_rate_limit(self):
-        """处理速率限制检查"""
-        ip = request.remote_addr
-        if ip in SECURITY['white_ips']:
+        Returns:
+            如果超过限制，返回错误响应；否则返回 None
+        """
+        if not self.is_enabled():
             return None
-        if not self.check_rate_limit(ip):
-            response = jsonify(ResponseHandler.error(
-                code=StatusCode.FORBIDDEN,
-                msg="请求过于频繁，请稍后再试"
-            ))
-            response.status_code = 429
-            return response
             
+        if request.path.startswith(('/static/', '/.well-known/')):
+            return None
+            
+        client_ip = request.remote_addr
+        
+        # 检查白名单
+        if client_ip in SECURITY.get('white_ips', []):
+            return None
+            
+        # 检查是否超过速率限制
+        limit_result = self.check_rate_limit(request)
+        if limit_result is not None:
+            # 已在 check_rate_limit 中返回了响应
+            return limit_result
+            
+        # 未超过限制
         return None
 
 # 创建速率限制服务实例

@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-02-04 23:29:47
-# LastEditTime: 2025-03-21 22:59:05
+# LastEditTime: 2025-03-27 21:03:16
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -83,13 +83,18 @@ class PlayerService:
             # 直接比较加密后的密码字符串
             if player[2] == password:  # 前端已经用相同的方式加密
                 # 设置session
+                session.clear()  # 先清除现有session
                 session['is_player'] = True
                 session['player_id'] = player[0]
                 session['player_name'] = player[1]
                 session['level'] = player[3]
                 session['points'] = player[4]
+                session.permanent = True  # 设置为持久 session
                 
-                logger.info(f"玩家 {player[1]} 登录成功")
+                # 确保 session 被保存
+                session.modified = True
+                
+                logger.info(f"玩家 {player[1]} 登录成功，设置 session: {dict(session)}")
                 return ResponseHandler.success(
                     data={
                         "player_id": player[0],
@@ -150,12 +155,23 @@ class PlayerService:
         """玩家认证装饰器"""
         @wraps(f)
         def decorated_function(*args, **kwargs):
+            logger.info(f"检查玩家认证: 路径={request.path}, session={dict(session)}")
+            
             if not session.get('is_player'):
+                # 记录诊断信息
+                from flask import current_app
                 logger.warning(f"未授权访问: {request.path}")
+                logger.warning(f"当前Session: {dict(session)}")
+                logger.warning(f"当前Cookies: {request.cookies}")
+                logger.warning(f"Session配置: name={current_app.config.get('SESSION_COOKIE_NAME')}, domain={current_app.config.get('SESSION_COOKIE_DOMAIN')}, secure={current_app.config.get('SESSION_COOKIE_SECURE')}")
+                
                 return ResponseHandler.error(
                     code=StatusCode.UNAUTHORIZED,
                     msg="需要玩家登录"
                 )
+            
+            # 记录成功授权
+            logger.info(f"已授权访问: {request.path}, 玩家ID={session.get('player_id')}")
             return f(*args, **kwargs)
         return decorated_function
 

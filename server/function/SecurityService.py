@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-03-11 11:46:01
-# LastEditTime: 2025-03-11 21:35:17
+# LastEditTime: 2025-03-27 22:10:12
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -14,7 +14,7 @@
 """
 import logging
 from flask import request, jsonify
-from config.config import SECURITY
+from config.config import SECURITY, PROD_SERVER
 from utils.response_handler import ResponseHandler, StatusCode
 
 logger = logging.getLogger(__name__)
@@ -60,10 +60,20 @@ class SecurityService:
         return False
         
     def check_user_agent(self):
-        """检查User-Agent"""
+        """检查User-Agent
+        
+        如果请求包含有效的API密钥，则跳过用户代理检查
+        """
         if not self.is_security_enabled():
             return True
-            
+        
+        # 检查是否有有效的API密钥（用于自动化工具和API客户端）
+        api_key = request.headers.get('X-API-KEY')
+        if api_key and api_key == PROD_SERVER['API_KEY']:
+            # API密钥有效，允许请求通过
+            print(f"[Security] 检测到有效的API密钥，跳过用户代理检查")
+            return True
+        
         user_agent = request.headers.get('User-Agent', '').lower()
         blocked_agents = ['zgrab', 'python-requests', 'curl', 'wget', 'postman']
         
@@ -114,18 +124,23 @@ class SecurityService:
         if not self.is_security_enabled():
             return None
             
-        if not self.check_user_agent():
+        # 检查用户代理，如果不通过直接返回响应
+        user_agent_check = self.check_user_agent()
+        if user_agent_check is not True:  # 确保不会返回布尔值
             return jsonify({
                 'code': 403,
-                'msg': 'Forbidden'
+                'msg': 'Forbidden: Invalid User-Agent'
             }), 403
             
-        if not self.check_path_injection():
+        # 检查路径注入，如果不通过直接返回响应
+        path_check = self.check_path_injection()
+        if path_check is not True:  # 确保不会返回布尔值
             return jsonify({
                 'code': 400,
-                'msg': 'Bad Request'
+                'msg': 'Bad Request: Invalid Path'
             }), 400
             
+        # 检查通过，返回 None（表示继续处理请求）
         return None
 
 # 创建安全服务实例

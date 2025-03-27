@@ -148,11 +148,32 @@ class WordcloudService {
             const response = await this.api.getWordCloud(this.playerService.getPlayerId());
             if (response.code === 0 && response.data) {
                 const wordCloudData = this.transformMedalsToWordCloudData(response.data);
-                this.wordCloudChart.setOption({
+                // 设置词云配置项
+                const option = {
+                    tooltip: {
+                        show: true
+                    },
                     series: [{
+                        type: 'wordCloud',
+                        shape: 'circle',         // 词云形状
+                        sizeRange: [12, 60],     // 字体大小范围
+                        rotationRange: [-45, 45], // 旋转角度范围
+                        gridSize: 8,             // 网格大小
+                        drawOutOfBound: false,   // 是否允许词语超出边界
+                        layoutAnimation: true,    // 启用布局动画
+                        textStyle: {
+                            fontFamily: 'sans-serif',
+                            fontWeight: 'bold'
+                        },
+                        emphasis: {
+                            focus: 'self'
+                        },
                         data: wordCloudData
                     }]
-                });
+                };
+
+                // 应用配置
+                this.wordCloudChart.setOption(option);
                 Logger.debug('文字云更新完成');
             }
         } catch (error) {

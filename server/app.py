@@ -19,23 +19,10 @@ from functools import wraps
 import time as time_module
 import threading
 from datetime import datetime, time, timedelta
-from admin import admin_bp
 import os
 import sqlite3
 import logging
-from flask_socketio import SocketIO, emit, join_room, leave_room
-from flask_cors import CORS
 from flask import Flask, request, redirect, send_from_directory, make_response, render_template, jsonify, session
-from shop import shop_bp  # 确保在同一目录下
-from function.PlayerService import player_service
-from function.TaskService import task_service
-from function.GPSService import gps_service
-from function.RoadmapService import roadmap_service
-from function.WeChatService import wechat_service
-from utils.LogService import log_service  # 导入日志服务
-from function.SchedulerService import scheduler_service  # 导入调度器服务
-from function.ServerService import server_service  # 导入服务器管理服务
-from function.WebSocketService import websocket_service
 from config.config import (
     SERVER_IP, 
     PORT, 
@@ -53,6 +40,30 @@ from config.config import (
     SECURITY,
     DOMAIN
 )
+
+# 首先导入服务器管理服务
+from function.ServerService import server_service  # 导入服务器管理服务
+from utils.LogService import log_service  # 导入日志服务
+
+# 创建 Flask 应用实例
+app = Flask(__name__, static_folder='static')
+
+# 立即应用服务器配置
+app = server_service.configure_app(app)
+logger = log_service.setup_logging(DEBUG)
+
+# 导入其他依赖
+from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask_cors import CORS
+from admin import admin_bp
+from shop import shop_bp  # 确保在同一目录下
+from function.PlayerService import player_service
+from function.TaskService import task_service
+from function.GPSService import gps_service
+from function.RoadmapService import roadmap_service
+from function.WeChatService import wechat_service
+from function.SchedulerService import scheduler_service  # 导入调度器服务
+from function.WebSocketService import websocket_service
 from config.private import AMAP_SECURITY_JS_CODE, WECHAT_TOKEN, WECHAT_ENCODING_AES_KEY, WECHAT_APP_ID
 import requests
 from function.NotificationService import notification_service
@@ -62,86 +73,15 @@ from utils.response_handler import ResponseHandler, StatusCode, api_response
 from wechat import wechat_bp  # 导入微信蓝图
 from function.SecurityService import security_service
 from function.RateLimitService import rate_limit_service
+from lxml import etree
 
-# 初始化日志
-logger = log_service.setup_logging(DEBUG)
+# 初始化 Flask 应用设置
+logger.info(f"Flask应用初始化完成，Session配置: {app.config.get('SESSION_COOKIE_NAME')}, {app.config.get('SESSION_COOKIE_DOMAIN')}, {app.config.get('SESSION_COOKIE_SECURE')}")
 
-app = Flask(__name__, static_folder='static')
-
-# 添加Cloudflare代理支持
-if CLOUDFLARE['enabled']:
-    from werkzeug.middleware.proxy_fix import ProxyFix
-    app.wsgi_app = ProxyFix(
-        app.wsgi_app,
-        x_for=CLOUDFLARE['headers']['X-Forwarded-For'],
-        x_proto=CLOUDFLARE['headers']['X-Forwarded-Proto'],
-        x_host=CLOUDFLARE['headers']['X-Forwarded-Host'],
-        x_port=CLOUDFLARE['headers']['X-Forwarded-Port'],
-        x_prefix=CLOUDFLARE['headers']['X-Forwarded-Prefix']
-    )
-    
-    # 只在非本地环境且需要强制 HTTPS 时添加 SchemeEnforcingMiddleware
-    if ENV != 'local' and (HTTPS_ENABLED or CLOUDFLARE['flexible_ssl']):
-        class SchemeEnforcingMiddleware:
-            def __init__(self, app):
-                self.app = app
-
-            def __call__(self, environ, start_response):
-                environ['wsgi.url_scheme'] = 'https'
-                return self.app(environ, start_response)
-
-        app.wsgi_app = SchemeEnforcingMiddleware(app.wsgi_app)
-
-# 优化应用配置
-app.config.update(
-
-    MAX_CONTENT_LENGTH=50 * 1024 * 1024,  # 最大请求体大小50MB
-    JSONIFY_PRETTYPRINT_REGULAR=False,  # 禁用JSON美化
-    JSON_SORT_KEYS=False,  # 禁用JSON键排序
-    PROPAGATE_EXCEPTIONS=True,  # 传播异常
-    TRAP_HTTP_EXCEPTIONS=True,  # 捕获HTTP异常
-    TRAP_BAD_REQUEST_ERRORS=True,  # 捕获错误请求
-    # 根据环境设置默认 scheme
-    PREFERRED_URL_SCHEME='http' if ENV == 'local' and not HTTPS_ENABLED else 'https',
-    # 根据环境设置 cookie 安全性
-    SESSION_COOKIE_SECURE=ENV != 'local' or HTTPS_ENABLED,
-    SESSION_COOKIE_HTTPONLY=True,  # 防止JavaScript访问cookie
-    SESSION_COOKIE_SAMESITE='Lax',  # 设置SameSite属性
-    # Session配置
-    SESSION_COOKIE_NAME='earthonline_session',
-    PERMANENT_SESSION_LIFETIME=timedelta(days=7),  # session有效期7天
-    # 如果使用IP访问，不要强制HTTPS
-    SESSION_COOKIE_DOMAIN=None if ENV == 'local' else DOMAIN,
-)
-
-# 配置CORS允许所有来源
-CORS(app, resources={
-    r"/*": {
-        "origins": "*",
-        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "supports_credentials": True,
-        "max_age": 3600  # 预检请求缓存1小时
-    }
-})
-
-# 获取项目根目录
-if getattr(sys, 'frozen', False):
-    # 如果是打包后的可执行文件
-    project_root = os.path.dirname(sys.executable)
-else:
-    # 如果是直接运行Python脚本
-    project_root = os.path.dirname(os.path.abspath(__file__))
-
-# 数据库路径
-DB_PATH = os.path.join(os.path.dirname(__file__), 'database', 'game.db')
-
-app.secret_key = '00000000000000000000000000000000'  # 设置session密钥
+# 注册蓝图
 app.register_blueprint(admin_bp, url_prefix='/admin')
-
-# 注册商店蓝图
 app.register_blueprint(shop_bp)
-app.register_blueprint(wechat_bp, url_prefix='/wechat')  # 注册微信蓝图
+app.register_blueprint(wechat_bp, url_prefix='/wechat')
 
 # 初始化WebSocket服务
 websocket_service.init_app(app)
@@ -940,7 +880,178 @@ def get_game_card(game_card_id):
     """获取单个道具卡信息"""
     return game_card_service.get_game_card(game_card_id)
 
-# 全局错误处理
+@app.route('/api/task/approval/status', methods=['GET'])
+@player_service.player_required
+@api_response
+def get_task_approval_status():
+    """获取任务审批状态"""
+    try:
+        task_id = request.args.get('task_id')
+        player_id = request.args.get('player_id')
+        
+        if not task_id or not player_id:
+            return ResponseHandler.error(
+                code=StatusCode.PARAM_ERROR,
+                msg='缺少必要参数: task_id 或 player_id'
+            )
+            
+        # 转换为整数类型
+        try:
+            task_id = int(task_id)
+            player_id = int(player_id)
+        except ValueError:
+            return ResponseHandler.error(
+                code=StatusCode.PARAM_ERROR,
+                msg='参数类型错误: task_id 和 player_id 必须为整数'
+            )
+            
+        logger.info(f"[TaskApprovalAPI] 获取任务审批状态 - 玩家ID: {player_id}, 任务ID: {task_id}")
+        result = task_service.get_task_approval_status(task_id, player_id)
+        return result
+        
+    except Exception as e:
+        logger.error(f"[TaskApprovalAPI] 获取任务审批状态失败: {str(e)}", exc_info=True)
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=f'获取任务审批状态失败: {str(e)}'
+        )
+
+@app.route('/api/task/approval/sync', methods=['POST'])
+@player_service.player_required
+@api_response
+def sync_task_approval_status():
+    """同步任务审批状态"""
+    try:
+        # 获取请求数据
+        data = request.get_json()
+        if not data:
+            return ResponseHandler.error(
+                code=StatusCode.PARAM_ERROR,
+                msg='请求数据为空'
+            )
+            
+        # 检查必要参数
+        required_fields = ['task_id', 'player_id']
+        for field in required_fields:
+            if field not in data:
+                return ResponseHandler.error(
+                    code=StatusCode.PARAM_ERROR,
+                    msg=f'缺少必要参数: {field}'
+                )
+                
+        task_id = data['task_id']
+        player_id = data['player_id']
+        
+        logger.info(f"[TaskApprovalAPI] 同步任务审批状态 - 玩家ID: {player_id}, 任务ID: {task_id}")
+        result = task_service.sync_approval_status(task_id, player_id)
+        return result
+        
+    except Exception as e:
+        logger.error(f"[TaskApprovalAPI] 同步任务审批状态失败: {str(e)}", exc_info=True)
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=f'同步任务审批状态失败: {str(e)}'
+        )
+
+@app.route('/api/test_session', methods=['GET'])
+@api_response
+def test_session():
+    """测试 session 是否正常工作"""
+    from flask import current_app
+    # 设置测试值
+    if 'test_count' not in session:
+        session['test_count'] = 1
+    else:
+        session['test_count'] += 1
+    session.modified = True
+    
+    # 收集状态信息
+    return {
+        'session_data': dict(session),
+        'is_logged_in': bool(session.get('is_player', False)),
+        'request_info': {
+            'remote_addr': request.remote_addr,
+            'host': request.host,
+            'cookies': {k: v for k, v in request.cookies.items()},
+            'user_agent': request.headers.get('User-Agent', ''),
+            'method': request.method,
+            'path': request.path
+        },
+        'session_config': {
+            'cookie_name': current_app.config.get('SESSION_COOKIE_NAME'),
+            'cookie_domain': current_app.config.get('SESSION_COOKIE_DOMAIN'),
+            'cookie_secure': current_app.config.get('SESSION_COOKIE_SECURE'),
+            'cookie_httponly': current_app.config.get('SESSION_COOKIE_HTTPONLY'),
+            'cookie_samesite': current_app.config.get('SESSION_COOKIE_SAMESITE'),
+            'permanent_lifetime': str(current_app.config.get('PERMANENT_SESSION_LIFETIME'))
+        }
+    }
+
+@app.route('/debug_session', methods=['GET'])
+def debug_session():
+    """查看和修复当前 session"""
+    # 当前 session 状态
+    current_session = dict(session)
+    
+    # 请求信息
+    request_info = {
+        'remote_addr': request.remote_addr,
+        'host': request.host,
+        'user_agent': request.headers.get('User-Agent'),
+        'referrer': request.referrer,
+        'cookies': {k: v for k, v in request.cookies.items()}
+    }
+    
+    # Flask 配置信息
+    config_info = {
+        'SESSION_COOKIE_DOMAIN': app.config.get('SESSION_COOKIE_DOMAIN'),
+        'SESSION_COOKIE_SECURE': app.config.get('SESSION_COOKIE_SECURE'),
+        'SESSION_COOKIE_HTTPONLY': app.config.get('SESSION_COOKIE_HTTPONLY'),
+        'SESSION_COOKIE_SAMESITE': app.config.get('SESSION_COOKIE_SAMESITE'),
+        'SESSION_COOKIE_PATH': app.config.get('SESSION_COOKIE_PATH'),
+        'SECRET_KEY_SET': bool(app.secret_key)
+    }
+    
+    # 创建简单的 HTML 页面
+    html = f"""
+    <html>
+    <head><title>Session Debug</title></head>
+    <body>
+        <h2>当前 Session:</h2>
+        <pre>{json.dumps(current_session, indent=4)}</pre>
+        
+        <h2>请求信息:</h2>
+        <pre>{json.dumps(request_info, indent=4)}</pre>
+        
+        <h2>配置信息:</h2>
+        <pre>{json.dumps(config_info, indent=4)}</pre>
+        
+        <h2>操作:</h2>
+        <form method="post" action="/set_test_session">
+            <button type="submit">设置测试 Session</button>
+        </form>
+        <form method="post" action="/clear_session">
+            <button type="submit">清除 Session</button>
+        </form>
+    </body>
+    </html>
+    """
+    
+    return html
+
+@app.route('/set_test_session', methods=['POST'])
+def set_test_session():
+    """设置测试 session 数据"""
+    session['test_value'] = 'test_' + str(time_module.time())
+    session.modified = True
+    return redirect('/debug_session')
+
+@app.route('/clear_session', methods=['POST'])
+def clear_session():
+    """清除 session 数据"""
+    session.clear()
+    return redirect('/debug_session')
+
 @app.errorhandler(Exception)
 def handle_error(e):
     """全局错误处理器"""
@@ -993,40 +1104,40 @@ def handle_404(e):
     """处理404错误"""
     return security_service.handle_404(e)
 
-# 添加安全中间件
+# 添加 HTTP 请求前置处理器
 @app.before_request
 def before_request():
-    """请求前处理"""
-    # 静态文件不处理
-    if request.endpoint and 'static' in request.endpoint:
-        return None
-        
-    # Let's Encrypt 验证不处理
-    if request.path.startswith('/.well-known/acme-challenge/'):
-        return None
-        
-    # 安全检查
-    security_check_result = security_service.security_check()
-    if security_check_result is not None:
-        return security_check_result
-        
+    """请求预处理"""
+    # 添加 session 调试信息
+    if '/api/' in request.path and request.method != 'OPTIONS':
+        logger.debug(f"请求: {request.path}, IP: {request.remote_addr}, Session: {dict(session)}")
+    
     # 速率限制检查
-    rate_limit_result = rate_limit_service.handle_rate_limit()
-    if rate_limit_result is not None:
-        return rate_limit_result
-        
-    return None
+    if SECURITY['rate_limit']['enabled'] and not request.path.startswith(('/static/', '/.well-known/')):
+        limiter_result = rate_limit_service.handle_rate_limit(request)
+        if limiter_result is not None:  # 确保返回不是 None
+            return limiter_result
+    
+    # 安全检查
+    security_result = security_service.security_check()
+    if security_result is not None:  # 确保返回不是 None
+        return security_result
+    
+    # 所有检查都通过，不返回任何内容，继续处理请求
 
-# 添加安全头
+# 添加 HTTP 请求后置处理器
 @app.after_request
 def after_request(response):
-    """请求后处理"""
-    return security_service.add_security_headers(response)
+    """响应后处理"""
+    # 添加安全响应头
+    response = security_service.add_security_headers(response)
+    return response
 
 @app.route('/test/nfc')
 def nfc_test():
     """NFC测试页面"""
     return render_template('nfc.html')
+
 
 if __name__ == '__main__':
     logger.info("开始初始化服务器...")
@@ -1042,26 +1153,8 @@ if __name__ == '__main__':
     logger.info(f"服务器配置 - IP: {SERVER_IP}, 端口: {'%d(HTTPS)' % HTTPS_PORT if HTTPS_ENABLED else '%d(HTTP)' % PORT}, 调试模式: {DEBUG}")
     
     try:
-        # 确保没有其他进程占用端口
-        import socket
-        def check_port(port):
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)  # 启用keepalive
-                s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # 启用TCP_NODELAY
-                try:
-                    s.bind((SERVER_IP, port))
-                    return True
-                except:
-                    return False
-        
-        # 检查需要使用的端口
-        target_port = HTTPS_PORT if HTTPS_ENABLED else PORT
-        if not check_port(target_port):
-            logger.error(f"{'HTTPS' if HTTPS_ENABLED else 'HTTP'}端口 {target_port} 已被占用")
-            sys.exit(1)
-            
-        # 使用服务器管理服务启动服务器
+        # 使用 ServerService 启动服务器，它会应用所有配置
+        socketio = SocketIO(app, cors_allowed_origins="*")
         server_service.start_server(app, socketio)
         
     except KeyboardInterrupt:

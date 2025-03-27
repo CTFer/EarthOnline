@@ -11,7 +11,7 @@ import json
 from typing import Dict, List, Optional
 from utils.response_handler import ResponseHandler, StatusCode
 from function.PlayerService import player_service
-
+from config.config import DEBUG
 logger = logging.getLogger(__name__)
 
 class TaskService:
@@ -274,16 +274,129 @@ class TaskService:
 
     def submit_task(self, player_id: int, task_id: int, comment: str = None) -> Dict:
         """提交任务"""
-        return self._update_task_status(
-            task_id, 
-            player_id, 
-            'CHECK',
-            {
-                'submit_time': int(time.time()),
-                'comment': comment
+        try:
+            # 1. 获取任务信息和玩家信息，用于创建审批
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 获取玩家的企业微信用户ID
+            if DEBUG:
+                wechat_userid = 'DuChengLong'
+            else:
+                cursor.execute('SELECT wechat_userid FROM player_data WHERE player_id = ?', (player_id,))
+                player_result = cursor.fetchone()
+                if not player_result or not player_result['wechat_userid']:
+                    logger.warning(f"玩家 {player_id} 未关联企业微信账号，跳过审批流程")
+                    # 没有关联企业微信，仍然更新任务状态但不创建审批
+                    return self._update_task_status(
+                        task_id, 
+                        player_id, 
+                        'CHECK',
+                        {
+                            'submit_time': int(time.time()),
+                            'comment': comment
+                        }
+                    )
+                
+                wechat_userid = player_result['wechat_userid']
+            
+            # 获取任务详情
+            cursor.execute('''
+                SELECT t.name, t.description, pt.id 
+                FROM player_task pt
+                JOIN task t ON pt.task_id = t.id
+                WHERE pt.id = ? AND pt.player_id = ?
+            ''', (task_id, player_id))
+            task_result = cursor.fetchone()
+            if not task_result:
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在"
+                )
+            
+            task_name = task_result['name']
+            task_description = task_result['description']
+            player_task_id = task_result['id']
+            
+            # 2. 更新任务状态
+            update_result = self._update_task_status(
+                task_id, 
+                player_id, 
+                'CHECK',
+                {
+                    'submit_time': int(time.time()),
+                    'comment': comment
+                }
+            )
+            
+            # 3. 创建审批申请
+            from function.QYWeChat.QYWeChat_Review import qywechat_review
+            
+            # 获取审批人列表
+            approvers = qywechat_review.get_default_approvers()
+            if not approvers:
+                logger.warning("未找到审批人，使用系统默认值")
+                approvers = ["admin"] # 这里应该改为您系统中管理员的企业微信ID
+            
+            # 构建表单数据
+            form_data = {
+                "task_name": task_name,
+                "task_description": task_description,
+                "comment": comment or "无"
             }
-        )
-
+            
+            # 提交审批申请
+            success, result = qywechat_review.create_task_approval(
+                player_id=player_id,
+                task_id=player_task_id,
+                approvers=approvers,
+                form_data=form_data,
+                wechat_userid=wechat_userid
+            )
+            
+            if success:
+                # 更新审批单号
+                sp_no = result
+                cursor.execute('''
+                    UPDATE player_task 
+                    SET review_id = ? 
+                    WHERE id = ? AND player_id = ?
+                ''', (sp_no, task_id, player_id))
+                conn.commit()
+                
+                logger.info(f"任务 {task_id} 提交成功并创建审批申请，审批单号: {sp_no}")
+                
+                # 返回原始更新结果，并附加审批信息
+                if isinstance(update_result.get('data'), dict):
+                    update_result['data']['approval'] = {
+                        'sp_no': sp_no,
+                        'status': '审批中'
+                    }
+                return update_result
+            else:
+                # 审批创建失败，记录错误但不影响任务状态更新
+                logger.error(f"创建审批申请失败: {result}")
+                
+                # 添加警告信息到响应中
+                if isinstance(update_result.get('data'), dict):
+                    update_result['data']['approval_warning'] = f"审批创建失败: {result}"
+                return update_result
+                
+        except Exception as e:
+            logger.error(f"提交任务并创建审批失败: {str(e)}", exc_info=True)
+            # 发生异常时，尝试回退到基本的任务提交逻辑
+            return self._update_task_status(
+                task_id, 
+                player_id, 
+                'CHECK',
+                {
+                    'submit_time': int(time.time()),
+                    'comment': comment
+                }
+            )
+        finally:
+            if conn:
+                conn.close()
 
     def get_available_tasks(self, player_id: int) -> Dict:
         """获取可用任务列表"""
@@ -337,7 +450,7 @@ class TaskService:
                     SELECT task_id 
                     FROM player_task 
                     WHERE player_id = ? 
-                    AND (status = 'IN_PROGRESS' OR status = 'COMPLETED')
+                    AND (status = 'IN_PROGRESS' OR status = 'COMPLETED' or status = 'CHECK')
                 )
             ''', (player_id, player_id))
             
@@ -430,7 +543,7 @@ class TaskService:
                 JOIN task t ON pt.task_id = t.id
                 WHERE pt.player_id = ? 
                 AND (pt.endtime > ? or pt.endtime is null)
-                AND pt.status = 'IN_PROGRESS'
+                AND (pt.status = 'IN_PROGRESS' or pt.status = 'CHECK')
                 ORDER BY pt.starttime DESC
             ''', (player_id, current_timestamp))
 
@@ -1694,6 +1807,221 @@ class TaskService:
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
                 msg=f"任务驳回失败: {str(e)}"
+            )
+        finally:
+            if conn:
+                conn.close()
+
+    def get_task_approval_status(self, task_id: int, player_id: int) -> Dict:
+        """
+        查询任务的审批状态
+        :param task_id: 任务ID
+        :param player_id: 玩家ID
+        :return: 审批状态信息
+        """
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 获取任务审批单号
+            cursor.execute('''
+                SELECT review_id 
+                FROM player_task 
+                WHERE id = ? AND player_id = ?
+            ''', (task_id, player_id))
+            
+            task = cursor.fetchone()
+            if not task or not task['review_id']:
+                return ResponseHandler.error(
+                    code=StatusCode.NOT_FOUND,
+                    msg="未找到任务审批信息"
+                )
+            
+            sp_no = task['review_id']
+            
+            # 获取审批状态
+            from function.QYWeChat.QYWeChat_Review import qywechat_review
+            success, status_info = qywechat_review.get_task_approval_status(sp_no)
+            
+            if not success:
+                return ResponseHandler.error(
+                    code=StatusCode.SERVER_ERROR,
+                    msg=f"获取审批状态失败: {status_info}"
+                )
+            
+            return ResponseHandler.success(
+                data=status_info,
+                msg="获取审批状态成功"
+            )
+            
+        except Exception as e:
+            logger.error(f"获取任务审批状态失败: {str(e)}", exc_info=True)
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"获取任务审批状态失败: {str(e)}"
+            )
+        finally:
+            if conn:
+                conn.close()
+                
+    def sync_approval_status(self, task_id: int, player_id: int) -> Dict:
+        """
+        同步企业微信审批状态到任务状态
+        :param task_id: 任务ID
+        :param player_id: 玩家ID
+        :return: 同步结果
+        """
+        try:
+            # 获取审批状态
+            approval_result = self.get_task_approval_status(task_id, player_id)
+            if approval_result.get('code') != 0:
+                return approval_result
+            
+            status_info = approval_result.get('data', {})
+            status_code = status_info.get('status_code')
+            
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 先获取任务的当前状态
+            cursor.execute('''
+                SELECT status 
+                FROM player_task 
+                WHERE id = ? AND player_id = ?
+            ''', (task_id, player_id))
+            current_status = cursor.fetchone()
+            
+            if not current_status:
+                return ResponseHandler.error(
+                    code=StatusCode.TASK_NOT_FOUND,
+                    msg="任务不存在"
+                )
+            
+            current_status = current_status["status"]
+            
+            # 如果任务已经完成或已被驳回，不再更新状态
+            if current_status not in ['CHECK']:
+                logger.info(f"任务 {task_id} 当前状态为 {current_status}，不需要同步审批状态")
+                return ResponseHandler.success(
+                    data={
+                        "task_id": task_id,
+                        "player_id": player_id,
+                        "status": current_status,
+                        "approval_status": status_info
+                    },
+                    msg=f"任务当前状态为 {current_status}，不需要同步审批状态"
+                )
+            
+            # 根据审批状态更新任务状态
+            if status_code == 2:  # 已通过
+                # 更新任务状态为完成
+                cursor.execute('''
+                    UPDATE player_task 
+                    SET status = 'COMPLETED', 
+                        complete_time = ? 
+                    WHERE id = ? AND player_id = ?
+                ''', (int(time.time()), task_id, player_id))
+                conn.commit()
+                
+                # 获取任务信息
+                cursor.execute('''
+                    SELECT t.name, t.task_rewards 
+                    FROM player_task pt
+                    JOIN task t ON pt.task_id = t.id
+                    WHERE pt.id = ? AND pt.player_id = ?
+                ''', (task_id, player_id))
+                task_info = cursor.fetchone()
+                
+                if task_info and task_info["task_rewards"]:
+                    # 处理任务奖励
+                    self._process_task_rewards(cursor, player_id, task_info, int(time.time()))
+                    conn.commit()
+                
+                return ResponseHandler.success(
+                    data={
+                        "task_id": task_id,
+                        "player_id": player_id,
+                        "status": "COMPLETED",
+                        "approval_status": status_info
+                    },
+                    msg="任务已通过审批并设置为完成状态"
+                )
+                
+            elif status_code == 3:  # 已驳回
+                # 获取驳回原因
+                reject_reason = "审批驳回"
+                if status_info.get("approval_nodes"):
+                    for node in status_info["approval_nodes"]:
+                        if node.get("speech"):
+                            reject_reason = f"审批驳回：{node['speech']}"
+                            break
+                
+                # 更新任务状态为进行中（驳回后可以重新提交）
+                cursor.execute('''
+                    UPDATE player_task 
+                    SET status = 'IN_PROGRESS',
+                        reject_reason = ? 
+                    WHERE id = ? AND player_id = ?
+                ''', (reject_reason, task_id, player_id))
+                conn.commit()
+                
+                # 发送驳回通知
+                from function.NotificationService import notification_service
+                notification_service.add_notification(
+                    message_title="任务被驳回",
+                    content=f"您的任务「{task_id}」已被驳回，原因：{reject_reason}",
+                    target_type="player",
+                    target_id=player_id,
+                    notification_type="task_rejected"
+                )
+                
+                return ResponseHandler.success(
+                    data={
+                        "task_id": task_id,
+                        "player_id": player_id,
+                        "status": "IN_PROGRESS",
+                        "approval_status": status_info,
+                        "reject_reason": reject_reason
+                    },
+                    msg="任务审批被驳回，已重置为进行中状态"
+                )
+                
+            elif status_code == 4 or status_code == 6 or status_code == 7:  # 已撤销、通过后撤销、已删除
+                # 更新任务状态为进行中
+                cursor.execute('''
+                    UPDATE player_task 
+                    SET status = 'IN_PROGRESS' 
+                    WHERE id = ? AND player_id = ?
+                ''', (task_id, player_id))
+                conn.commit()
+                
+                return ResponseHandler.success(
+                    data={
+                        "task_id": task_id,
+                        "player_id": player_id,
+                        "status": "IN_PROGRESS",
+                        "approval_status": status_info
+                    },
+                    msg="任务审批已撤销/删除，已重置为进行中状态"
+                )
+                
+            else:
+                # 其他状态不处理
+                return ResponseHandler.success(
+                    data={
+                        "task_id": task_id,
+                        "player_id": player_id,
+                        "status": "CHECK",  # 保持审核状态
+                        "approval_status": status_info
+                    },
+                    msg=f"任务审批状态：{status_info.get('status_text', '未知')}"
+                )
+                
+        except Exception as e:
+            logger.error(f"同步任务审批状态失败: {str(e)}", exc_info=True)
+            return ResponseHandler.error(
+                code=StatusCode.SERVER_ERROR,
+                msg=f"同步任务审批状态失败: {str(e)}"
             )
         finally:
             if conn:

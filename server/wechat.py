@@ -5,6 +5,7 @@ from function.WeChatService import wechat_service
 from function.QYWeChatService import qywechat_service
 from utils.response_handler import ResponseHandler, StatusCode, api_response
 import xml.etree.ElementTree as ET
+from lxml import etree  # 添加此导入
 
 # 创建蓝图
 wechat_bp = Blueprint('wechat', __name__)
@@ -447,3 +448,80 @@ def send_qywechat_task_card():
             code=StatusCode.WECHAT_API_ERROR,
             msg=f"发送任务卡片消息失败: {str(e)}"
         )
+
+
+@wechat_bp.route('/approval/callback', methods=['GET', 'POST'])
+def wechat_approval_callback():
+    """企业微信审批回调处理"""
+    if request.method == 'GET':
+        # 处理URL验证请求
+        try:
+            msg_signature = request.args.get('msg_signature')
+            timestamp = request.args.get('timestamp')
+            nonce = request.args.get('nonce')
+            echostr = request.args.get('echostr')
+            
+            from function.QYWeChat.QYWeChat_Auth import qywechat_auth
+            result = qywechat_auth.verify_url(msg_signature, timestamp, nonce, echostr)
+            
+            if result:
+                return result
+            else:
+                return "验证失败", 403
+        except Exception as e:
+            logger.error(f"[QYWeChat] 企业微信回调URL验证失败: {str(e)}", exc_info=True)
+            return "验证失败", 403
+    else:
+        # 处理POST请求
+        try:
+            # 获取URL参数
+            msg_signature = request.args.get('msg_signature')
+            timestamp = request.args.get('timestamp')
+            nonce = request.args.get('nonce')
+            
+            # 解析XML数据
+            xml_data = request.data
+            logger.info(f"[QYWeChat] 收到审批回调数据: {xml_data.decode('utf-8')}")
+            
+            xml_tree = etree.fromstring(xml_data)
+            encrypt_msg = xml_tree.find("Encrypt").text
+            
+            # 解密消息
+            from function.QYWeChat.QYWeChat_Auth import qywechat_auth
+            decrypted_msg = qywechat_auth.decrypt_message(encrypt_msg)
+            
+            logger.info(f"[QYWeChat] 解密后的审批回调消息: {decrypted_msg}")
+            
+            # 解析解密后的XML
+            event_xml = etree.fromstring(decrypted_msg)
+            
+            # 获取事件类型
+            if event_xml.find("Event") is not None:
+                event_type = event_xml.find("Event").text
+                
+                # 处理审批状态变更事件
+                if event_type == "sys_approval_change":
+                    logger.info("[QYWeChat] 收到审批状态变更事件")
+                    
+                    # 提取审批信息
+                    approval_info = {}
+                    approval_info_node = event_xml.find("ApprovalInfo")
+                    if approval_info_node is not None:
+                        for child in approval_info_node:
+                            approval_info[child.tag] = child.text
+                    
+                    logger.info(f"[QYWeChat] 审批信息: {approval_info}")
+                    
+                    # 处理审批事件
+                    from function.QYWeChat.QYWeChat_Review import qywechat_review
+                    success, message = qywechat_review.handle_approval_event({"ApprovalInfo": approval_info})
+                    
+                    logger.info(f"[QYWeChat] 处理审批事件结果: success={success}, message={message}")
+            
+            # 返回成功响应
+            return "success"
+            
+        except Exception as e:
+            logger.error(f"[QYWeChat] 处理企业微信回调失败: {str(e)}", exc_info=True)
+            # 即使出错也返回success，避免企业微信重试
+            return "success"

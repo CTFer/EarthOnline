@@ -7,6 +7,7 @@ import ssl
 import logging
 import threading
 import eventlet
+from datetime import datetime, time,timedelta
 from eventlet import wsgi
 from eventlet import listen
 from flask import Flask, send_from_directory
@@ -44,9 +45,17 @@ class ServerService:
     def __init__(self):
         """初始化服务器管理服务"""
         if not hasattr(self, 'initialized'):
-            self.http_thread = None
-            self.is_running = False
             self.initialized = True
+            self.http_server = None
+            self.https_server = None
+            self.server_thread = None
+            
+            # 配置日志
+            self.logger = logging.getLogger(__name__)
+            
+            # 初始化服务器状态
+            self.running = False
+            self.ssl_context = None
             
             # 配置eventlet
             eventlet.monkey_patch()
@@ -54,6 +63,80 @@ class ServerService:
             wsgi.MAX_HEADER_LINE = 65536  # 增加最大请求头大小
             wsgi.MINIMUM_CHUNK_SIZE = 16384  # 优化块大小
             wsgi.MAX_REQUEST_LINE = 16384  # 优化请求行大小
+
+    def configure_app(self, app):
+        """配置 Flask 应用"""
+        # 设置 secret_key
+        app.secret_key = '8b8d3a9e2e7c4f5e9d3a8b7c6d5e4f3a'  # 固定 secret_key
+        
+        # 清除任何现有配置
+        for key in list(app.config.keys()):
+            if key.startswith('SESSION_'):
+                app.config.pop(key, None)
+        
+        # 设置基本配置
+        app.config.update(
+            # Session 配置
+            SESSION_COOKIE_NAME="earthonline_session",  # 自定义 cookie 名称
+            SESSION_COOKIE_DOMAIN=None,       # 确保在 IP 地址下也能工作
+            SESSION_COOKIE_SECURE=False,      # 确保在 HTTP 下也能工作
+            SESSION_COOKIE_HTTPONLY=True,     # 防止 JavaScript 访问
+            SESSION_COOKIE_SAMESITE=None,     # 允许跨站请求
+            SESSION_COOKIE_PATH='/',          # 应用于所有路径
+            SESSION_TYPE='filesystem',        # 使用文件系统存储 session
+            SESSION_PERMANENT=True,           # 使会话持久化
+            SESSION_COOKIE_PARTITIONED=False, # Flask 2.3.0+ 需要这个配置项
+            PERMANENT_SESSION_LIFETIME=timedelta(days=7),  # session 有效期7天
+            SESSION_REFRESH_EACH_REQUEST=True,# 每次请求都刷新 session
+            SESSION_USE_SIGNER=False,         # 不使用签名器
+            
+            # 应用配置
+            MAX_CONTENT_LENGTH=50 * 1024 * 1024,  # 最大请求体大小50MB
+            JSONIFY_PRETTYPRINT_REGULAR=False,    # 禁用JSON美化
+            JSON_SORT_KEYS=False,                 # 禁用JSON键排序
+            PROPAGATE_EXCEPTIONS=True,            # 传播异常
+            TRAP_HTTP_EXCEPTIONS=True,            # 捕获HTTP异常
+            TRAP_BAD_REQUEST_ERRORS=True,         # 捕获错误请求
+            PREFERRED_URL_SCHEME='http'           # 默认为 HTTP 协议
+        )
+        
+        # 配置 CORS - 确保支持 cookies
+        CORS(app, 
+            supports_credentials=True,   # 确保凭据支持
+            origins="*",                # 允许所有来源
+            allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+            methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            max_age=3600               # 预检请求缓存1小时
+        )
+        
+        # 添加Cloudflare代理支持
+        if CLOUDFLARE['enabled']:
+            from werkzeug.middleware.proxy_fix import ProxyFix
+            app.wsgi_app = ProxyFix(
+                app.wsgi_app,
+                x_for=CLOUDFLARE['headers']['X-Forwarded-For'],
+                x_proto=CLOUDFLARE['headers']['X-Forwarded-Proto'],
+                x_host=CLOUDFLARE['headers']['X-Forwarded-Host'],
+                x_port=CLOUDFLARE['headers']['X-Forwarded-Port'],
+                x_prefix=CLOUDFLARE['headers']['X-Forwarded-Prefix']
+            )
+            
+            # 只在非本地环境且需要强制 HTTPS 时添加 SchemeEnforcingMiddleware
+            if ENV != 'local' and (HTTPS_ENABLED or CLOUDFLARE['flexible_ssl']):
+                class SchemeEnforcingMiddleware:
+                    def __init__(self, app):
+                        self.app = app
+
+                    def __call__(self, environ, start_response):
+                        environ['wsgi.url_scheme'] = 'https'
+                        return self.app(environ, start_response)
+
+                app.wsgi_app = SchemeEnforcingMiddleware(app.wsgi_app)
+        
+        # 打印配置信息
+        self.logger.info(f"[Server] 配置应用完成，Session配置: SESSION_COOKIE_NAME={app.config.get('SESSION_COOKIE_NAME')}, SESSION_COOKIE_DOMAIN={app.config.get('SESSION_COOKIE_DOMAIN')}, SESSION_COOKIE_SECURE={app.config.get('SESSION_COOKIE_SECURE')}, SESSION_COOKIE_SAMESITE={app.config.get('SESSION_COOKIE_SAMESITE')}, SESSION_COOKIE_PARTITIONED={app.config.get('SESSION_COOKIE_PARTITIONED')}")
+        
+        return app
 
     def setup_ssl(self, ssl_dir: str) -> Tuple[bool, Optional[ssl.SSLContext]]:
         """配置SSL上下文"""
@@ -340,6 +423,10 @@ class ServerService:
     def start_server(self, app: Flask, socketio) -> None:
         """启动服务器（HTTP或HTTPS）"""
         try:
+            # 配置应用
+            app = self.configure_app(app)
+            self.logger.info(f"[Server] 应用配置完成，Session配置：{app.config.get('SESSION_COOKIE_DOMAIN')}, {app.config.get('SESSION_COOKIE_SECURE')}")
+            
             if HTTPS_ENABLED:
                 # 获取SSL配置
                 ssl_success, ssl_context = self.setup_ssl(SSL_CERT_DIR)

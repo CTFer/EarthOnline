@@ -14,6 +14,7 @@ from function.TaskService import task_service
 from function.GPSService import gps_service
 from function.QYWeChat.QYWeChat_Auth import qywechat_auth
 from function.QYWeChat.QYWeChat_Send import qywechat_send
+import sqlite3
 
 logger = logging.getLogger(__name__)
 
@@ -110,14 +111,14 @@ class QYWeChatService:
         """处理企业微信消息和事件"""
         try:
             xml_str = xml_data.decode('utf-8')
-            logger.info(f"[QYWeChat] 收到原始消息: {xml_str}")
+            # logger.info(f"[QYWeChat] 收到原始消息: {xml_str}")
             
             # 解析XML
             root = ET.fromstring(xml_str)
             
             # 获取加密消息
             encrypted_msg = root.find('Encrypt').text
-            logger.debug(f"[QYWeChat] 收到加密消息: {encrypted_msg}")
+            # logger.debug(f"[QYWeChat] 收到加密消息: {encrypted_msg}")
             
             # 验证消息签名
             signature_list = [self.auth.token, timestamp, nonce, encrypted_msg]
@@ -130,7 +131,7 @@ class QYWeChatService:
             
             # 解密消息
             decrypted_xml = self.auth.decrypt_message(encrypted_msg)
-            logger.debug(f"[QYWeChat] 解密后的消息: {decrypted_xml}")
+            # logger.debug(f"[QYWeChat] 解密后的消息: {decrypted_xml}")
             
             # 解析解密后的XML
             msg_root = ET.fromstring(decrypted_xml)
@@ -178,7 +179,7 @@ class QYWeChatService:
             
             # 加密响应消息
             encrypted_response = self._get_encrypted_response(reply_msg, timestamp, nonce)
-            logger.debug(f"[QYWeChat] 返回加密消息: {encrypted_response}")
+            # logger.debug(f"[QYWeChat] 返回加密消息: {encrypted_response}")
             
             return encrypted_response
             
@@ -298,7 +299,6 @@ class QYWeChatService:
                     
                     logger.debug(f"[QYWeChat] 准备添加GPS记录: {gps_data}")
                     
-
                     result = gps_service.add_gps(gps_data)
                     
                     if result.get('code') == 0:
@@ -326,6 +326,42 @@ class QYWeChatService:
                 elif event_key == 'AVAIL_TASK':
                     # 处理可用任务列表
                     return self._handle_available_tasks(player_id, wechat_userid, from_user)
+            elif event == 'sys_approval_change':
+                # 处理审批状态变更事件
+                approval_info = root.find('ApprovalInfo')
+                if approval_info is not None:
+                    sp_no = approval_info.find('SpNo').text  # 审批单号
+                    sp_status = int(approval_info.find('SpStatus').text)  # 审批状态
+                    
+                    logger.info(f"[QYWeChat] 收到审批状态变更 - 单号: {sp_no}, 状态: {sp_status}")
+                    
+                    # 查询数据库，找到对应的任务
+                    conn = sqlite3.connect("database/game.db")
+                    conn.row_factory = sqlite3.Row
+                    cursor = conn.cursor()
+                    
+                    cursor.execute('''
+                        SELECT id, player_id
+                        FROM player_task
+                        WHERE review_id = ?
+                    ''', (sp_no,))
+                    
+                    task = cursor.fetchone()
+                    conn.close()
+                    
+                    if not task:
+                        logger.warning(f"[QYWeChat] 未找到审批单号对应的任务: {sp_no}")
+                        return 'success'
+                    
+                    task_id = task["id"]
+                    player_id = task["player_id"]
+                    
+                    # 调用TaskService同步审批状态
+                    from function.TaskService import task_service
+                    result = task_service.sync_approval_status(task_id, player_id)
+                    
+                    logger.info(f"[QYWeChat] 同步审批状态结果: {result}")
+                    
             return 'success'
             
         except Exception as e:

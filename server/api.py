@@ -250,3 +250,76 @@ api_registry.register(
         "msg": "处理结果信息"
     }
 )
+
+# 注册任务审批相关API
+api_registry.register(
+    path="/api/task/approval/status",
+    method="GET",
+    description="获取任务审批状态",
+    auth_required=True,
+    parameters=[
+        {
+            "name": "task_id",
+            "type": "integer",
+            "required": True,
+            "description": "任务ID"
+        },
+        {
+            "name": "player_id",
+            "type": "integer",
+            "required": True,
+            "description": "玩家ID"
+        }
+    ],
+    response={
+        "data": {
+            "sp_no": "审批单号",
+            "status_code": "状态码",
+            "status_text": "状态文本",
+            "apply_time": "提交时间",
+            "apply_user_id": "提交用户ID",
+            "approval_nodes": [
+                {
+                    "approver_userid": "审批人ID",
+                    "approver_name": "审批人姓名",
+                    "status": "审批状态",
+                    "speech": "审批意见",
+                    "time": "审批时间"
+                }
+            ]
+        }
+    }
+)
+
+api_registry.register(
+    path="/api/task/approval/sync",
+    method="POST",
+    description="同步企业微信审批状态到任务状态",
+    auth_required=True,
+    parameters=[
+        {
+            "name": "task_id",
+            "type": "integer",
+            "required": True,
+            "description": "任务ID"
+        },
+        {
+            "name": "player_id",
+            "type": "integer",
+            "required": True,
+            "description": "玩家ID"
+        }
+    ],
+    response={
+        "data": {
+            "task_id": "任务ID",
+            "player_id": "玩家ID",
+            "status": "更新后的任务状态",
+            "approval_status": {
+                "sp_no": "审批单号",
+                "status_code": "状态码",
+                "status_text": "状态文本"
+            }
+        }
+    }
+)

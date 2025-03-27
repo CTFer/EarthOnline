@@ -158,7 +158,7 @@ SECURITY = {
     'open': False,
     'rate_limit': {
         'enabled': True if ENV == 'prod' else False,  # 生产环境启用速率限制
-        'limit': 300,  # 每个IP每分钟最大请求数
+        'limit': 500,  # 每个IP每分钟最大请求数
         'window': 60   # 时间窗口（秒）
     },
     'headers': {
