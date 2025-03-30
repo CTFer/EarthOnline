@@ -1,0 +1,13 @@
+{
+    "DEBUG": false,
+    "CONFIG": {
+        "review_api_url": "http://1.95.11.164/car_park/review",
+        "conn_str": "DRIVER={SQL Server};SERVER=localhost;DATABASE=Park_DB;UID=sa;PWD=123",
+        "sync_interval": 5,
+        "max_retries": 3,
+        "retry_interval": 5
+    },
+    "HEADERS": {
+        "X-API-KEY": "95279527"
+    }
+} 

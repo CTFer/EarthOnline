@@ -1016,7 +1016,8 @@ class TaskService:
                 
                 if cursor.rowcount > 0:
                     rewards_summary['medals'].append(medal_id)
-        
+        # 输出奖励信息
+        logger.info(f"奖励信息: {rewards_summary}")
         return rewards_summary
 
     def _process_main_quest_completion(self, cursor, player_id: int, task_id: int, 
