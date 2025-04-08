@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-03-24 19:33:57
+ * @LastEditTime: 2025-04-03 11:01:53
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -85,7 +85,7 @@ class GameManager {
     try {
       // 初始化API客户端
       // 根据浏览器的地址来传入不同的域名
-      const domain = window.location.hostname;
+      const domain = window.location.href;
       this.api = new APIClient(domain);
 
       // 初始化事件总线

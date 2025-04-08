@@ -12,7 +12,7 @@ import os
 SERVER_IP = '0.0.0.0'
 DOMAIN = 'duonline.top'
 DOMAIN_IP = '1.95.11.164'
-PORT = 80
+PORT = 8000
 # 环境配置 本地开发环境 local 生产环境 prod 生产环境中NFC读写卡功能关闭
 ENV = 'local'
 

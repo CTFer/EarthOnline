@@ -14,6 +14,46 @@ dist_dir = os.path.join(current_dir, 'dist', 'parking_service')
 log_dir = os.path.join(dist_dir, 'logs')
 Path(log_dir).mkdir(parents=True, exist_ok=True)
 
+# 创建禁用快速编辑模式的代码文件
+disable_quick_edit_code = '''
+import ctypes
+
+def disable_quick_edit():
+    """禁用控制台的快速编辑模式，防止程序假死"""
+    try:
+        # 定义Windows API常量
+        ENABLE_QUICK_EDIT_MODE = 0x0040
+        ENABLE_EXTENDED_FLAGS = 0x0080
+        STD_INPUT_HANDLE = -10
+
+        # 获取控制台句柄
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(STD_INPUT_HANDLE)
+        
+        # 获取当前控制台模式
+        mode = ctypes.c_ulong()
+        kernel32.GetConsoleMode(handle, ctypes.byref(mode))
+        
+        # 清除快速编辑模式位
+        mode.value &= ~ENABLE_QUICK_EDIT_MODE
+        # 设置扩展标志位
+        mode.value |= ENABLE_EXTENDED_FLAGS
+        
+        # 设置新的控制台模式
+        kernel32.SetConsoleMode(handle, mode)
+        print("[Car_Park] 已禁用控制台快速编辑模式")
+        
+    except Exception as e:
+        print(f"[Car_Park] 禁用快速编辑模式失败: {str(e)}")
+
+# 程序启动时禁用快速编辑模式
+disable_quick_edit()
+'''
+
+disable_quick_edit_path = os.path.join(current_dir, 'disable_quick_edit.py')
+with open(disable_quick_edit_path, 'w', encoding='utf-8') as f:
+    f.write(disable_quick_edit_code)
+
 # 图标文件路径
 icon_path = os.path.join(current_dir, '256.ico')
 if not os.path.exists(icon_path):
@@ -44,7 +84,9 @@ if not os.path.exists(config_file):
         json.dump(default_config, f, indent=4, ensure_ascii=False)
 
 # 添加数据文件
-datas = []
+datas = [
+    (disable_quick_edit_path, '.'),  # 添加禁用快速编辑模式的脚本
+]
 
 # 添加配置文件
 if os.path.exists(config_file):
@@ -56,7 +98,7 @@ if os.path.exists(icon_path):
 
 # 主程序分析
 a = Analysis(
-    [os.path.join(spec_dir, 'car_park_client.py')],  # 使用完整路径
+    [os.path.join(spec_dir, 'car_park_client.py'), disable_quick_edit_path],  # 添加禁用快速编辑模式的脚本
     pathex=[current_dir, spec_dir],  # 添加搜索路径
     binaries=[],
     datas=datas,
@@ -69,6 +111,7 @@ a = Analysis(
         're',
         'sys',
         'time',
+        'ctypes',  # 添加ctypes依赖
         
         # 第三方库
         'pyodbc',           # SQL Server数据库连接
@@ -131,6 +174,7 @@ dist/
     parking_service.exe  # 主程序
     config.json         # 配置文件
     256.ico            # 图标文件（如果存在）
+    disable_quick_edit.py  # 禁用快速编辑模式的脚本
     logs/              # 日志目录
     python*.dll        # Python运行时
     其他依赖文件...
@@ -141,4 +185,5 @@ dist/
 3. 日志文件会保存在logs目录下
 4. 确保程序有足够的文件读写权限
 5. 默认开启调试模式，可在config.json中修改
+6. 已禁用控制台快速编辑模式，防止程序假死
 """

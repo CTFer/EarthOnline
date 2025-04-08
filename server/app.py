@@ -71,7 +71,8 @@ from function.MedalService import medal_service
 from function.GameCardService import game_card_service
 from utils.response_handler import ResponseHandler, StatusCode, api_response
 from wechat import wechat_bp  # 导入微信蓝图
-from car_park import car_park_bp  # 导入车场蓝图
+if ENV == 'prod':
+    from car_park import car_park_bp  # 导入车场蓝图
 from function.SecurityService import security_service
 from function.RateLimitService import rate_limit_service
 from lxml import etree
@@ -83,7 +84,8 @@ logger.info(f"Flask应用初始化完成，Session配置: {app.config.get('SESSI
 app.register_blueprint(admin_bp, url_prefix='/admin')
 app.register_blueprint(shop_bp)
 app.register_blueprint(wechat_bp, url_prefix='/wechat')
-app.register_blueprint(car_park_bp, url_prefix='/car_park')
+if ENV == 'prod':
+    app.register_blueprint(car_park_bp, url_prefix='/car_park')
 # 初始化WebSocket服务
 websocket_service.init_app(app)
 

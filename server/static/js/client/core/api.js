@@ -13,7 +13,7 @@ import { SSL_ENABLED } from '../../config/config.js';
 // API 请求封装
 class APIClient {
     constructor(baseURL) {
-        // 确保baseURL末尾没有斜杠
+        // 确保baseURL末尾没有斜杠 
         this.baseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
         Logger.info('API', '初始化 API 客户端:', this.baseURL);
     }

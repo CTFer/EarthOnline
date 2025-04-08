@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-10 17:02:31
- * @LastEditTime: 2025-03-17 17:33:09
+ * @LastEditTime: 2025-04-03 10:47:50
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -9,7 +9,7 @@
  */
 
 // 声明配置变量
-export const SERVER = "192.168.5.18/";  // 使用相对协议
+export const SERVER = "192.168.5.18:8000/";  // 使用相对协议
 export const DOMAIN = SERVER;  // 不包含协议，让 WebSocket 服务自己处理
 export const SSL_ENABLED = true;  // 启用 SSL
 export const SSL_PORT = 443;

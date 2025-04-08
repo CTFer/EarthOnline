@@ -75,30 +75,33 @@ class ServerService:
                 app.config.pop(key, None)
         
         # 设置基本配置
-        app.config.update(
+        session_config = {
             # Session 配置
-            SESSION_COOKIE_NAME="earthonline_session",  # 自定义 cookie 名称
-            SESSION_COOKIE_DOMAIN=None,       # 确保在 IP 地址下也能工作
-            SESSION_COOKIE_SECURE=False,      # 确保在 HTTP 下也能工作
-            SESSION_COOKIE_HTTPONLY=True,     # 防止 JavaScript 访问
-            SESSION_COOKIE_SAMESITE=None,     # 允许跨站请求
-            SESSION_COOKIE_PATH='/',          # 应用于所有路径
-            SESSION_TYPE='filesystem',        # 使用文件系统存储 session
-            SESSION_PERMANENT=True,           # 使会话持久化
-            SESSION_COOKIE_PARTITIONED=False, # Flask 2.3.0+ 需要这个配置项
-            PERMANENT_SESSION_LIFETIME=timedelta(days=7),  # session 有效期7天
-            SESSION_REFRESH_EACH_REQUEST=True,# 每次请求都刷新 session
-            SESSION_USE_SIGNER=False,         # 不使用签名器
+            'SESSION_COOKIE_NAME': "earthonline_session",  # 自定义 cookie 名称
+            'SESSION_COOKIE_DOMAIN': DOMAIN if ENV != 'local' else None,  # 生产环境使用域名
+            'SESSION_COOKIE_SECURE': HTTPS_ENABLED,  # 根据HTTPS状态设置安全标志
+            'SESSION_COOKIE_HTTPONLY': True,     # 防止 JavaScript 访问
+            'SESSION_COOKIE_SAMESITE': None,     # 允许跨站请求
+            'SESSION_COOKIE_PATH': '/',          # 应用于所有路径
+            'SESSION_TYPE': 'filesystem',        # 使用文件系统存储 session
+            'SESSION_PERMANENT': True,           # 使会话持久化
+            'SESSION_COOKIE_PARTITIONED': False, # Flask 2.3.0+ 需要这个配置项
+            'PERMANENT_SESSION_LIFETIME': timedelta(days=7),  # session 有效期7天
+            'SESSION_REFRESH_EACH_REQUEST': True,# 每次请求都刷新 session
+            'SESSION_USE_SIGNER': False,         # 不使用签名器
             
             # 应用配置
-            MAX_CONTENT_LENGTH=50 * 1024 * 1024,  # 最大请求体大小50MB
-            JSONIFY_PRETTYPRINT_REGULAR=False,    # 禁用JSON美化
-            JSON_SORT_KEYS=False,                 # 禁用JSON键排序
-            PROPAGATE_EXCEPTIONS=True,            # 传播异常
-            TRAP_HTTP_EXCEPTIONS=True,            # 捕获HTTP异常
-            TRAP_BAD_REQUEST_ERRORS=True,         # 捕获错误请求
-            PREFERRED_URL_SCHEME='http'           # 默认为 HTTP 协议
-        )
+            'MAX_CONTENT_LENGTH': 50 * 1024 * 1024,  # 最大请求体大小50MB
+            'JSONIFY_PRETTYPRINT_REGULAR': False,    # 禁用JSON美化
+            'JSON_SORT_KEYS': False,                 # 禁用JSON键排序
+            'PROPAGATE_EXCEPTIONS': True,            # 传播异常
+            'TRAP_HTTP_EXCEPTIONS': True,            # 捕获HTTP异常
+            'TRAP_BAD_REQUEST_ERRORS': True,         # 捕获错误请求
+            'PREFERRED_URL_SCHEME': 'http'  # 根据配置设置协议
+        }
+        
+        # 更新应用配置
+        app.config.update(session_config)
         
         # 配置 CORS - 确保支持 cookies
         CORS(app, 
@@ -134,7 +137,15 @@ class ServerService:
                 app.wsgi_app = SchemeEnforcingMiddleware(app.wsgi_app)
         
         # 打印配置信息
-        self.logger.info(f"[Server] 配置应用完成，Session配置: SESSION_COOKIE_NAME={app.config.get('SESSION_COOKIE_NAME')}, SESSION_COOKIE_DOMAIN={app.config.get('SESSION_COOKIE_DOMAIN')}, SESSION_COOKIE_SECURE={app.config.get('SESSION_COOKIE_SECURE')}, SESSION_COOKIE_SAMESITE={app.config.get('SESSION_COOKIE_SAMESITE')}, SESSION_COOKIE_PARTITIONED={app.config.get('SESSION_COOKIE_PARTITIONED')}")
+        self.logger.info(
+            f"[Server] 配置应用完成，Session配置: "
+            f"SESSION_COOKIE_NAME={app.config['SESSION_COOKIE_NAME']}, "
+            f"SESSION_COOKIE_DOMAIN={app.config['SESSION_COOKIE_DOMAIN']}, "
+            f"SESSION_COOKIE_SECURE={app.config['SESSION_COOKIE_SECURE']}, "
+            f"SESSION_COOKIE_SAMESITE={app.config['SESSION_COOKIE_SAMESITE']}, "
+            f"SESSION_TYPE={app.config['SESSION_TYPE']}, "
+            f"SESSION_PERMANENT={app.config['SESSION_PERMANENT']}"
+        )
         
         return app
 
