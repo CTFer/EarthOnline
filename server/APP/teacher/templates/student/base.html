@@ -1,0 +1,73 @@
+<!--
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-10-22 14:29:31
+ * @LastEditTime: 2025-10-23 09:10:51
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2025 迷舍
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}学生作业系统{% endblock %}</title>
+    
+    <!-- Layui CSS -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <!-- 自定义CSS -->
+    <link rel="stylesheet" href="/teacher/static/css/student.min.css">
+    <!-- jQuery -->
+    <script src="/static/js/jquery.min.js"></script>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- 导航栏 -->
+    <div class="layui-layout layui-layout-admin">
+        <div class="layui-header">
+            <div class="layui-logo">学生作业系统</div>
+            <ul class="layui-nav layui-layout-left">
+                <li class="layui-nav-item layui-this">
+                    <a href="{{ url_for('teacher.teacher_student.homework_list') }}">作业列表</a>
+                </li>
+            </ul>
+            <ul class="layui-nav layui-layout-right">
+                <li class="layui-nav-item">
+                    <a href="#">{{ session.student_name or '学生' }}</a>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="{{ url_for('teacher.teacher_student.logout') }}">退出</a>
+                </li>
+            </ul>
+        </div>
+        
+        <!-- 主体内容 -->
+        <div class="layui-body">
+            <div class="layui-container">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+        
+        <!-- 页脚 -->
+        <div class="layui-footer">
+            <p>&copy; 2025 学生作业系统. All rights reserved.</p>
+        </div>
+    </div>
+    
+    <!-- Layui JS -->
+    <script src="/static/layui/layui.js"></script>
+    <!-- 自定义JS -->
+    <script src="/teacher/static/js/student/base.js"></script>
+    
+    {% block extra_js %}{% endblock %}
+    
+    <script>
+        // 初始化Layui
+        layui.use(['element', 'layer'], function(){
+            var element = layui.element;
+            var layer = layui.layer;
+        });
+    </script>
+</body>
+</html>

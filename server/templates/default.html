@@ -1,0 +1,413 @@
+<!--
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-10-30 14:00:00
+ * @LastEditTime: 2025-10-30 21:42:30
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2025 迷舍
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>团团圆圆的地球家 - EarthOnline</title>
+    <!-- 缓存控制 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <!-- favicon -->
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+    <!-- CSS引入 -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f5f7fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 300;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .tool-section {
+            margin-top: 30px;
+        }
+        .tool-section h2 {
+            color: #333;
+            font-size: 22px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e6e6e6;
+        }
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .tool-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        .tool-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .tool-card h3 {
+            margin: 0 0 15px 0;
+            color: #409eff;
+            font-size: 18px;
+        }
+        .tool-card p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+        .tool-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .tool-content {
+            margin-top: 30px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .text-input {
+            width: 100%;
+            min-height: 200px;
+            padding: 10px;
+            border: 1px solid #e6e6e6;
+            border-radius: 4px;
+            resize: vertical;
+            font-family: monospace;
+            margin-bottom: 15px;
+        }
+        .result-box {
+            width: 100%;
+            min-height: 150px;
+            padding: 10px;
+            border: 1px solid #e6e6e6;
+            border-radius: 4px;
+            background-color: #fafafa;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-bottom: 15px;
+        }
+        .function-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .footer {
+            text-align: center;
+            padding: 30px 0;
+            margin-top: 50px;
+            background-color: white;
+            border-top: 1px solid #e6e6e6;
+        }
+        .footer p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #409eff;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>私人订制-前端工具箱</h1>
+        <p>团团圆圆的天下第一最最好的爸爸专用</p>
+    </div>
+    
+    <div class="container">
+        <div class="tool-section">
+            <h2>JSON处理工具</h2>
+            <div class="tool-grid">
+                <div class="tool-card">
+                    <h3>JSON美化</h3>
+                    <p>美化或格式化JSON数据，提升JSON文本的可读性</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('json-beautify')">使用</button>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>JSON压缩</h3>
+                    <p>删除JSON数据中的空格、换行符等不必要的字符来减小其体积</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('json-minify')">使用</button>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>JSON转CSV</h3>
+                    <p>将JSON列表数据转换为CSV格式文件</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('json-to-csv')">使用</button>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>JSON验证</h3>
+                    <p>验证JSON格式是否正确，提供详细的错误信息</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('json-validate')">使用</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tool-section">
+            <h2>编码转换工具</h2>
+            <div class="tool-grid">
+                <div class="tool-card">
+                    <h3>URL编码</h3>
+                    <p>将文本数据进行URL编码，更安全地传输文本信息</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('url-encode')">使用</button>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>URL解码</h3>
+                    <p>将已进行URL编码的数据还原为原始的文本信息</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('url-decode')">使用</button>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>Base64编码</h3>
+                    <p>将文本数据进行Base64编码</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('base64-encode')">使用</button>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>Base64解码</h3>
+                    <p>将Base64编码的数据还原为原始文本</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('base64-decode')">使用</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tool-section">
+            <h2>文本处理工具</h2>
+            <div class="tool-grid">
+                <div class="tool-card">
+                    <h3>Unicode解码</h3>
+                    <p>将Unicode编码字符(\uXXXX格式)转换为实际字符</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('unicode-decode')">使用</button>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>HTML实体编码</h3>
+                    <p>将特殊字符转换为HTML实体形式，防止XSS攻击</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('html-encode')">使用</button>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>HTML实体解码</h3>
+                    <p>将HTML实体转换回原始字符</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('html-decode')">使用</button>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>文本去重</h3>
+                    <p>去除文本中的重复行，保留唯一内容</p>
+                    <div class="tool-actions">
+                        <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="showTool('text-deduplicate')">使用</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="tool-content-area" class="tool-content" style="display: none;">
+            <h3 id="tool-title">工具名称</h3>
+            <div class="function-buttons">
+                <button id="execute-btn" class="layui-btn layui-btn-normal">执行</button>
+                <button class="layui-btn layui-btn-primary" onclick="copyResult()">复制结果</button>
+                <button class="layui-btn layui-btn-primary" onclick="clearAll()">清空</button>
+            </div>
+            <textarea id="input-text" class="text-input" placeholder="请输入需要处理的文本..."></textarea>
+            <div id="result-area" class="result-box"></div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p><img class="logo" src="/static/img/logo01.png" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 5px;"><a href="https://beian.mps.gov.cn/#/query/webSearch?code=51019002007781" rel="noreferrer" target="_blank" id="mps">川公网安备51019002007781号</a></p>
+        <p><a href="https://beian.miit.gov.cn" target="_blank" id="icp">蜀ICP备2025013255号-1</a></p>
+        <p>© 2025 EarthOnline</p>
+    </div>
+    
+    <script src="/static/layui/layui.js"></script>
+    <script>
+        let currentTool = '';
+        
+        // 显示工具内容区域
+        function showTool(toolName) {
+            currentTool = toolName;
+            const toolContent = document.getElementById('tool-content-area');
+            const toolTitle = document.getElementById('tool-title');
+            
+            // 设置工具标题
+            const toolTitles = {
+                'json-beautify': 'JSON美化',
+                'json-minify': 'JSON压缩',
+                'json-to-csv': 'JSON转CSV',
+                'json-validate': 'JSON验证',
+                'url-encode': 'URL编码',
+                'url-decode': 'URL解码',
+                'base64-encode': 'Base64编码',
+                'base64-decode': 'Base64解码',
+                'unicode-decode': 'Unicode解码',
+                'html-encode': 'HTML实体编码',
+                'html-decode': 'HTML实体解码',
+                'text-deduplicate': '文本去重'
+            };
+            
+            toolTitle.textContent = toolTitles[toolName] || '工具名称';
+            toolContent.style.display = 'block';
+            
+            // 滚动到工具区域
+            toolContent.scrollIntoView({ behavior: 'smooth' });
+            
+            // 清空输入和结果
+            clearAll();
+        }
+        
+        // 执行工具功能
+        document.getElementById('execute-btn').addEventListener('click', function() {
+            const input = document.getElementById('input-text').value;
+            const resultArea = document.getElementById('result-area');
+            
+            try {
+                let result = '';
+                
+                switch(currentTool) {
+                    case 'json-beautify':
+                        result = JSON.stringify(JSON.parse(input), null, 2);
+                        break;
+                    case 'json-minify':
+                        result = JSON.stringify(JSON.parse(input));
+                        break;
+                    case 'json-to-csv':
+                        // 简单的JSON转CSV实现，仅支持一维数组对象
+                        const data = JSON.parse(input);
+                        if (Array.isArray(data) && data.length > 0) {
+                            const headers = Object.keys(data[0]);
+                            const csv = [
+                                headers.join(','),
+                                ...data.map(row => headers.map(header => JSON.stringify(row[header] || '')).join(','))
+                            ].join('\n');
+                            result = csv;
+                        } else {
+                            result = '请输入有效的JSON数组数据';
+                        }
+                        break;
+                    case 'json-validate':
+                        JSON.parse(input);
+                        result = 'JSON格式正确！';
+                        break;
+                    case 'url-encode':
+                        result = encodeURIComponent(input);
+                        break;
+                    case 'url-decode':
+                        result = decodeURIComponent(input);
+                        break;
+                    case 'base64-encode':
+                        result = btoa(unescape(encodeURIComponent(input)));
+                        break;
+                    case 'base64-decode':
+                        result = decodeURIComponent(escape(atob(input)));
+                        break;
+                    case 'unicode-decode':
+                        // Unicode解码
+                        result = input.replace(/\\u([0-9a-fA-F]{4})/g, function(match, hex) {
+                            return String.fromCharCode(parseInt(hex, 16));
+                        });
+                        break;
+                    case 'html-encode':
+                        // HTML实体编码
+                        const textarea = document.createElement('textarea');
+                        textarea.textContent = input;
+                        result = textarea.innerHTML;
+                        break;
+                    case 'html-decode':
+                        // HTML实体解码
+                        const textarea2 = document.createElement('textarea');
+                        textarea2.innerHTML = input;
+                        result = textarea2.textContent;
+                        break;
+                    case 'text-deduplicate':
+                        // 文本去重
+                        const lines = input.split('\n');
+                        const uniqueLines = [...new Set(lines)];
+                        result = uniqueLines.join('\n');
+                        break;
+                    default:
+                        result = '请选择要使用的工具';
+                }
+                
+                resultArea.textContent = result;
+                resultArea.style.color = '#333';
+            } catch (e) {
+                resultArea.textContent = '处理失败: ' + e.message;
+                resultArea.style.color = '#ff4d4f';
+            }
+        });
+        
+        // 复制结果
+        function copyResult() {
+            const resultText = document.getElementById('result-area').textContent;
+            if (resultText) {
+                navigator.clipboard.writeText(resultText).then(() => {
+                    layui.use('layer', function() {
+                        const layer = layui.layer;
+                        layer.msg('复制成功！');
+                    });
+                }).catch(err => {
+                    layui.use('layer', function() {
+                        const layer = layui.layer;
+                        layer.msg('复制失败，请手动复制');
+                    });
+                });
+            }
+        }
+        
+        // 清空所有内容
+        function clearAll() {
+            document.getElementById('input-text').value = '';
+            document.getElementById('result-area').textContent = '';
+            document.getElementById('result-area').style.color = '#333';
+        }
+    </script>
+</body>
+</html>

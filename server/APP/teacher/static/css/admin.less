@@ -1,0 +1,184 @@
+// 教师系统后台管理样式
+
+// 变量定义
+@primary-color: #1E9FFF;
+@success-color: #5FB878;
+@warning-color: #FFB800;
+@danger-color: #FF5722;
+@info-color: #2F4056;
+
+// 基础样式
+body {
+    font-family: "Microsoft YaHei", Arial, sans-serif;
+    background-color: #f2f2f2;
+}
+
+// 卡片样式
+.layui-card {
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+    
+    .layui-card-header {
+        background-color: #fff;
+        border-bottom: 1px solid #e6e6e6;
+        font-weight: 600;
+    }
+    
+    .layui-card-body {
+        background-color: #fff;
+    }
+}
+
+// 统计卡片
+.stat-card {
+    .layui-card-body {
+        padding: 20px;
+        
+        h3 {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 0;
+            color: @primary-color;
+        }
+        
+        p {
+            margin: 5px 0 0 0;
+            color: #666;
+            font-size: 14px;
+        }
+    }
+}
+
+// 表格样式
+.layui-table {
+    th {
+        background-color: #f8f8f8;
+        font-weight: 600;
+    }
+    
+    .layui-badge {
+        font-size: 12px;
+    }
+}
+
+// 按钮组
+.layui-btn-group {
+    .layui-btn {
+        margin-right: 5px;
+    }
+}
+
+// 时间轴样式
+.layui-timeline {
+    .layui-timeline-item {
+        .layui-timeline-content {
+            .layui-timeline-title {
+                font-size: 16px;
+                font-weight: 600;
+                margin-bottom: 10px;
+            }
+        }
+    }
+}
+
+// 进度条样式
+.layui-progress {
+    margin: 10px 0;
+}
+
+// 表单样式
+.layui-form {
+    .layui-form-item {
+        margin-bottom: 15px;
+    }
+    
+    .layui-form-label {
+        width: 100px;
+        text-align: right;
+    }
+    
+    .layui-input-block {
+        margin-left: 110px;
+    }
+}
+
+// 导航栏样式
+.layui-header {
+    .layui-logo {
+        color: #fff;
+        font-size: 18px;
+        font-weight: bold;
+    }
+}
+
+// 侧边栏样式
+.layui-side {
+    .layui-nav-tree {
+        .layui-nav-item {
+            a {
+                padding: 12px 20px;
+                
+                i {
+                    margin-right: 8px;
+                }
+            }
+        }
+    }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+    .layui-container {
+        padding: 10px;
+    }
+    
+    .layui-card {
+        margin-bottom: 10px;
+    }
+    
+    .layui-form {
+        .layui-form-label {
+            width: 80px;
+        }
+        
+        .layui-input-block {
+            margin-left: 90px;
+        }
+    }
+}
+
+// 动画效果
+.layui-card {
+    transition: all 0.3s ease;
+    
+    &:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+}
+
+// 状态颜色
+.status-completed {
+    color: @success-color;
+}
+
+.status-pending {
+    color: @warning-color;
+}
+
+.status-overdue {
+    color: @danger-color;
+}
+
+// 文件类型图标
+.file-type-video {
+    color: @primary-color;
+}
+
+.file-type-audio {
+    color: @success-color;
+}
+
+.file-type-document {
+    color: @warning-color;
+}

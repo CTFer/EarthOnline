@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学生登录 - 作业系统</title>
+    
+    <!-- Layui CSS -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <!-- 自定义CSS -->
+    <link rel="stylesheet" href="/teacher/static/css/student.min.css">
+</head>
+<body>
+    <div class="layui-container" style="margin-top: 100px;">
+        <div class="layui-row">
+            <div class="layui-col-md4 layui-col-md-offset4">
+                <div class="layui-card">
+                    <div class="layui-card-header">
+                        <h2 style="text-align: center;">学生登录</h2>
+                        <p style="text-align: center; color: #999;">请输入班级ID和姓名</p>
+                    </div>
+                    <div class="layui-card-body">
+                        <form class="layui-form" id="loginForm">
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">班级ID</label>
+                                <div class="layui-input-block">
+                                    <input type="text" name="class_code" required lay-verify="required" 
+                                           placeholder="请输入班级ID" autocomplete="off" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">姓名</label>
+                                <div class="layui-input-block">
+                                    <input type="text" name="student_name" required lay-verify="required" 
+                                           placeholder="请输入姓名" autocomplete="off" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
+                                <div class="layui-input-block">
+                                    <button class="layui-btn layui-btn-fluid" lay-submit lay-filter="login">进入作业系统</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Layui JS -->
+    <script src="/static/layui/layui.js"></script>
+    
+    <script>
+        layui.use(['form', 'layer'], function(){
+            var form = layui.form;
+            var layer = layui.layer;
+            
+            // 监听提交
+            form.on('submit(login)', function(data){
+                // 发送登录请求
+                fetch('{{ url_for("teacher.teacher_student.login") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data.field)
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        layer.msg('验证成功', {icon: 1});
+                        setTimeout(function(){
+                            window.location.href = '{{ url_for("teacher.teacher_student.homework_list") }}';
+                        }, 1000);
+                    } else {
+                        layer.msg(result.message, {icon: 2});
+                    }
+                })
+                .catch(error => {
+                    layer.msg('验证失败，请重试', {icon: 2});
+                });
+                
+                return false;
+            });
+        });
+    </script>
+</body>
+</html>

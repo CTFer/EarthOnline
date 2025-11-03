@@ -1,0 +1,196 @@
+{% extends "admin/base.html" %}
+
+{% block title %}材料管理 - 教师管理系统{% endblock %}
+
+{% block content %}
+<div class="layui-container">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <div class="layui-card">
+                <div class="layui-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin: 0;">材料管理</h2>
+                    <button class="layui-btn layui-btn-normal" onclick="uploadMaterial()">
+                        <i class="layui-icon layui-icon-upload"></i> 上传材料
+                    </button>
+                </div>
+                <div class="layui-card-body">
+                    <!-- 筛选条件 -->
+                    <div class="layui-form layui-row layui-col-space10">
+                        <div class="layui-col-md3">
+                            <select name="type" lay-filter="typeFilter">
+                                <option value="">选择类型</option>
+                                <option value="video">视频</option>
+                                <option value="audio">音频</option>
+                                <option value="document">文档</option>
+                            </select>
+                        </div>
+                        <div class="layui-col-md3">
+                            <select name="class_id" lay-filter="classFilter">
+                                <option value="">选择班级</option>
+                            </select>
+                        </div>
+                        <div class="layui-col-md3">
+                            <input type="text" name="keyword" placeholder="搜索材料标题" class="layui-input">
+                        </div>
+                        <div class="layui-col-md2">
+                            <button class="layui-btn" onclick="searchMaterials()">搜索</button>
+                        </div>
+                    </div>
+                    
+                    <table class="layui-table" lay-data="{url:'/teacher/api/materials', page:true, id:'materialTable'}" lay-filter="materialTable">
+                        <thead>
+                            <tr>
+                                <th lay-data="{field:'id', width:80}">ID</th>
+                                <th lay-data="{field:'title', width:200}">材料标题</th>
+                                <th lay-data="{field:'type', width:80, templet:'#typeTpl'}">类型</th>
+                                <th lay-data="{field:'file_size', width:100, templet:'#sizeTpl'}">大小</th>
+                                <th lay-data="{field:'targets', width:200, templet:'#targetTpl'}">分发对象</th>
+                                <th lay-data="{field:'completion_rate', width:100, templet:'#rateTpl'}">完成率</th>
+                                <th lay-data="{field:'deadline', width:150}">截止时间</th>
+                                <th lay-data="{field:'create_time', width:150}">创建时间</th>
+                                <th lay-data="{field:'status', width:80, templet:'#statusTpl'}">状态</th>
+                                <th lay-data="{fixed: 'right', width:200, align:'center', toolbar: '#barDemo'}">操作</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 类型模板 -->
+<script type="text/html" id="typeTpl">
+    <div class="type-badge">
+        <!-- 类型标签将通过JavaScript动态生成 -->
+    </div>
+</script>
+
+<!-- 文件大小模板 -->
+<script type="text/html" id="sizeTpl">
+    <div class="file-size">
+        <!-- 文件大小将通过JavaScript动态生成 -->
+    </div>
+</script>
+
+<!-- 分发对象模板 -->
+<script type="text/html" id="targetTpl">
+    <div class="target-badges">
+        <!-- 分发对象标签将通过JavaScript动态生成 -->
+    </div>
+</script>
+
+<!-- 完成率模板 -->
+<script type="text/html" id="rateTpl">
+    <div class="completion-rate">
+        <!-- 完成率将通过JavaScript动态生成 -->
+    </div>
+</script>
+
+<!-- 状态模板 -->
+<script type="text/html" id="statusTpl">
+    <div class="status-badge">
+        <!-- 状态标签将通过JavaScript动态生成 -->
+    </div>
+</script>
+
+<!-- 操作按钮模板 -->
+<script type="text/html" id="barDemo">
+    <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+    <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="distribute">分发</a>
+    <a class="layui-btn layui-btn-xs layui-btn-warm" lay-event="stats">统计</a>
+    <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="del">删除</a>
+</script>
+
+<!-- 材料上传表单 -->
+<div id="materialUploadForm" style="display: none; padding: 20px;">
+    <form class="layui-form" lay-filter="materialUploadForm" enctype="multipart/form-data">
+        <div class="layui-form-item">
+            <label class="layui-form-label">材料标题</label>
+            <div class="layui-input-block">
+                <input type="text" name="title" required lay-verify="required" placeholder="请输入材料标题" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">材料类型</label>
+            <div class="layui-input-block">
+                <select name="type" required lay-verify="required">
+                    <option value="">请选择类型</option>
+                    <option value="video">视频</option>
+                    <option value="audio">音频</option>
+                    <option value="document">文档</option>
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">选择文件</label>
+            <div class="layui-input-block">
+                <button type="button" class="layui-btn" id="uploadBtn">
+                    <i class="layui-icon">&#xe67c;</i>选择文件
+                </button>
+                <div id="fileInfo" style="margin-top: 10px;"></div>
+            </div>
+        </div>
+        <div class="layui-form-item layui-form-text">
+            <label class="layui-form-label">材料描述</label>
+            <div class="layui-input-block">
+                <textarea name="description" placeholder="请输入材料描述" class="layui-textarea"></textarea>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">截止时间</label>
+            <div class="layui-input-block">
+                <input type="text" name="deadline" id="deadline" placeholder="请选择截止时间" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">分发对象</label>
+            <div class="layui-input-block">
+                <div id="targetCheckboxes"></div>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <div class="layui-input-block">
+                <button class="layui-btn" lay-submit lay-filter="submitMaterial">确定</button>
+                <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- 材料编辑表单 -->
+<div id="materialEditForm" style="display: none; padding: 20px;">
+    <form class="layui-form" lay-filter="materialEditForm">
+        <input type="hidden" name="id" value="">
+        <div class="layui-form-item">
+            <label class="layui-form-label">材料标题</label>
+            <div class="layui-input-block">
+                <input type="text" name="title" required lay-verify="required" placeholder="请输入材料标题" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item layui-form-text">
+            <label class="layui-form-label">材料描述</label>
+            <div class="layui-input-block">
+                <textarea name="description" placeholder="请输入材料描述" class="layui-textarea"></textarea>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">截止时间</label>
+            <div class="layui-input-block">
+                <input type="text" name="deadline" id="editDeadline" placeholder="请选择截止时间" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <div class="layui-input-block">
+                <button class="layui-btn" lay-submit lay-filter="submitEdit">确定</button>
+                <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="/teacher/static/js/admin/material_manage.js"></script>
+{% endblock %}

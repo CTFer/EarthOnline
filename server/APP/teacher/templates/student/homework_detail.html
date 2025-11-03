@@ -1,0 +1,191 @@
+{% extends "student/base.html" %}
+
+{% block title %}{{ material.title }} - 学生作业系统{% endblock %}
+
+{% block content %}
+<div class="layui-row">
+    <div class="layui-col-md12">
+        <div class="layui-card">
+            <div class="layui-card-header">
+                <h3>{{ material.title }}</h3>
+                <div class="layui-btn-group">
+                    <a href="{{ url_for('teacher.teacher_student.homework_list') }}" class="layui-btn layui-btn-sm">返回列表</a>
+                    {% if not completion or completion.status == 0 %}
+                    <button class="layui-btn layui-btn-sm layui-btn-normal" id="completeBtn">标记完成</button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="layui-card-body">
+                <!-- 材料信息 -->
+                <div class="layui-row">
+                    <div class="layui-col-md8">
+                        <table class="layui-table">
+                            <tr>
+                                <td width="100">类型</td>
+                                <td>
+                                    <span class="layui-badge layui-bg-{{ 'blue' if material.type == 'video' else 'green' if material.type == 'audio' else 'orange' }}">
+                                        {{ '视频' if material.type == 'video' else '音频' if material.type == 'audio' else '文档' }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>发布时间</td>
+                                <td>{{ material.create_time }}</td>
+                            </tr>
+                            <tr>
+                                <td>截止时间</td>
+                                <td>
+                                    {% if material.deadline %}
+                                        <span class="layui-badge layui-bg-{{ 'red' if material.deadline < 'now' else 'orange' }}">
+                                            {{ material.deadline }}
+                                        </span>
+                                    {% else %}
+                                        <span class="layui-badge">无期限</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>完成状态</td>
+                                <td>
+                                    {% if completion and completion.status == 1 %}
+                                        <span class="layui-badge layui-bg-green">已完成</span>
+                                    {% else %}
+                                        <span class="layui-badge layui-bg-gray">未完成</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% if material.description %}
+                            <tr>
+                                <td>描述</td>
+                                <td>{{ material.description }}</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                    <div class="layui-col-md4">
+                        <!-- 完成状态 -->
+                        {% if completion %}
+                        <div class="layui-card">
+                            <div class="layui-card-header">学习进度</div>
+                            <div class="layui-card-body">
+                                <div class="layui-progress" lay-showpercent="true">
+                                    <div class="layui-progress-bar" lay-percent="{{ completion.progress or 0 }}%"></div>
+                                </div>
+                                <p style="margin-top: 10px;">
+                                    最后播放位置: {{ completion.last_position or 0 }}秒
+                                </p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- 媒体播放区域 -->
+                <div class="layui-row" style="margin-top: 20px;">
+                    <div class="layui-col-md12">
+                        <div class="layui-card">
+                            <div class="layui-card-header">学习内容</div>
+                            <div class="layui-card-body">
+                                {% if material.type == 'video' %}
+                                <!-- 视频播放器 -->
+                                <video id="videoPlayer" controls style="width: 100%; max-width: 800px;">
+                                    <source src="{{ material.file_url or '/teacher/uploads/' + material.file_path.split('/')[-1] }}" type="video/mp4">
+                                    您的浏览器不支持视频播放。
+                                </video>
+                                {% elif material.type == 'audio' %}
+                                <!-- 音频播放器 -->
+                                <audio id="audioPlayer" controls style="width: 100%;">
+                                    <source src="{{ material.file_url or '/teacher/uploads/' + material.file_path.split('/')[-1] }}" type="audio/mpeg">
+                                    您的浏览器不支持音频播放。
+                                </audio>
+                                {% else %}
+                                <!-- 文档预览 -->
+                                <div id="documentViewer" style="width: 100%; height: 600px; border: 1px solid #ddd;">
+                                    <iframe src="{{ material.file_url or '/teacher/uploads/' + material.file_path.split('/')[-1] }}" 
+                                            style="width: 100%; height: 100%; border: none;"></iframe>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    layui.use(['layer', 'element'], function(){
+        var layer = layui.layer;
+        var element = layui.element;
+        
+        // 标记完成按钮
+        document.getElementById('completeBtn').addEventListener('click', function(){
+            layer.confirm('确定要标记为已完成吗？', function(index){
+                // 发送完成请求
+                fetch('{{ url_for("teacher_student.mark_complete", material_id=material.id) }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({})
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        layer.msg('标记完成成功', {icon: 1});
+                        setTimeout(function(){
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        layer.msg(result.message, {icon: 2});
+                    }
+                })
+                .catch(error => {
+                    layer.msg('操作失败，请重试', {icon: 2});
+                });
+                
+                layer.close(index);
+            });
+        });
+        
+        // 媒体播放器事件监听
+        var videoPlayer = document.getElementById('videoPlayer');
+        var audioPlayer = document.getElementById('audioPlayer');
+        
+        if (videoPlayer) {
+            // 视频播放器事件
+            videoPlayer.addEventListener('timeupdate', function(){
+                updateProgress('{{ material.id }}', this.currentTime, this.duration);
+            });
+        }
+        
+        if (audioPlayer) {
+            // 音频播放器事件
+            audioPlayer.addEventListener('timeupdate', function(){
+                updateProgress('{{ material.id }}', this.currentTime, this.duration);
+            });
+        }
+        
+        function updateProgress(materialId, currentTime, duration) {
+            var progress = Math.round((currentTime / duration) * 100);
+            
+            // 每10秒更新一次进度
+            if (Math.floor(currentTime) % 10 === 0) {
+                fetch('{{ url_for("teacher_student.update_progress", material_id=material.id) }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        progress: progress,
+                        last_position: Math.floor(currentTime)
+                    })
+                });
+            }
+        }
+    });
+</script>
+{% endblock %}

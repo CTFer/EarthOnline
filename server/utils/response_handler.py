@@ -32,6 +32,7 @@ class StatusCode:
     ACCOUNT_LOCKED = 1005     # 账户被锁定
     ACCOUNT_DISABLED = 1006   # 账户被禁用
     PASSWORD_EXPIRED = 1007   # 密码过期
+    PASSWORD_ERROR = 1008  # 密码不匹配
 
     # 用户相关状态码 (1100-1199)
     USER_NOT_FOUND = 1100     # 用户不存在

@@ -1,0 +1,116 @@
+{% extends "public/base.html" %}
+
+{% block title %}公开资源 - 教师展示系统{% endblock %}
+
+{% block content %}
+<div class="layui-container">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <div class="layui-card">
+                <div class="layui-card-header">
+                    <h2>公开学习资源</h2>
+                </div>
+                <div class="layui-card-body">
+                    <!-- 筛选条件 -->
+                    <div class="layui-form layui-row layui-col-space10">
+                        <div class="layui-col-md3">
+                            <select name="type" lay-filter="typeFilter">
+                                <option value="">选择类型</option>
+                                <option value="video">视频</option>
+                                <option value="audio">音频</option>
+                                <option value="document">文档</option>
+                            </select>
+                        </div>
+                        <div class="layui-col-md6">
+                            <input type="text" name="keyword" placeholder="搜索资源名称" class="layui-input">
+                        </div>
+                        <div class="layui-col-md3">
+                            <button class="layui-btn" onclick="searchResources()">搜索</button>
+                        </div>
+                    </div>
+                    
+                    <div class="layui-row layui-col-space15" id="resourcesList">
+                        <!-- 资源列表将通过JavaScript动态加载 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 资源详情模态框 -->
+<div id="resourceDetail" style="display: none; padding: 20px;">
+    <div class="layui-card">
+        <div class="layui-card-header">
+            <h3 id="resourceTitle"></h3>
+        </div>
+        <div class="layui-card-body">
+            <div class="layui-row">
+                <div class="layui-col-md6">
+                    <p><strong>资源类型：</strong><span id="resourceType"></span></p>
+                    <p><strong>文件大小：</strong><span id="resourceSize"></span></p>
+                    <p><strong>创建时间：</strong><span id="resourceTime"></span></p>
+                </div>
+                <div class="layui-col-md6">
+                    <p><strong>播放时长：</strong><span id="resourceDuration"></span></p>
+                    <p><strong>下载次数：</strong><span id="resourceDownloads"></span></p>
+                </div>
+            </div>
+            <div class="layui-row" style="margin-top: 20px;">
+                <div class="layui-col-md12">
+                    <h4>资源描述</h4>
+                    <div id="resourceDescription"></div>
+                </div>
+            </div>
+            <div class="layui-row" style="margin-top: 20px;">
+                <div class="layui-col-md12">
+                    <button class="layui-btn layui-btn-normal" id="playBtn" style="display: none;">
+                        <i class="layui-icon layui-icon-play"></i> 在线播放
+                    </button>
+                    <button class="layui-btn layui-btn-warm" id="downloadBtn" style="display: none;">
+                        <i class="layui-icon layui-icon-download-circle"></i> 下载资源
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 资源播放器 -->
+<div id="resourcePlayer" style="display: none; padding: 20px;">
+    <div class="layui-card">
+        <div class="layui-card-header">
+            <h3 id="playerTitle"></h3>
+            <button class="layui-btn layui-btn-sm layui-btn-primary" onclick="closePlayer()" style="float: right;">
+                <i class="layui-icon layui-icon-close"></i> 关闭
+            </button>
+        </div>
+        <div class="layui-card-body">
+            <!-- 视频播放器 -->
+            <div id="videoPlayer" style="display: none;">
+                <video id="videoElement" controls style="width: 100%; height: 400px;">
+                    <source src="" type="video/mp4">
+                    您的浏览器不支持视频播放。
+                </video>
+            </div>
+            
+            <!-- 音频播放器 -->
+            <div id="audioPlayer" style="display: none;">
+                <audio id="audioElement" controls style="width: 100%;">
+                    <source src="" type="audio/mpeg">
+                    您的浏览器不支持音频播放。
+                </audio>
+            </div>
+            
+            <!-- 文档预览 -->
+            <div id="documentViewer" style="display: none;">
+                <iframe id="documentFrame" src="" style="width: 100%; height: 600px; border: none;"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/teacher/static/js/public/resources.js"></script>
+{% endblock %}

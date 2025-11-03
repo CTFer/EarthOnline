@@ -1,0 +1,96 @@
+<!--
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-10-22 14:29:04
+ * @LastEditTime: 2025-10-22 23:01:03
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2025 迷舍
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教师登录 - 教师管理系统</title>
+    
+    <!-- Layui CSS -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <!-- 自定义CSS -->
+    <link rel="stylesheet" href="/teacher/static/css/admin.min.css">
+</head>
+<body>
+    <div class="layui-container" style="margin-top: 100px;">
+        <div class="layui-row">
+            <div class="layui-col-md4 layui-col-md-offset4">
+                <div class="layui-card">
+                    <div class="layui-card-header">
+                        <h2 style="text-align: center;">教师登录</h2>
+                    </div>
+                    <div class="layui-card-body">
+                        <form class="layui-form" id="loginForm">
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">用户名</label>
+                                <div class="layui-input-block">
+                                    <input type="text" name="username" required lay-verify="required|username" 
+                                           placeholder="请输入用户名" autocomplete="off" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">密码</label>
+                                <div class="layui-input-block">
+                                    <input type="password" name="password" required lay-verify="required" 
+                                           placeholder="请输入密码" autocomplete="off" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-form-item">
+                                <div class="layui-input-block">
+                                    <button class="layui-btn layui-btn-fluid" lay-submit lay-filter="login">登录</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Layui JS -->
+    <script src="/static/layui/layui.js"></script>
+    
+    <script>
+        layui.use(['form', 'layer'], function(){
+            var form = layui.form;
+            var layer = layui.layer;
+            
+            // 监听提交
+            form.on('submit(login)', function(data){
+                // 发送登录请求
+                fetch('{{ url_for("teacher.teacher_admin.login") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data.field)
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        layer.msg('登录成功', {icon: 1});
+                        setTimeout(function(){
+                            window.location.href = '{{ url_for("teacher.teacher_admin.dashboard") }}';
+                        }, 1000);
+                    } else {
+                        layer.msg(result.message, {icon: 2});
+                    }
+                })
+                .catch(error => {
+                    layer.msg('登录失败，请重试', {icon: 2});
+                });
+                
+                return false;
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,4 +1,24 @@
 # -*- coding: utf-8 -*-
+
+# Author: 一根鱼骨棒 Email 775639471@qq.com
+# Date: 2025-01-07 14:02:42
+# LastEditTime: 2025-11-01 19:41:18
+# LastEditors: 一根鱼骨棒
+# Description: 本开源代码使用GPL 3.0协议
+# Software: VScode
+# Copyright 2025 迷舍
+
+# -*- coding: utf-8 -*-
+
+# Author: 一根鱼骨棒 Email 775639471@qq.com
+# Date: 2025-01-07 14:02:42
+# LastEditTime: 2025-10-26 15:12:33
+# LastEditors: 一根鱼骨棒
+# Description: 本开源代码使用GPL 3.0协议
+# Software: VScode
+# Copyright 2025 迷舍
+
+# -*- coding: utf-8 -*-
 import eventlet
 eventlet.monkey_patch()
 
@@ -46,10 +66,14 @@ from function.ServerService import server_service  # 导入服务器管理服务
 from utils.LogService import log_service  # 导入日志服务
 
 # 创建 Flask 应用实例
-app = Flask(__name__, static_folder='static')
+import os
+# 获取当前文件所在目录的绝对路径
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# 明确指定templates文件夹路径
+app = Flask(__name__, static_folder='static', template_folder=os.path.join(BASE_DIR, 'templates'))
 
 # 立即应用服务器配置
-app = server_service.configure_app(app)
+# app = server_service.configure_app(app)
 logger = log_service.setup_logging(DEBUG)
 
 # 导入其他依赖
@@ -73,6 +97,59 @@ from utils.response_handler import ResponseHandler, StatusCode, api_response
 from wechat import wechat_bp  # 导入微信蓝图
 if ENV == 'prod':
     from car_park import car_park_bp  # 导入车场蓝图
+# 导入新的停车场管理模块（位于APP目录下）
+from APP.car_park import car_park_new_bp
+# APP模块集成 - 使用统一的应用集成服务
+try:
+    # 直接导入AppIntegrationService类
+    from function.AppIntegrationService import AppIntegrationService
+    # 创建集成服务实例
+    app_integration_service = AppIntegrationService()
+    # 设置日志记录器
+    app_integration_service.set_logger(logger)
+    
+    # 定义要集成的应用配置列表
+    apps_to_integrate = [
+        # APP目录下的轨迹图模块
+        {
+            'app_name': '轨迹图模块',
+            'app_path': 'APP/route',
+            'module_name': 'app',
+            'blueprint_name': 'route_bp',
+            'url_prefix': '/route'
+        },
+        # APP目录下的教师系统
+        {
+            'app_name': 'APP教师系统',
+            'app_path': 'APP/teacher',
+            'module_name': 'app',
+            'blueprint_name': 'teacher_bp',
+            'url_prefix': '/teacher'
+        },
+        # APP目录下的停车场管理系统
+        {
+            'app_name': '停车场管理系统',
+            'app_path': 'APP/car_park',
+            'module_name': 'app',
+            'blueprint_name': 'car_park_new_bp',
+            'url_prefix': '/car_park_new'
+        },
+        # 其他可能的应用可以在这里添加...
+    ]
+    
+    # 批量集成应用
+    success_count, fail_count = app_integration_service.integrate_multiple_apps(app, apps_to_integrate)
+    
+    # 记录集成结果
+    if success_count > 0:
+        logger.info(f"成功集成 {success_count} 个应用模块")
+    if fail_count > 0:
+        logger.warning(f"有 {fail_count} 个应用模块集成失败")
+    
+except Exception as e:
+    logger.warning(f"应用集成服务初始化失败: {e}")
+    import traceback
+    traceback.print_exc()
 from function.SecurityService import security_service
 from function.RateLimitService import rate_limit_service
 from lxml import etree
@@ -86,6 +163,7 @@ app.register_blueprint(shop_bp)
 app.register_blueprint(wechat_bp, url_prefix='/wechat')
 if ENV == 'prod':
     app.register_blueprint(car_park_bp, url_prefix='/car_park')
+# 停车场管理系统蓝图已通过应用集成服务注册
 # 初始化WebSocket服务
 websocket_service.init_app(app)
 
@@ -103,8 +181,9 @@ app.view_functions = {
 
 # 添加模板目录配置
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+app.template_folder = TEMPLATE_DIR  # 设置模板目录
 
-# 注意：不再需要重复定义WebSocket事件处理器，因为它们已经在WebSocketService中定义
+
 # 以下是其他API路由
 
 # 添加玩家登录路由
@@ -326,11 +405,11 @@ def record():
         logger.error(f"Error: {str(e)}")
         return f"Error: {str(e)}", 500
 
-@app.route('/')
+@app.route('/earthonline')
 @app.route('/shop')
 def spa_index():
     """单页应用入口"""
-    return render_template('/client/base.html')
+    return render_template('client/base.html')
 
 # API路由 - 获取模板片段
 @app.route('/api/templates/<template_name>')
@@ -956,105 +1035,6 @@ def sync_task_approval_status():
             msg=f'同步任务审批状态失败: {str(e)}'
         )
 
-@app.route('/api/test_session', methods=['GET'])
-@api_response
-def test_session():
-    """测试 session 是否正常工作"""
-    from flask import current_app
-    # 设置测试值
-    if 'test_count' not in session:
-        session['test_count'] = 1
-    else:
-        session['test_count'] += 1
-    session.modified = True
-    
-    # 收集状态信息
-    return {
-        'session_data': dict(session),
-        'is_logged_in': bool(session.get('is_player', False)),
-        'request_info': {
-            'remote_addr': request.remote_addr,
-            'host': request.host,
-            'cookies': {k: v for k, v in request.cookies.items()},
-            'user_agent': request.headers.get('User-Agent', ''),
-            'method': request.method,
-            'path': request.path
-        },
-        'session_config': {
-            'cookie_name': current_app.config.get('SESSION_COOKIE_NAME'),
-            'cookie_domain': current_app.config.get('SESSION_COOKIE_DOMAIN'),
-            'cookie_secure': current_app.config.get('SESSION_COOKIE_SECURE'),
-            'cookie_httponly': current_app.config.get('SESSION_COOKIE_HTTPONLY'),
-            'cookie_samesite': current_app.config.get('SESSION_COOKIE_SAMESITE'),
-            'permanent_lifetime': str(current_app.config.get('PERMANENT_SESSION_LIFETIME'))
-        }
-    }
-
-@app.route('/debug_session', methods=['GET'])
-def debug_session():
-    """查看和修复当前 session"""
-    # 当前 session 状态
-    current_session = dict(session)
-    
-    # 请求信息
-    request_info = {
-        'remote_addr': request.remote_addr,
-        'host': request.host,
-        'user_agent': request.headers.get('User-Agent'),
-        'referrer': request.referrer,
-        'cookies': {k: v for k, v in request.cookies.items()}
-    }
-    
-    # Flask 配置信息
-    config_info = {
-        'SESSION_COOKIE_DOMAIN': app.config.get('SESSION_COOKIE_DOMAIN'),
-        'SESSION_COOKIE_SECURE': app.config.get('SESSION_COOKIE_SECURE'),
-        'SESSION_COOKIE_HTTPONLY': app.config.get('SESSION_COOKIE_HTTPONLY'),
-        'SESSION_COOKIE_SAMESITE': app.config.get('SESSION_COOKIE_SAMESITE'),
-        'SESSION_COOKIE_PATH': app.config.get('SESSION_COOKIE_PATH'),
-        'SECRET_KEY_SET': bool(app.secret_key)
-    }
-    
-    # 创建简单的 HTML 页面
-    html = f"""
-    <html>
-    <head><title>Session Debug</title></head>
-    <body>
-        <h2>当前 Session:</h2>
-        <pre>{json.dumps(current_session, indent=4)}</pre>
-        
-        <h2>请求信息:</h2>
-        <pre>{json.dumps(request_info, indent=4)}</pre>
-        
-        <h2>配置信息:</h2>
-        <pre>{json.dumps(config_info, indent=4)}</pre>
-        
-        <h2>操作:</h2>
-        <form method="post" action="/set_test_session">
-            <button type="submit">设置测试 Session</button>
-        </form>
-        <form method="post" action="/clear_session">
-            <button type="submit">清除 Session</button>
-        </form>
-    </body>
-    </html>
-    """
-    
-    return html
-
-@app.route('/set_test_session', methods=['POST'])
-def set_test_session():
-    """设置测试 session 数据"""
-    session['test_value'] = 'test_' + str(time_module.time())
-    session.modified = True
-    return redirect('/debug_session')
-
-@app.route('/clear_session', methods=['POST'])
-def clear_session():
-    """清除 session 数据"""
-    session.clear()
-    return redirect('/debug_session')
-
 @app.errorhandler(Exception)
 def handle_error(e):
     """全局错误处理器"""
@@ -1140,6 +1120,11 @@ def after_request(response):
 def nfc_test():
     """NFC测试页面"""
     return render_template('nfc.html')
+
+@app.route('/')
+def index():
+    """首页路由，渲染默认首页"""
+    return render_template('default.html')
 
 
 if __name__ == '__main__':

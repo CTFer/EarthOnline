@@ -12,7 +12,7 @@ import re
 from utils.response_handler import ResponseHandler, StatusCode
 from config.config import ENV
 if ENV == 'local':
-    from ndef import message, record, UriRecord, TextRecord, message_encoder
+    from ndef import message, record
     from function.NFC_Device import NFC_Device
 
 logger = logging.getLogger(__name__)

@@ -1,0 +1,166 @@
+{% extends "admin/base.html" %}
+
+{% block title %}仪表盘 - 教师管理系统{% endblock %}
+
+{% block content %}
+<div class="layui-row layui-col-space15">
+    <!-- 统计卡片 -->
+    <div class="layui-col-md3">
+        <div class="layui-card">
+            <div class="layui-card-body">
+                <div class="layui-row">
+                    <div class="layui-col-md8">
+                        <h3>{{ dashboard_data.classes.total }}</h3>
+                        <p>班级总数</p>
+                    </div>
+                    <div class="layui-col-md4">
+                        <i class="layui-icon layui-icon-group" style="font-size: 40px; color: #1E9FFF;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="layui-col-md3">
+        <div class="layui-card">
+            <div class="layui-card-body">
+                <div class="layui-row">
+                    <div class="layui-col-md8">
+                        <h3>{{ dashboard_data.students.active_students }}</h3>
+                        <p>学生总数</p>
+                    </div>
+                    <div class="layui-col-md4">
+                        <i class="layui-icon layui-icon-user" style="font-size: 40px; color: #5FB878;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="layui-col-md3">
+        <div class="layui-card">
+            <div class="layui-card-body">
+                <div class="layui-row">
+                    <div class="layui-col-md8">
+                        <h3>{{ dashboard_data.materials.total_materials }}</h3>
+                        <p>材料总数</p>
+                    </div>
+                    <div class="layui-col-md4">
+                        <i class="layui-icon layui-icon-file" style="font-size: 40px; color: #FFB800;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="layui-col-md3">
+        <div class="layui-card">
+            <div class="layui-card-body">
+                <div class="layui-row">
+                    <div class="layui-col-md8">
+                        <h3>{{ dashboard_data.completion.today_deadline }}</h3>
+                        <p>今日到期</p>
+                    </div>
+                    <div class="layui-col-md4">
+                        <i class="layui-icon layui-icon-time" style="font-size: 40px; color: #FF5722;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 通知区域 -->
+{% if notifications %}
+<div class="layui-row" style="margin-top: 15px;">
+    <div class="layui-col-md12">
+        <div class="layui-card">
+            <div class="layui-card-header">
+                <h3>系统通知</h3>
+            </div>
+            <div class="layui-card-body">
+                <ul class="layui-timeline">
+                    {% for notification in notifications %}
+                    <li class="layui-timeline-item">
+                        <i class="layui-icon layui-icon-{{ 'time' if notification.priority == 'urgent' else 'notice' }} layui-timeline-axis"></i>
+                        <div class="layui-timeline-content layui-text">
+                            <h3 class="layui-timeline-title">{{ notification.title }}</h3>
+                            <p>{{ notification.message }}</p>
+                            <p><span class="layui-badge layui-bg-{{ 'red' if notification.priority == 'urgent' else 'blue' }}">{{ notification.priority }}</span></p>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- 最近活动 -->
+<div class="layui-row" style="margin-top: 15px;">
+    <div class="layui-col-md6">
+        <div class="layui-card">
+            <div class="layui-card-header">
+                <h3>最近班级</h3>
+            </div>
+            <div class="layui-card-body">
+                {% if dashboard_data.classes.list %}
+                <table class="layui-table">
+                    <thead>
+                        <tr>
+                            <th>班级名称</th>
+                            <th>学生数量</th>
+                            <th>创建时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for class_item in dashboard_data.classes.list[:5] %}
+                        <tr>
+                            <td>{{ class_item.name }}</td>
+                            <td>{{ class_item.student_count }}</td>
+                            <td>{{ class_item.create_time }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p>暂无班级数据</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="layui-col-md6">
+        <div class="layui-card">
+            <div class="layui-card-header">
+                <h3>即将到期材料</h3>
+            </div>
+            <div class="layui-card-body">
+                {% if dashboard_data.upcoming_materials %}
+                <table class="layui-table">
+                    <thead>
+                        <tr>
+                            <th>材料标题</th>
+                            <th>类型</th>
+                            <th>到期时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for material in dashboard_data.upcoming_materials[:5] %}
+                        <tr>
+                            <td>{{ material.title }}</td>
+                            <td>{{ material.type }}</td>
+                            <td>{{ material.deadline }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p>暂无即将到期的材料</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

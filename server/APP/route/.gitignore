@@ -1,0 +1,6 @@
+__pycache__/
+.htaccess
+data.sqlite3
+nginx.htaccess
+react-big-screen-master/
+backup.sql

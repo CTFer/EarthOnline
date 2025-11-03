@@ -17,7 +17,7 @@ import traceback
 from datetime import datetime
 import serial
 import serial.tools.list_ports
-from ndef import message, record, UriRecord, TextRecord, message_encoder
+from ndef import message, record
 import re
 import nfc
 

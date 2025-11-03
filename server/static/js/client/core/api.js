@@ -25,21 +25,15 @@ class APIClient {
      * @returns {Promise<any>}
      */
     async request(endpoint, options = {}) {
-        // 获取当前页面协议
-        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        // 获取当前页面协议和域名
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        const port = window.location.port ? `:${window.location.port}` : '';
         
-        // 构建基础URL
-        let baseUrl = this.baseURL;
-        
-        // 如果baseURL包含协议，则直接使用
-        if (!baseUrl.startsWith('http')) {
-            baseUrl = `${protocol}//${baseUrl}`;
-        }
-        
-        // 构建完整URL
+        // 构建完整URL - 确保API请求总是以/开头，使用正确的协议
         const url = endpoint.startsWith('http') 
             ? endpoint 
-            : `${baseUrl}${endpoint}`;
+            : `${protocol}//${hostname}${port}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
         
         try {
             Logger.debug('API', '发送请求:', { url, options });
@@ -347,4 +341,4 @@ class APIClient {
 }
 
 // 修改导出方式
-export default APIClient;  // 使用默认导出 
+export default APIClient;  // 使用默认导出

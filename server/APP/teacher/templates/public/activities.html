@@ -1,0 +1,98 @@
+{% extends "public/base.html" %}
+
+{% block title %}活动展示 - 教师展示系统{% endblock %}
+
+{% block content %}
+<div class="layui-container">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <div class="layui-card">
+                <div class="layui-card-header">
+                    <h2>活动展示</h2>
+                </div>
+                <div class="layui-card-body">
+                    <div class="layui-row layui-col-space15" id="activitiesList">
+                        <!-- 活动列表将通过JavaScript动态加载 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 活动详情模态框 -->
+<div id="activityDetail" style="display: none; padding: 20px;">
+    <div class="layui-card">
+        <div class="layui-card-header">
+            <h3 id="activityTitle"></h3>
+        </div>
+        <div class="layui-card-body">
+            <div class="layui-row">
+                <div class="layui-col-md6">
+                    <p><strong>活动时间：</strong><span id="activityTime"></span></p>
+                    <p><strong>活动地点：</strong><span id="activityLocation"></span></p>
+                    <p><strong>活动类型：</strong><span id="activityType"></span></p>
+                </div>
+                <div class="layui-col-md6">
+                    <p><strong>参与人数：</strong><span id="activityParticipants"></span></p>
+                    <p><strong>是否需要报名：</strong><span id="activityRegistration"></span></p>
+                </div>
+            </div>
+            <div class="layui-row" style="margin-top: 20px;">
+                <div class="layui-col-md12">
+                    <h4>活动描述</h4>
+                    <div id="activityDescription"></div>
+                </div>
+            </div>
+            <div class="layui-row" style="margin-top: 20px;">
+                <div class="layui-col-md12">
+                    <button class="layui-btn layui-btn-normal" id="registerBtn" style="display: none;">
+                        <i class="layui-icon layui-icon-ok"></i> 立即报名
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 报名表单 -->
+<div id="registrationForm" style="display: none; padding: 20px;">
+    <form class="layui-form" lay-filter="registrationForm">
+        <input type="hidden" name="activity_id" value="">
+        <div class="layui-form-item">
+            <label class="layui-form-label">姓名</label>
+            <div class="layui-input-block">
+                <input type="text" name="name" required lay-verify="required" placeholder="请输入姓名" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">联系电话</label>
+            <div class="layui-input-block">
+                <input type="text" name="phone" required lay-verify="required|phone" placeholder="请输入联系电话" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">邮箱</label>
+            <div class="layui-input-block">
+                <input type="email" name="email" placeholder="请输入邮箱" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item layui-form-text">
+            <label class="layui-form-label">备注</label>
+            <div class="layui-input-block">
+                <textarea name="notes" placeholder="请输入备注信息" class="layui-textarea"></textarea>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <div class="layui-input-block">
+                <button class="layui-btn" lay-submit lay-filter="submitRegistration">提交报名</button>
+                <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/teacher/static/js/public/activities.js"></script>
+{% endblock %}

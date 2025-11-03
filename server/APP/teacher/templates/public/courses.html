@@ -1,0 +1,130 @@
+{% extends "public/base.html" %}
+
+{% block title %}课程体系 - 教师展示系统{% endblock %}
+
+{% block content %}
+<div class="layui-container">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <div class="layui-card">
+                <div class="layui-card-header">
+                    <h2>课程体系</h2>
+                </div>
+                <div class="layui-card-body">
+                    <!-- 筛选条件 -->
+                    <div class="layui-form layui-row layui-col-space10">
+                        <div class="layui-col-md3">
+                            <select name="target_age" lay-filter="ageFilter">
+                                <option value="">选择年龄段</option>
+                                <option value="preschool">学前班</option>
+                                <option value="elementary">小学</option>
+                                <option value="middle">中学</option>
+                                <option value="high">高中</option>
+                                <option value="adult">成人</option>
+                            </select>
+                        </div>
+                        <div class="layui-col-md3">
+                            <select name="difficulty" lay-filter="difficultyFilter">
+                                <option value="">选择难度</option>
+                                <option value="beginner">初级</option>
+                                <option value="intermediate">中级</option>
+                                <option value="advanced">高级</option>
+                            </select>
+                        </div>
+                        <div class="layui-col-md3">
+                            <select name="is_online" lay-filter="typeFilter">
+                                <option value="">选择类型</option>
+                                <option value="1">线上课程</option>
+                                <option value="0">线下课程</option>
+                            </select>
+                        </div>
+                        <div class="layui-col-md3">
+                            <button class="layui-btn" onclick="searchCourses()">搜索</button>
+                        </div>
+                    </div>
+                    
+                    <div class="layui-row layui-col-space15" id="coursesList">
+                        <!-- 课程列表将通过JavaScript动态加载 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 课程详情模态框 -->
+<div id="courseDetail" style="display: none; padding: 20px;">
+    <div class="layui-card">
+        <div class="layui-card-header">
+            <h3 id="courseTitle"></h3>
+        </div>
+        <div class="layui-card-body">
+            <div class="layui-row">
+                <div class="layui-col-md6">
+                    <p><strong>适合年龄段：</strong><span id="courseAge"></span></p>
+                    <p><strong>难度等级：</strong><span id="courseDifficulty"></span></p>
+                    <p><strong>课程类型：</strong><span id="courseType"></span></p>
+                </div>
+                <div class="layui-col-md6">
+                    <p><strong>课时数：</strong><span id="courseDuration"></span></p>
+                    <p><strong>收费标准：</strong><span id="coursePrice"></span></p>
+                </div>
+            </div>
+            <div class="layui-row" style="margin-top: 20px;">
+                <div class="layui-col-md12">
+                    <h4>课程描述</h4>
+                    <div id="courseDescription"></div>
+                </div>
+            </div>
+            <div class="layui-row" style="margin-top: 20px;">
+                <div class="layui-col-md12">
+                    <button class="layui-btn layui-btn-normal" id="contactBtn">
+                        <i class="layui-icon layui-icon-phone"></i> 联系咨询
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 咨询表单 -->
+<div id="contactForm" style="display: none; padding: 20px;">
+    <form class="layui-form" lay-filter="contactForm">
+        <input type="hidden" name="course_id" value="">
+        <div class="layui-form-item">
+            <label class="layui-form-label">姓名</label>
+            <div class="layui-input-block">
+                <input type="text" name="name" required lay-verify="required" placeholder="请输入姓名" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">联系电话</label>
+            <div class="layui-input-block">
+                <input type="text" name="phone" required lay-verify="required|phone" placeholder="请输入联系电话" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">邮箱</label>
+            <div class="layui-input-block">
+                <input type="email" name="email" placeholder="请输入邮箱" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item layui-form-text">
+            <label class="layui-form-label">咨询内容</label>
+            <div class="layui-input-block">
+                <textarea name="content" required lay-verify="required" placeholder="请输入咨询内容" class="layui-textarea"></textarea>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <div class="layui-input-block">
+                <button class="layui-btn" lay-submit lay-filter="submitContact">提交咨询</button>
+                <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/teacher/static/js/public/courses.js"></script>
+{% endblock %}

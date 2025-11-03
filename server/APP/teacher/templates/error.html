@@ -1,0 +1,49 @@
+<!--
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2025-10-22 14:31:02
+ * @LastEditTime: 2025-10-22 14:53:08
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2025 迷舍
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错误页面 - 教师系统</title>
+    
+    <!-- Layui CSS -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <!-- 自定义CSS -->
+    <link rel="stylesheet" href="/teacher/static/css/admin.min.css">
+</head>
+<body>
+    <div class="layui-container" style="margin-top: 100px;">
+        <div class="layui-row">
+            <div class="layui-col-md6 layui-col-md-offset3">
+                <div class="layui-card">
+                    <div class="layui-card-body" style="text-align: center; padding: 50px;">
+                        <i class="layui-icon layui-icon-{{ 'face-cry' if error_code == 404 else 'face-surprised' }}" 
+                           style="font-size: 100px; color: #FF5722; margin-bottom: 30px;"></i>
+                        <h2 style="color: #FF5722; margin-bottom: 20px;">
+                            {{ error_code or '错误' }}
+                        </h2>
+                        <p style="font-size: 16px; color: #666; margin-bottom: 30px;">
+                            {{ message or '抱歉，页面出现了问题' }}
+                        </p>
+                        <div class="layui-btn-group">
+                            <button class="layui-btn" onclick="history.back()">返回上页</button>
+                            <a href="/teacher/public/" class="layui-btn layui-btn-normal">返回首页</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Layui JS -->
+    <script src="/static/layui/layui.js"></script>
+</body>
+</html>

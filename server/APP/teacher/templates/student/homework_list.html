@@ -1,0 +1,138 @@
+{% extends "student/base.html" %}
+
+{% block title %}作业列表 - 学生作业系统{% endblock %}
+
+{% block content %}
+<div class="layui-row">
+    <div class="layui-col-md12">
+        <div class="layui-card">
+            <div class="layui-card-header">
+                <h3>我的作业</h3>
+                <div class="layui-btn-group">
+                    <button class="layui-btn layui-btn-sm" id="refreshBtn">刷新</button>
+                    <button class="layui-btn layui-btn-sm layui-btn-normal" id="filterBtn">筛选</button>
+                </div>
+            </div>
+            <div class="layui-card-body">
+                {% if materials %}
+                <table class="layui-table">
+                    <thead>
+                        <tr>
+                            <th>作业标题</th>
+                            <th>类型</th>
+                            <th>发布时间</th>
+                            <th>截止时间</th>
+                            <th>完成状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for material in materials %}
+                        <tr>
+                            <td>{{ material.title }}</td>
+                            <td>
+                                <span class="layui-badge layui-bg-{{ 'blue' if material.type == 'video' else 'green' if material.type == 'audio' else 'orange' }}">
+                                    {{ '视频' if material.type == 'video' else '音频' if material.type == 'audio' else '文档' }}
+                                </span>
+                            </td>
+                            <td>{{ material.create_time }}</td>
+                            <td>
+                                {% if material.deadline %}
+                                    <span class="layui-badge layui-bg-{{ 'red' if material.deadline < 'now' else 'orange' }}">
+                                        {{ material.deadline }}
+                                    </span>
+                                {% else %}
+                                    <span class="layui-badge">无期限</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if material.is_completed %}
+                                    <span class="layui-badge layui-bg-green">已完成</span>
+                                {% else %}
+                                    <span class="layui-badge layui-bg-gray">未完成</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('teacher.teacher_student.homework_detail', material_id=material.id) }}" 
+                                   class="layui-btn layui-btn-xs layui-btn-normal">查看</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="layui-empty">
+                    <div class="layui-empty-icon">
+                        <i class="layui-icon layui-icon-file"></i>
+                    </div>
+                    <div class="layui-empty-text">暂无作业</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    layui.use(['layer'], function(){
+        var layer = layui.layer;
+        
+        // 刷新按钮
+        document.getElementById('refreshBtn').addEventListener('click', function(){
+            location.reload();
+        });
+        
+        // 筛选按钮
+        document.getElementById('filterBtn').addEventListener('click', function(){
+            layer.open({
+                type: 1,
+                title: '筛选条件',
+                content: `
+                    <div style="padding: 20px;">
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">类型</label>
+                            <div class="layui-input-block">
+                                <select name="type" lay-filter="type">
+                                    <option value="">全部</option>
+                                    <option value="video">视频</option>
+                                    <option value="audio">音频</option>
+                                    <option value="document">文档</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">状态</label>
+                            <div class="layui-input-block">
+                                <select name="status" lay-filter="status">
+                                    <option value="">全部</option>
+                                    <option value="completed">已完成</option>
+                                    <option value="incomplete">未完成</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `,
+                area: ['400px', '300px'],
+                btn: ['确定', '取消'],
+                yes: function(index, layero){
+                    // 获取筛选条件
+                    var type = layero.find('select[name="type"]').val();
+                    var status = layero.find('select[name="status"]').val();
+                    
+                    // 执行筛选逻辑
+                    filterMaterials(type, status);
+                    
+                    layer.close(index);
+                }
+            });
+        });
+        
+        function filterMaterials(type, status) {
+            // 这里可以实现筛选逻辑
+            console.log('筛选条件:', type, status);
+        }
+    });
+</script>
+{% endblock %}

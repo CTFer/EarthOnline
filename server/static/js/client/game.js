@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-04-03 11:01:53
+ * @LastEditTime: 2025-05-13 15:46:10
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -186,7 +186,7 @@ class GameManager {
     // 初始化通知服务
     // this.notificationService = new NotificationService(this.eventBus, this.websocketService, this.api);
     // 设置ICP备案号
-    gameUtils.setICPAndMPS(ICP, MPS);
+    // gameUtils.setICPAndMPS(ICP, MPS);
   }
 
   // 初始化基础属性

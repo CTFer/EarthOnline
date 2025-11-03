@@ -1,0 +1,128 @@
+<!--
+ * @Author: 一根鱼骨棒 Email 775639471@qq.com
+ * @Date: 2023-10-25 09:11:53
+ * @LastEditTime: 2025-10-26 22:28:47
+ * @LastEditors: 一根鱼骨棒
+ * @Description: 本开源代码使用GPL 3.0协议
+ * Software: VScode
+ * Copyright 2023 迷舍
+-->
+<!DOCTYPE html>
+<html lang="zh-cn">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>我的出行轨迹</title>
+    <link rel="stylesheet" href="{{ url_for('route.static', filename='layui/css/layui.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('route.static', filename='style.min.css') }}" />
+    <script src="{{ url_for('route.static', filename='layui/layui.js') }}"></script>
+    <!-- <script src="{{ url_for('route.static', filename='layui/jquery-3.6.0.min.js') }}"></script> -->
+    <script type="text/javascript" src="{{ url_for('route.static', filename='js/echarts.min.js') }}"></script>
+    <script src="{{ url_for('route.static', filename='js/china.js') }}"></script>
+    <script src="{{ url_for('route.static', filename='js/function.js') }}"></script>
+  </head>
+  <body>
+    <!--维度： 年度 出行方式（飞机 动车 自驾） 航班号 车次 去程（返程）  -->
+    <!-- TODO 点亮省份 -->
+    <!-- TODO 表单渲染BUG -->
+    <!-- TODO 添加途经点功能 -->
+    <div class="header layui-container collapsed">
+      <div class="layui-row">
+        <div class="title layui-col-xs-12">
+          <p>出行轨迹</p>
+        </div>
+      </div>
+      <div class="options">
+        <form class="layui-form layui-row" id="route-form" lay-filter="route-form">
+          <div class="layui-col-xs12 layui-col-sm6 layui-col-md6 layui-col-lg3">
+            <div class="layui-form-item">
+              <label class="layui-form-label">日期</label>
+              <div class="layui-input-inline layui-input-wrap">
+                <div class="layui-input-prefix">
+                  <i class="layui-icon layui-icon-date"></i>
+                </div>
+                <input type="text" name="date" id="date" placeholder="yyyy-MM-dd HH:mm:ss" autocomplete="off" class="layui-input" required />
+              </div>
+            </div>
+          </div>
+          <!-- 出行方式 -->
+          <div class="layui-col-xs12 layui-col-sm6 layui-col-md6 layui-col-lg3">
+            <div class="layui-form-item">
+              <label class="layui-form-label">方式</label>
+              <div class="layui-input-inline">
+                <select name="method">
+                  <option value="plane">飞机</option>
+                  <option value="train">火车</option>
+                  <option value="drive">自驾</option>
+                  <option value="bus">汽车</option>
+                  <option value="boat">轮船</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="layui-col-xs12 layui-col-sm6 layui-col-md6 layui-col-lg3">
+            <div class="layui-form-item">
+              <label class="layui-form-label">出发地</label>
+              <div class="layui-input-inline">
+                <select name="start" class="start" lay-verify="required" lay-search></select>
+              </div>
+            </div>
+          </div>
+          <div class="layui-col-xs12 layui-col-sm6 layui-col-md6 layui-col-lg3">
+            <div class="layui-form-item">
+              <label class="layui-form-label">目的地</label>
+              <div class="layui-input-inline">
+                <select name="end" class="end" lay-verify="required" lay-search></select>
+              </div>
+            </div>
+          </div>
+
+          <div class="layui-col-xs12">
+            <div class="layui-col-xs12 layui-col-sm6 layui-col-md6 layui-col-lg3">
+              <div class="layui-form-item">
+                <label class="layui-form-label">备注</label>
+                <div class="layui-input-inline">
+                  <input name="remark" class="layui-input remark" />
+                </div>
+              </div>
+            </div>
+            <div class="layui-col-xs12 layui-col-sm6 layui-col-md6 layui-col-lg3">·</div>
+            <div class="layui-col-xs12 layui-col-sm6 layui-col-md6 layui-col-lg3">·</div>
+            <div class="layui-col-xs12 layui-col-sm6 layui-col-md6 layui-col-lg3">
+              <div class="layui-form-item right mr-30">
+                <button class="layui-btn" lay-submit id="btn-add" lay-filter="btn-add">添加</button>
+                <button class="layui-btn layui-bg-blue" id="btn-exchange">交换</button>
+                <button class="layui-btn layui-bg-blue" id="btn-list">列表</button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="content">
+      <div id="map">
+        <!-- echarts地图 -->
+      </div>
+    </div>
+    <div class="footer"></div>
+    <script src="{{ url_for('route.static', filename='js/index.js') }}"></script>
+
+    <table class="layui-table" id="list-table" lay-even>
+      <colgroup>
+        <col />
+        <col width="150" />
+        <col width="150" />
+        <col />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>时间</th>
+          <th>出发地</th>
+          <th>目的地</th>
+          <th>备注</th>
+        </tr>
+      </thead>
+      <tbody class="list-content"></tbody>
+    </table>
+  </body>
+</html>

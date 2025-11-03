@@ -1,0 +1,80 @@
+{% extends "admin/base.html" %}
+
+{% block title %}班级管理 - 教师管理系统{% endblock %}
+
+{% block content %}
+<div class="layui-container">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <div class="layui-card">
+                <div class="layui-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin: 0;">班级管理</h2>
+                    <button class="layui-btn layui-btn-normal" onclick="addClass()">
+                        <i class="layui-icon layui-icon-add-1"></i> 新增班级
+                    </button>
+                </div>
+                <div class="layui-card-body">
+                    <table class="layui-table" lay-data="{url:'/teacher/api/classes', page:true, id:'classTable'}" lay-filter="classTable">
+                        <thead>
+                            <tr>
+                                <th lay-data="{field:'id', width:80}">ID</th>
+                                <th lay-data="{field:'name', width:200}">班级名称</th>
+                                <th lay-data="{field:'class_code', width:150}">班级代码</th>
+                                <th lay-data="{field:'description', width:300}">描述</th>
+                                <th lay-data="{field:'student_count', width:100}">学生数</th>
+                                <th lay-data="{field:'create_time', width:150}">创建时间</th>
+                                <th lay-data="{field:'status', width:80, templet:'#statusTpl'}">状态</th>
+                                <th lay-data="{fixed: 'right', width:200, align:'center', toolbar: '#barDemo'}">操作</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 状态模板 -->
+<script type="text/html" id="statusTpl">
+    <div class="status-badge">
+        <!-- 状态标签将通过JavaScript动态生成 -->
+    </div>
+</script>
+
+<!-- 操作按钮模板 -->
+<script type="text/html" id="barDemo">
+    <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+    <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="students">学生</a>
+    <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="del">删除</a>
+</script>
+
+<!-- 新增/编辑班级表单 -->
+<div id="classForm" style="display: none; padding: 20px;">
+    <form class="layui-form" lay-filter="classForm">
+        <input type="hidden" name="id" value="">
+        <div class="layui-form-item">
+            <label class="layui-form-label">班级名称</label>
+            <div class="layui-input-block">
+                <input type="text" name="name" required lay-verify="required" placeholder="请输入班级名称" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item layui-form-text">
+            <label class="layui-form-label">班级描述</label>
+            <div class="layui-input-block">
+                <textarea name="description" placeholder="请输入班级描述" class="layui-textarea"></textarea>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <div class="layui-input-block">
+                <button class="layui-btn" lay-submit lay-filter="submitClass">确定</button>
+                <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="/teacher/static/js/admin/class_manage.js"></script>
+{% endblock %}

@@ -1,4 +1,13 @@
 # -*- coding: utf-8 -*-
+
+# Author: 一根鱼骨棒 Email 775639471@qq.com
+# Date: 2025-03-28 17:04:22
+# LastEditTime: 2025-10-07 22:27:40
+# LastEditors: 一根鱼骨棒
+# Description: 本开源代码使用GPL 3.0协议
+# Software: VScode
+# Copyright 2025 迷舍
+
 from flask import Blueprint, request, make_response
 import logging
 from utils.response_handler import ResponseHandler, StatusCode, api_response
@@ -310,109 +319,42 @@ class QYWeChatService:
         :return: 响应内容
         """
         try:
-            content = msg_root.find('Content').text.strip()  # 清理前后空格
+            content = msg_root.find('Content').text
             msg_id = msg_root.find('MsgId').text
             from_user = msg_root.find('FromUserName').text
 
-            logger.info(
-                f"[Car_Park] 收到文本消息 - 内容: {content}, 消息ID: {msg_id}, 发送者: {from_user}")
-            # 判断是否是车牌号（包含数字且长度大于等于6）
-            is_plate = len(content) >= 6 and any(char.isdigit()
-                                                 for char in content)
-            is_name = len(content) >= 2 and any(char.isalpha()
-                                                for char in content)
-            # 根据内容关键词进行回复 先判断是否是车牌号或者姓名
+            logger.info(f"[Car_Park] 收到文本消息 - 内容: {content}, 消息ID: {msg_id}, 发送者: {from_user}")
+
+            # 处理特殊查询
             if '价格' in content:
                 return "停车费用标准：\n1. 业主首车：60元/月\n2. 业主第二车：150元/月\n3. 租户或其他：200元/月"
-            elif '绑定，' in content:
-                return self._add_wechat_id(from_user, content, True)
-            elif '解绑，' in content:
-                return self._add_wechat_id(from_user, content, False)
-            # 内容以续期开头
-            elif content.startswith('续期：'):
-                if from_user not in CONFIG["DEFAULT_MESSAGE_RECEIVER"]["touser"]:
-                    return "您无权进行续期操作"
-                try:
-                    content = content[3:].strip()
-                    content = content.replace('，', ',')
-                    parts = [part.strip() for part in content.split(',')]
-
-                    if len(parts) != 3:
-                        return "格式错误，正确格式：续期：车主，车牌号，月数\n例如：续期：张三，川A12345，1"
-                    owner = parts[0]
-                    car_number = parts[1]
-                    try:
-                        month = int(parts[2])
-                        if month <= 0:
-                            return "续期月数必须大于0"
-                    except ValueError:
-                        return "月数必须是整数"
-
-                    # 添加续期记录
-                    addtime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    car_info = {
-                        'owner': owner,
-                        'car_number': car_number,
-                        'parktime': month,
-                        'addtime': addtime,
-                        'status': 'pending',
-                        'remark': '程序添加'
-                    }
-
-                    if save_car_park_info(car_info):
-                        return (f"续期申请已提交：\n"
-                                f"车主：{owner}\n"
-                                f"车牌号：{car_number}\n"
-                                f"续期时长：{month}个月\n"
-                                f"提交时间：{addtime}")
-                    else:
-                        return f"续期失败：{car_number}（车辆信息不存在或数据库错误）"
-                except Exception as e:
-                    logger.error(
-                        f"[Car_Park] 处理续期请求异常: {str(e)}", exc_info=True)
-                    return "续期处理失败，请检查格式是否正确：续期：车主，车牌号，月数"
-            elif content.startswith('备注：'):
-                if from_user not in CONFIG["DEFAULT_MESSAGE_RECEIVER"]["touser"]:
-                    return "您无权进行备注操作"
-                # 移除备注：
-                content = content[3:].strip()
-                content = content.replace('，', ',')
-                parts = [part.strip() for part in content.split(',')]
-                if len(parts) != 2:
-                    return "格式错误，正确格式：备注：车牌号，备注内容"
-                car_number = parts[0]
-                return self._add_remark(from_user, content)
             elif content == "统计":
-                if from_user not in CONFIG["DEFAULT_MESSAGE_RECEIVER"]["touser"]:
+                if not self._check_permission(from_user, '统计'):
                     return "您无权进行统计操作"
                 # 获取统计信息
                 message_parts = get_car_park_statistics()
                 if isinstance(message_parts, list):
                     # 发送概览信息
                     self.send_text_message(
-                        content="\n".join(message_parts[:10]),  # 发送基础统计信息
+                        content="\n".join(message_parts[:10]),
                         to_user=from_user
                     )
 
                     # 发送即将到期车辆信息
                     expiring_start = 10
-                    expiring_end = message_parts.index(
-                        "\n❌ 已过期车辆（30天内）：") if "\n❌ 已过期车辆（30天内）：" in message_parts else len(message_parts)
+                    expiring_end = message_parts.index("\n❌ 已过期车辆（30天内）：") if "\n❌ 已过期车辆（30天内）：" in message_parts else len(message_parts)
                     if expiring_end > expiring_start:
                         self.send_text_message(
-                            content="\n".join(
-                                message_parts[expiring_start:expiring_end]),
+                            content="\n".join(message_parts[expiring_start:expiring_end]),
                             to_user=from_user
                         )
 
                     # 发送已过期车辆信息
                     expired_start = expiring_end
-                    expired_end = message_parts.index(
-                        "\n⛔ 长期过期车辆（超30天）：") if "\n⛔ 长期过期车辆（超30天）：" in message_parts else len(message_parts)
+                    expired_end = message_parts.index("\n⛔ 长期过期车辆（超30天）：") if "\n⛔ 长期过期车辆（超30天）：" in message_parts else len(message_parts)
                     if expired_end > expired_start:
                         self.send_text_message(
-                            content="\n".join(
-                                message_parts[expired_start:expired_end]),
+                            content="\n".join(message_parts[expired_start:expired_end]),
                             to_user=from_user
                         )
 
@@ -423,33 +365,160 @@ class QYWeChatService:
                             to_user=from_user
                         )
 
-                    return None  # 返回None表示已经通过其他方式发送了消息
+                    return None
                 else:
-                    return message_parts  # 如果是错误信息，直接返回
+                    return message_parts
+
+            # 处理命令操作
+            if content.startswith('备注'):
+                if not self._check_permission(from_user, '备注'):
+                    return "您无权进行备注操作"
+                _, parts = self._normalize_input(content)
+                if len(parts) != 2:
+                    return "格式错误，正确格式：备注：车牌号，备注内容"
+                return self._add_remark(from_user, ",".join(parts))
+
+            elif content.startswith('修改'):
+                if not self._check_permission(from_user, '修改'):
+                    return "您无权进行修改车牌操作"
+                _, parts = self._normalize_input(content)
+                if len(parts) != 2:
+                    return "格式错误，正确格式：修改：原车牌，新车牌\n例如：修改：川A12345，川B67890"
+                
+                old_plate = parts[0].strip()
+                new_plate = parts[1].strip()
+                
+                # 验证车牌格式
+                if not old_plate or not new_plate:
+                    return "车牌号不能为空"
+                
+                # 检查原车牌是否存在并获取车主姓名
+                conn = sqlite3.connect("database/car_park.db")
+                cursor = conn.cursor()
+                
+                # 检查原车牌是否存在
+                cursor.execute('SELECT * FROM Sys_Park_Plate WHERE plateNumber = ?', (old_plate,))
+                result = cursor.fetchone()
+                
+                if not result:
+                    conn.close()
+                    return f"原车牌 {old_plate} 不存在，无法修改"
+                
+                # 检查新车牌是否已存在
+                cursor.execute('SELECT * FROM Sys_Park_Plate WHERE plateNumber = ?', (new_plate,))
+                result = cursor.fetchone()
+                
+                if result:
+                    conn.close()
+                    return f"新车牌 {new_plate} 已存在，无法修改"
+                
+                # 获取车主姓名
+                cursor.execute('''
+                    SELECT pp.pName 
+                    FROM Sys_Park_Plate p
+                    LEFT JOIN Sys_Park_Person pp ON p.personId = pp.id
+                    WHERE p.plateNumber = ?
+                ''', (old_plate,))
+                owner_result = cursor.fetchone()
+                owner_name = owner_result[0] if owner_result else "未知车主"
+                
+                conn.close()
+                
+                # 添加修改记录
+                addtime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                car_info = {
+                    'owner': owner_name,
+                    'car_number': old_plate,
+                    'parktime': 0,  # 修改车牌不需要续期
+                    'addtime': addtime,
+                    'status': 'change',
+                    'remark': new_plate  # 在remark字段记录新车牌
+                }
+                
+                if save_car_park_info(car_info):
+                    return (f"车牌修改申请已提交：\n"
+                            f"原车牌：{old_plate}\n"
+                            f"新车牌：{new_plate}\n"
+                            f"提交时间：{addtime}\n"
+                            f"状态：等待客户端处理")
+                else:
+                    return f"车牌修改申请提交失败：{old_plate}"
 
             elif content.startswith('审批'):
-                if from_user not in CONFIG["DEFAULT_MESSAGE_RECEIVER"]["touser"] and from_user != "cymg":
+                if not self._check_permission(from_user, '审批'):
                     return "您无权进行审批操作"
-                # 提取车牌号和时长 移除审批和分隔符 
-                content = content[2:].strip()
-                # 移除可能存在的分割符号，替换为半角逗号
-                pattern = re.compile(r'[^\u4e00-\u9fa5a-zA-Z0-9 ]')
-                content = pattern.sub(',', content)
-                # 移除开头结尾的非中英文数字字符
-                content = re.sub(r'^[^a-zA-Z0-9\u4e00-\u9fa5]+|[^a-zA-Z0-9\u4e00-\u9fa5]+$', '', content)
-                print(content)
-                parts = [part.strip() for part in content.split(',')]
+                _, parts = self._normalize_input(content)
                 if len(parts) != 2:
                     return "格式错误，正确格式：审批：车牌号，时长"
-                car_number = parts[0].upper()
-                month = int(parts[1])
-                if month <= 0:
-                    return "时长必须大于0"
-                return self._handle_approval(car_number, month)
-            elif is_plate or is_name:
-                return self._query_car_info(content, not is_plate)
+                try:
+                    month = int(parts[1])
+                    if month <= 0:
+                        return "时长必须大于0"
+                except ValueError:
+                    return "时长必须是整数"
+                return self._handle_approval(parts[0], month, from_user)
+
+            elif content.startswith('删除'):
+                if not self._check_permission(from_user, '删除'):
+                    return "您无权进行删除操作"
+                _, parts = self._normalize_input(content)
+                if len(parts) != 1:
+                    return "格式错误，正确格式：删除：车牌号"
+                return self._delete_car_info(parts[0])
+
+            elif content.startswith('绑定'):
+                _, parts = self._normalize_input(content)
+                if len(parts) != 2:
+                    return "格式错误，正确格式：绑定，车主姓名，车牌号"
+                return self._add_wechat_id(from_user, ",".join(parts), True)
+
+            elif content.startswith('解绑'):
+                _, parts = self._normalize_input(content)
+                if len(parts) != 2:
+                    return "格式错误，正确格式：解绑，车主姓名，车牌号"
+                return self._add_wechat_id(from_user, ",".join(parts), False)
+
+            elif content.startswith('记录'):
+                if not self._check_permission(from_user, '记录'):
+                    return "您无权进行记录查询操作"
+                _, parts = self._normalize_input(content)
+                
+                # 如果没有提供数字，默认查询10条
+                limit = 10
+                if len(parts) >= 1 and parts[0].isdigit():
+                    limit = int(parts[0])
+                    if limit <= 0:
+                        return "记录数量必须大于0"
+                    if limit > 100:
+                        return "记录数量不能超过100条"
+                
+                return self._get_recent_records(limit)
+
+            # 处理查询操作
             else:
-                return "点击查看祥和园停车管理公约（试行）\nhttps://docs.qq.com/doc/DWVZVdmptY3R3cFF5#\n您可以：\n1. 直接输入车牌号(不区分大小写)查询车辆信息\n2. 直接输入车主姓名查询车辆信息\n3. 发送\"绑定，车主姓名，车牌号\"绑定车辆月租到期提醒\n4. 发送\"解绑，车主姓名，车牌号\"解绑车辆月租到期提醒\n5. 发送\"续期：车主姓名，车牌号，月数\"续期车辆月租\n6. 发送\"备注：车牌号，备注内容\"添加备注\n7. 发送\"统计\"查看统计信息"
+                _, parts = self._normalize_input(content)
+                if len(parts) == 1:
+                    query = parts[0]
+                    # 判断是否是车牌号（包含数字且长度大于等于6）
+                    is_plate = len(query) >= 6 and any(char.isdigit() for char in query)
+                    is_name = len(query) >= 2 and any(char.isalpha() for char in query)
+                    if is_plate or is_name:
+                        return self._query_car_info(query, not is_plate)
+
+            # 默认帮助信息
+            return ("点击查看祥和园停车管理公约（试行）\n"
+                    "https://docs.qq.com/doc/DWVZVdmptY3R3cFF5#\n"
+                    "您可以：\n"
+                    "1. 直接输入车牌号(不区分大小写)查询车辆信息\n"
+                    "2. 直接输入车主姓名查询车辆信息\n"
+                    "3. 发送\"绑定，车主姓名，车牌号\"绑定车辆月租到期提醒\n"
+                    "4. 发送\"解绑，车主姓名，车牌号\"解绑车辆月租到期提醒\n"
+                    "5. 发送\"修改：原车牌，新车牌\"修改车牌号码\n"
+                    "6. 发送\"备注：车牌号，备注内容\"添加备注\n"
+                    "7. 发送\"审批：车牌号，时长\"发起审批流程\n"
+                    "8. 发送\"删除：车牌号\"删除车辆信息\n"
+                    "9. 发送\"统计\"查看统计信息\n"
+                    "10. 发送\"记录\"或\"记录，数字\"查询续期操作记录")
 
         except Exception as e:
             logger.error(f"[Car_Park] 处理文本消息异常: {str(e)}", exc_info=True)
@@ -650,7 +719,7 @@ class QYWeChatService:
             cursor = conn.cursor()
 
             # 解析内容
-            car_number = content.split(',')[0]
+            car_number = content.split(',')[0].upper()
             remark = content.split(',')[1]
 
             # 更新Sys_Park_Plate表的pRemark字段
@@ -970,6 +1039,226 @@ class QYWeChatService:
             logger.error(f"[Car_Park] 处理消息失败: {str(e)}")
             return 'success'
 
+    def _normalize_input(self, content: str) -> tuple:
+        """
+        统一处理输入内容，过滤空格，统一分隔符，转换车牌为大写
+
+        Args:
+            content: 输入内容
+
+        Returns:
+            tuple: (处理后的内容, 分割后的部分列表)
+        """
+        try:
+            # 清理前后空格
+            content = content.strip()
+            
+            # 定义命令关键词的基础部分（不包含分隔符）
+            commands = ['续期', '备注', '审批', '删除', '绑定', '解绑','记录', '修改']
+            
+            # 移除命令关键词和其后的任意非中文、字母、数字分隔符
+            for cmd in commands:
+                if content.startswith(cmd):
+                    # 使用正则表达式匹配命令后的任意非中文、字母、数字字符
+                    pattern = f"^{cmd}[^a-zA-Z0-9\u4e00-\u9fa5]+"
+                    content = re.sub(pattern, '', content).strip()
+                    break
+            
+            # 统一替换任意非中文、字母、数字字符为英文逗号
+            pattern = re.compile(r'[^a-zA-Z0-9\u4e00-\u9fa5]+')
+            content = pattern.sub(',', content)
+            
+            # 移除开头结尾的逗号
+            content = re.sub(r'^,+|,+$', '', content)
+            
+            # 分割内容
+            parts = [part.strip() for part in content.split(',') if part.strip()]
+            print(parts)
+            # 将所有可能的车牌号转换为大写
+            for i, part in enumerate(parts):
+                # 判断是否为车牌号（包含数字且长度大于等于6）
+                if len(part) >= 6 and any(char.isdigit() for char in part):
+                    parts[i] = part.upper()
+                
+            return content, parts
+        except Exception as e:
+            logger.error(f"[Car_Park] 输入内容处理异常: {str(e)}", exc_info=True)
+            return content, []
+
+    def _check_permission(self, from_user: str, operation: str) -> bool:
+        """
+        检查用户是否有权限执行特定操作
+
+        Args:
+            from_user: 用户ID
+            operation: 操作类型（'续期', '备注', '审批', '删除'）
+
+        Returns:
+            bool: 是否有权限
+        """
+
+            
+        # 管理员用户拥有所有权限
+        if from_user in CONFIG["DEFAULT_MESSAGE_RECEIVER"]["touser"]:
+            return True
+            
+        return False
+
+    def _delete_car_info(self, car_number: str) -> str:
+        """
+        删除车辆和车主信息
+
+        Args:
+            car_number: 车牌号
+
+        Returns:
+            str: 处理结果消息
+        """
+        try:
+            # 连接sqlite数据库
+            conn = sqlite3.connect("database/car_park.db")
+            cursor = conn.cursor()
+            
+            try:
+                # 1. 获取车辆信息
+                cursor.execute("""
+                    SELECT personId FROM Sys_Park_Plate 
+                    WHERE plateNumber = ?
+                """, (car_number.strip(),))
+                row = cursor.fetchone()
+                
+                if not row:
+                    return f"未找到车牌号为 {car_number} 的记录"
+                    
+                person_id = row[0]
+                
+                # 2. 删除车辆记录
+                cursor.execute("""
+                    DELETE FROM Sys_Park_Plate 
+                    WHERE plateNumber = ?
+                """, (car_number.strip(),))
+                
+                # 3. 如果存在personId，删除对应的车主记录
+                if person_id:
+                    cursor.execute("""
+                        DELETE FROM Sys_Park_Person 
+                        WHERE id = ?
+                    """, (person_id,))  # 修改这里，将person_id包装为元组
+                
+                # 4. 删除相关的续期记录
+                cursor.execute("""
+                    DELETE FROM car_park 
+                    WHERE car_number = ?
+                """, (car_number.strip(),))
+
+                # 提交事务
+                conn.commit()
+                
+                # 发送删除成功通知到企业微信
+                self.send_text_message(
+                    content=f"车辆信息删除成功\n车牌号：{car_number}",
+                    to_user=CONFIG["DEFAULT_MESSAGE_RECEIVER"]["touser"],
+                    to_party=CONFIG["DEFAULT_MESSAGE_RECEIVER"].get("toparty"),
+                    to_tag=CONFIG["DEFAULT_MESSAGE_RECEIVER"].get("totag")
+                )
+                
+                return f"已成功删除车牌号 {car_number} 的所有相关信息"
+                
+            except Exception as e:
+                # 发生异常时回滚事务
+                conn.rollback()
+                logger.error(f"[Car_Park] 删除操作异常: {str(e)}", exc_info=True)
+                raise e
+            
+        except Exception as e:
+            error_msg = f"删除车辆信息失败: {str(e)}"
+            logger.error(f"[Car_Park] {error_msg}", exc_info=True)
+            
+            # 发送错误通知到企业微信
+            self.send_text_message(
+                content=f"车辆信息删除失败\n车牌号：{car_number}\n原因：{str(e)}",
+                to_user=CONFIG["DEFAULT_MESSAGE_RECEIVER"]["touser"],
+                to_party=CONFIG["DEFAULT_MESSAGE_RECEIVER"].get("toparty"),
+                to_tag=CONFIG["DEFAULT_MESSAGE_RECEIVER"].get("totag")
+            )
+            
+            return error_msg
+            
+        finally:
+            # 确保关闭数据库连接
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
+
+    def _get_recent_records(self, limit: int = 10) -> str:
+        """
+        获取最近的续期操作记录
+        
+        Args:
+            limit: 查询记录数量，默认10条
+            
+        Returns:
+            str: 格式化的记录信息
+        """
+        try:
+            conn = sqlite3.connect("database/car_park.db")
+            cursor = conn.cursor()
+            
+            # 查询最近的续期和修改记录
+            cursor.execute('''
+                SELECT id, owner, car_number, time, addtime, status, remark, comment
+                FROM car_park
+                WHERE status IN ('pending', 'complete', 'failed', 'change', 'changed')
+                ORDER BY addtime DESC
+                LIMIT ?
+            ''', (limit,))
+            
+            records = cursor.fetchall()
+            conn.close()
+            
+            if not records:
+                return "暂无续期操作记录"
+            
+            # 格式化记录信息
+            result_lines = [f"最近 {len(records)} 条续期操作记录：\n"]
+            
+            for record in records:
+                record_id, owner, car_number, parktime, addtime, status, remark, comment = record
+                
+                # 根据状态显示不同的信息
+                if status == 'pending':
+                    status_text = "待处理"
+                    detail = f"续期{parktime}个月"
+                elif status == 'complete':
+                    status_text = "已完成"
+                    detail = f"续期{parktime}个月"
+                elif status == 'failed':
+                    status_text = "处理失败"
+                    detail = comment if comment else "续期失败"
+                elif status == 'change':
+                    status_text = "待修改"
+                    detail = f"修改为{remark}"
+                elif status == 'changed':
+                    status_text = "已修改"
+                    detail = comment if comment else f"修改为{remark}"
+                else:
+                    status_text = status
+                    detail = comment if comment else f"续期{parktime}个月"
+                
+                result_lines.append(
+                    f"• {addtime} | {owner} | {car_number} | {status_text} | {detail}"
+                )
+            
+            return "\n".join(result_lines)
+            
+        except Exception as e:
+            error_msg = f"查询续期记录失败: {str(e)}"
+            logger.error(f"[Car_Park] {error_msg}", exc_info=True)
+            return error_msg
+
+
+
 
 # 创建服务实例
 qywechat_service = QYWeChatService()
@@ -1201,14 +1490,39 @@ def save_car_park_info(car_info: dict) -> bool:
     try:
         conn = sqlite3.connect("database/car_park.db")
         cursor = conn.cursor()
+        
+        # 检查审批单号是否已经存在
+        remark = car_info.get("remark", "")
+        if remark and "审批单号:" in remark:
+            # 提取审批单号
+            import re
+            approval_match = re.search(r'审批单号: ([^,]+)', remark)
+            if approval_match:
+                approval_number = approval_match.group(1).strip()
+                # 查询是否已存在该审批单号的记录
+                cursor.execute("SELECT id FROM car_park WHERE remark LIKE ?", (f'%审批单号: {approval_number}%',))
+                existing_record = cursor.fetchone()
+                if existing_record:
+                    logger.info(f"[Car_Park] 审批单号 {approval_number} 已经处理过，跳过重复处理")
+                    conn.close()
+                    return False
+        
         # 检查Sys_Park_Plate数据库中是否存在该车辆信息，存在才添加续期信息
         cursor.execute('SELECT * FROM Sys_Park_Plate WHERE plateNumber = ?',
                        (car_info["car_number"].strip(),))
         result = cursor.fetchone()
         if not result:
             logger.info(f"[Car_Park] 车辆信息不存在: {car_info['car_number']}")
+                    # 发送错误通知到企业微信
+            qywechat_service.send_text_message(
+            content=f"车辆信息保存失败\n车牌号：{car_info['car_number']}\n车主：{car_info['owner']}\n原因：车辆信息不存在 {car_info['car_number']}",
+            to_user=CONFIG["DEFAULT_MESSAGE_RECEIVER"]["touser"],
+            to_party=CONFIG["DEFAULT_MESSAGE_RECEIVER"].get("toparty"),
+            to_tag=CONFIG["DEFAULT_MESSAGE_RECEIVER"].get("totag")
+        )
             return False
         remark = car_info.get("remark", "")
+        status = car_info.get("status", "pending")
         # 插入新记录 清理空格
         cursor.execute('''
         INSERT INTO car_park (
@@ -1219,7 +1533,7 @@ def save_car_park_info(car_info: dict) -> bool:
             car_info["car_number"].strip(),
             str(car_info["parktime"]),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'pending',
+            status,
             remark
         ))
 
@@ -1268,11 +1582,21 @@ def update_car_park_status(car_number: str, status: str, comment: str = None) ->
         owner = result[0] if result else "未知"
 
         if comment:
-            cursor.execute('''
-            UPDATE car_park 
-            SET status = ?, comment = ?
-            WHERE car_number = ?
-            ''', (status, comment, car_number))
+            # 根据状态决定更新哪个字段
+            if status == 'changed':
+                # 车牌修改完成，更新remark字段
+                cursor.execute('''
+                UPDATE car_park 
+                SET status = ?, remark = ?
+                WHERE car_number = ?
+                ''', (status, comment, car_number))
+            else:
+                # 续期等其他操作，更新comment字段
+                cursor.execute('''
+                UPDATE car_park 
+                SET status = ?, comment = ?
+                WHERE car_number = ?
+                ''', (status, comment, car_number))
         else:
             cursor.execute('''
             UPDATE car_park 
@@ -1287,6 +1611,8 @@ def update_car_park_status(car_number: str, status: str, comment: str = None) ->
             message = f"车辆续期失败\n车牌号：{car_number}\n车主：{owner}\n原因：{comment}"
         elif status == 'complete':
             message = f"车辆续期成功\n车牌号：{car_number}\n车主：{owner}\n续期时长：{comment}"
+        elif status == 'changed':
+            message = f"车牌修改完成\n{comment}\n车主：{owner}\n完成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
         qywechat_service.send_text_message(
             content=message,
@@ -1586,23 +1912,25 @@ def car_park_review():
             cursor = conn.cursor()
 
             cursor.execute('''
-            SELECT id, owner, car_number, time, addtime, status, comment
+            SELECT id, owner, car_number, time, addtime, status, remark, comment
             FROM car_park
-            WHERE status = 'pending'
+            WHERE status = 'pending' OR status = 'change'
             ORDER BY addtime DESC
             ''')
 
             reviews = []
             for row in cursor.fetchall():
-                reviews.append({
+                review_data = {
                     'id': row[0],
                     'owner': row[1],
                     'car_number': row[2],
                     'parktime': int(row[3]),
                     'addtime': row[4],
                     'status': row[5],
-                    'comment': row[6]
-                })
+                    'remark': row[6],   # 新车牌信息（用于修改功能）
+                    'comment': row[7]   # 备注信息（用于续期功能）
+                }
+                reviews.append(review_data)
 
             conn.close()
 
@@ -1896,9 +2224,6 @@ def client_alive():
         memory_usage = request.args.get('memory_usage', 'unknown')
         cpu_usage = request.args.get('cpu_usage', 'unknown')
 
-        # 更新心跳时间
-        update_heartbeat_time()
-
         # 记录客户端状态
         logger.info(f"[Car_Park] 收到客户端存活通知:")
         logger.info(f"[Car_Park] - 停车场系统状态: {park_system_status}")
@@ -1925,15 +2250,20 @@ def client_alive():
                 msg="客户端存活通知已接收，系统状态异常",
                 data={
                     "status": "warning",
-                    "message": "停车场系统状态异常，已发送通知"
+                    "message": "停车场系统状态异常，已发送通知",
+                    "code": 0  # 添加code字段，确保客户端能正确识别响应
                 }
             )
+
+        # 更新心跳时间
+        update_heartbeat_time()
 
         return ResponseHandler.success(
             msg="客户端存活通知已接收",
             data={
                 "status": "ok",
-                "message": "系统运行正常"
+                "message": "系统运行正常",
+                "code": 0  # 添加code字段，确保客户端能正确识别响应
             }
         )
 
@@ -1942,7 +2272,12 @@ def client_alive():
         logger.error(f"[Car_Park] {error_msg}")
         return ResponseHandler.error(
             code=StatusCode.SERVER_ERROR,
-            msg=error_msg
+            msg=error_msg,
+            data={
+                "status": "error",
+                "message": str(e),
+                "code": StatusCode.SERVER_ERROR
+            }
         )
 
 

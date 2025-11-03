@@ -1,0 +1,287 @@
+// 公共展示页面样式
+
+// 变量定义
+@primary-color: #1E9FFF;
+@success-color: #5FB878;
+@warning-color: #FFB800;
+@danger-color: #FF5722;
+@info-color: #2F4056;
+
+// 基础样式
+body {
+    font-family: "Microsoft YaHei", Arial, sans-serif;
+    background-color: #f8f9fa;
+    line-height: 1.6;
+}
+
+// 导航栏样式
+.layui-header {
+    background: linear-gradient(135deg, @primary-color, #5FB878);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    
+    .layui-logo {
+        color: #fff;
+        font-size: 20px;
+        font-weight: bold;
+    }
+    
+    .layui-nav {
+        .layui-nav-item {
+            a {
+                color: #fff;
+                transition: all 0.3s ease;
+                
+                &:hover {
+                    background-color: rgba(255,255,255,0.1);
+                }
+            }
+        }
+    }
+}
+
+// 轮播图样式
+.layui-carousel {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    
+    .layui-carousel-ind {
+        background-color: rgba(255,255,255,0.3);
+        
+        &.layui-this {
+            background-color: #fff;
+        }
+    }
+}
+
+// 特色卡片样式
+.feature-card {
+    .layui-card {
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        height: 100%;
+        
+        &:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+        
+        .layui-card-body {
+            padding: 30px 20px;
+            text-align: center;
+            
+            i {
+                display: block;
+                margin-bottom: 20px;
+            }
+            
+            h3 {
+                font-size: 20px;
+                font-weight: 600;
+                margin-bottom: 15px;
+                color: #333;
+            }
+            
+            p {
+                color: #666;
+                line-height: 1.6;
+                margin: 0;
+            }
+        }
+    }
+}
+
+// 快速入口样式
+.quick-entry {
+    .layui-card {
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        
+        &:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+        
+        .layui-card-body {
+            padding: 40px 30px;
+            text-align: center;
+            
+            i {
+                display: block;
+                margin-bottom: 20px;
+            }
+            
+            h3 {
+                font-size: 24px;
+                font-weight: 600;
+                margin-bottom: 15px;
+                color: #333;
+            }
+            
+            p {
+                color: #666;
+                margin-bottom: 25px;
+                line-height: 1.6;
+            }
+            
+            .layui-btn {
+                border-radius: 25px;
+                padding: 10px 30px;
+                font-weight: 500;
+            }
+        }
+    }
+}
+
+// 介绍卡片样式
+.intro-card {
+    .layui-card {
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        
+        .layui-card-header {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-bottom: 1px solid #dee2e6;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        
+        .layui-card-body {
+            padding: 25px;
+            
+            h4 {
+                color: @primary-color;
+                font-size: 16px;
+                margin: 20px 0 10px 0;
+                font-weight: 600;
+            }
+            
+            ul {
+                margin: 10px 0;
+                padding-left: 20px;
+                
+                li {
+                    margin-bottom: 8px;
+                    color: #555;
+                    
+                    strong {
+                        color: #333;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 页脚样式
+.layui-footer {
+    background: linear-gradient(135deg, #2F4056, #1E9FFF);
+    color: #fff;
+    text-align: center;
+    padding: 30px 0;
+    margin-top: 50px;
+    
+    p {
+        margin: 0;
+        font-size: 14px;
+    }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+    .layui-container {
+        padding: 10px;
+    }
+    
+    .layui-card {
+        margin-bottom: 15px;
+    }
+    
+    .feature-card, .quick-entry {
+        .layui-card-body {
+            padding: 20px 15px;
+            
+            h3 {
+                font-size: 18px;
+            }
+            
+            p {
+                font-size: 14px;
+            }
+        }
+    }
+    
+    .intro-card {
+        .layui-card-body {
+            padding: 20px 15px;
+        }
+    }
+}
+
+@media (max-width: 480px) {
+    .layui-header {
+        .layui-logo {
+            font-size: 16px;
+        }
+        
+        .layui-nav {
+            .layui-nav-item {
+                a {
+                    font-size: 14px;
+                    padding: 0 10px;
+                }
+            }
+        }
+    }
+    
+    .feature-card, .quick-entry {
+        .layui-card-body {
+            padding: 15px 10px;
+            
+            i {
+                font-size: 40px !important;
+            }
+            
+            h3 {
+                font-size: 16px;
+            }
+        }
+    }
+}
+
+// 动画效果
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.layui-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+// 渐变背景
+.gradient-bg {
+    background: linear-gradient(135deg, @primary-color, #5FB878);
+    color: #fff;
+}
+
+// 阴影效果
+.shadow-sm {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.shadow {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.shadow-lg {
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+}

@@ -1,0 +1,147 @@
+{% extends "public/base.html" %}
+
+{% block title %}首页 - 教师展示系统{% endblock %}
+
+{% block content %}
+<!-- 轮播图 -->
+<div class="layui-row">
+    <div class="layui-col-md12">
+        <div class="layui-carousel" id="banner">
+            <div carousel-item>
+                <div style="background: linear-gradient(45deg, #1E9FFF, #5FB878); height: 300px; display: flex; align-items: center; justify-content: center; color: white;">
+                    <div style="text-align: center;">
+                        <h1 style="font-size: 48px; margin-bottom: 20px;">教师展示系统</h1>
+                        <p style="font-size: 18px;">专业的课后练习管理平台</p>
+                    </div>
+                </div>
+                <div style="background: linear-gradient(45deg, #FFB800, #FF5722); height: 300px; display: flex; align-items: center; justify-content: center; color: white;">
+                    <div style="text-align: center;">
+                        <h1 style="font-size: 48px; margin-bottom: 20px;">高效教学</h1>
+                        <p style="font-size: 18px;">让教学更简单，让学习更高效</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 功能特色 -->
+<div class="layui-row" style="margin-top: 30px;">
+    <div class="layui-col-md12">
+        <h2 style="text-align: center; margin-bottom: 30px;">系统特色</h2>
+    </div>
+</div>
+
+<div class="layui-row layui-col-space15">
+    <div class="layui-col-md4">
+        <div class="layui-card">
+            <div class="layui-card-body" style="text-align: center;">
+                <i class="layui-icon layui-icon-group" style="font-size: 60px; color: #1E9FFF; margin-bottom: 20px;"></i>
+                <h3>班级管理</h3>
+                <p>轻松管理班级和学生信息，支持批量导入和分组管理</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="layui-col-md4">
+        <div class="layui-card">
+            <div class="layui-card-body" style="text-align: center;">
+                <i class="layui-icon layui-icon-file" style="font-size: 60px; color: #5FB878; margin-bottom: 20px;"></i>
+                <h3>材料分发</h3>
+                <p>支持音视频、文档等多种格式，一键分发给指定班级或学生</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="layui-col-md4">
+        <div class="layui-card">
+            <div class="layui-card-body" style="text-align: center;">
+                <i class="layui-icon layui-icon-chart" style="font-size: 60px; color: #FFB800; margin-bottom: 20px;"></i>
+                <h3>进度跟踪</h3>
+                <p>实时跟踪学习进度，统计分析完成情况，让教学更有针对性</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 快速入口 -->
+<div class="layui-row" style="margin-top: 50px;">
+    <div class="layui-col-md12">
+        <h2 style="text-align: center; margin-bottom: 30px;">快速入口</h2>
+    </div>
+</div>
+
+<div class="layui-row layui-col-space15">
+    <div class="layui-col-md6">
+        <div class="layui-card">
+            <div class="layui-card-body" style="text-align: center; padding: 40px;">
+                <i class="layui-icon layui-icon-user" style="font-size: 80px; color: #1E9FFF; margin-bottom: 20px;"></i>
+                <h3>教师入口</h3>
+                <p style="margin: 20px 0;">教师登录管理系统，管理班级、学生和作业</p>
+                <a href="/teacher/admin/login" class="layui-btn layui-btn-lg layui-btn-normal">教师登录</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="layui-col-md6">
+        <div class="layui-card">
+            <div class="layui-card-body" style="text-align: center; padding: 40px;">
+                <i class="layui-icon layui-icon-read" style="font-size: 80px; color: #5FB878; margin-bottom: 20px;"></i>
+                <h3>学生入口</h3>
+                <p style="margin: 20px 0;">学生输入班级ID和姓名，查看作业和完成学习</p>
+                <a href="/teacher/student/login" class="layui-btn layui-btn-lg layui-btn-normal">学生登录</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 系统介绍 -->
+<div class="layui-row" style="margin-top: 50px;">
+    <div class="layui-col-md12">
+        <div class="layui-card">
+            <div class="layui-card-header">
+                <h3>系统介绍</h3>
+            </div>
+            <div class="layui-card-body">
+                <p>教师展示系统是一个专为独立教师设计的课后练习管理平台，帮助教师高效管理学生群体，精准分发音视频和文档类作业，清晰把控作业完成期限。</p>
+                
+                <h4>主要功能：</h4>
+                <ul>
+                    <li><strong>班级管理：</strong>创建和管理班级，生成唯一班级ID供学生验证</li>
+                    <li><strong>学生管理：</strong>添加学生信息，支持批量导入和分组管理</li>
+                    <li><strong>材料分发：</strong>上传音视频和文档材料，按班级或学生分发</li>
+                    <li><strong>进度跟踪：</strong>实时查看学生完成情况，统计分析学习效果</li>
+                    <li><strong>在线学习：</strong>学生可在线观看视频、听音频、阅读文档</li>
+                    <li><strong>移动适配：</strong>完美支持手机、平板等移动设备</li>
+                </ul>
+                
+                <h4>适用场景：</h4>
+                <ul>
+                    <li>独立教师的课后练习管理</li>
+                    <li>培训机构的作业分发</li>
+                    <li>在线教育的内容管理</li>
+                    <li>企业内部培训系统</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    layui.use(['carousel'], function(){
+        var carousel = layui.carousel;
+        
+        // 初始化轮播图
+        carousel.render({
+            elem: '#banner',
+            width: '100%',
+            height: '300px',
+            arrow: 'hover',
+            autoplay: true,
+            interval: 5000
+        });
+    });
+</script>
+{% endblock %}

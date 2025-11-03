@@ -16,7 +16,12 @@ import win32com.client
 import win32process
 import win32con
 import win32gui
+import urllib3
 
+
+def disable_ssl_warnings():
+    """禁用SSL警告"""
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def load_config():
     """
@@ -60,12 +65,13 @@ def load_config():
         print("[调试] 使用默认配置")
         # 返回默认配置
         default_config = {
-            "review_api_url": "http://1.95.11.164/car_park/review",
+            "review_api_url": "https://1.95.11.164/car_park/review",
             "conn_str": "DRIVER={SQL Server};SERVER=localhost;DATABASE=Park_DB;UID=sa;PWD=123",
             "sync_interval": 10,  # 同步间隔（分钟）
             "sys_check_interval": 5,  # 系统检查间隔（分钟）
             "max_retries": 3,     # 最大重试次数
-            "retry_interval": 5   # 重试间隔（秒）
+            "retry_interval": 5,  # 重试间隔（秒）
+            "ssl_verify": False   # SSL证书验证，False表示跳过验证
         }
         print(f"[调试] 默认配置内容:")
         print(f"[调试] DEBUG = True")
@@ -117,6 +123,9 @@ def setup_logging(debug_mode):
 # 加载配置
 DEBUG, CONFIG, HEADERS = load_config()
 
+# 禁用SSL警告
+disable_ssl_warnings()
+
 # 设置日志
 logger = setup_logging(DEBUG)
 
@@ -125,131 +134,6 @@ logger.info("=== 加载配置信息 ===")
 if DEBUG:
     logger.info(f"调试模式: {DEBUG}")
 logger.info(f"API地址: {CONFIG['review_api_url']}")
-
-# SQL Server日期时间转换工具类
-
-
-class SQLServerDateConverter:
-    """SQL Server日期时间转换工具类"""
-
-    @staticmethod
-    def sqlserver_hex_to_datetime(hex_value):
-        """
-        将SQL Server的十六进制DateTime表示转换为Python datetime对象
-
-        参数:
-            hex_value: SQL Server的十六进制日期时间字符串或整数
-
-        返回:
-            datetime对象
-        """
-        try:
-            # 检查并提取十六进制值
-            if isinstance(hex_value, str):
-                # 处理CAST表达式
-                cast_match = re.search(
-                    r'CAST\(0x([0-9A-Fa-f]+)\s+AS\s+DateTime\)', hex_value)
-                if cast_match:
-                    hex_value = '0x' + cast_match.group(1)
-
-                # 确保有0x前缀
-                if not hex_value.startswith('0x'):
-                    hex_value = '0x' + hex_value
-
-                # 将十六进制字符串转换为整数
-                hex_int = int(hex_value, 16)
-            else:
-                # 如果已经是整数，直接使用
-                hex_int = hex_value
-
-            # 提取日期部分(高4字节)：1900-01-01以来的天数
-            days = hex_int >> 32
-
-            # 提取时间部分(低4字节)：以300分之一秒为单位的时间数
-            ticks = hex_int & 0xFFFFFFFF
-            seconds = ticks / 300.0
-
-            # 基准日期：1900-01-01
-            base_date = datetime(1900, 1, 1)
-
-            # 计算最终日期时间
-            result_datetime = base_date + timedelta(days=days, seconds=seconds)
-
-            return result_datetime
-        except Exception as e:
-            logger.error(f"十六进制转日期时间失败: {str(e)}")
-            return None
-
-    @staticmethod
-    def datetime_to_sqlserver_hex(dt):
-        """
-        将Python datetime对象转换为SQL Server的十六进制DateTime表示
-
-        参数:
-            dt: datetime对象或符合'%Y-%m-%d %H:%M:%S'格式的字符串
-
-        返回:
-            (hex_str, hex_int): 十六进制字符串表示和对应的整数值
-        """
-        try:
-            # 如果输入是字符串，转换为datetime对象
-            if isinstance(dt, str):
-                dt = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
-
-            # 基准日期：1900-01-01
-            base_date = datetime(1900, 1, 1)
-
-            # 计算与基准日期的差值
-            delta = dt - base_date
-            days = delta.days
-
-            # 计算当天经过的秒数，并转换为300分之一秒
-            seconds_since_midnight = dt.hour * 3600 + dt.minute * \
-                60 + dt.second + dt.microsecond / 1000000.0
-            ticks = int(seconds_since_midnight * 300)
-
-            # 合并天数和时间刻度为一个8字节整数
-            hex_int = (days << 32) | ticks
-
-            # 转换为十六进制字符串
-            hex_str = f"0x{hex_int:016X}"
-
-            return (hex_str, hex_int)
-        except Exception as e:
-            logger.error(f"日期时间转SQL Server格式失败: {str(e)}")
-            return (None, None)
-
-    @staticmethod
-    def format_datetime(dt_value, format='%Y-%m-%d %H:%M:%S'):
-        """
-        格式化日期时间对象为字符串
-
-        参数:
-            dt_value: datetime对象或SQL Server十六进制日期时间
-            format: 输出格式
-
-        返回:
-            格式化的日期时间字符串
-        """
-        try:
-            # 如果是十六进制字符串，先转换为datetime
-            if isinstance(dt_value, str) and ('0x' in dt_value or 'CAST(' in dt_value):
-                dt_value = SQLServerDateConverter.sqlserver_hex_to_datetime(
-                    dt_value)
-
-            # 格式化为字符串
-            if isinstance(dt_value, datetime):
-                return dt_value.strftime(format)
-
-            # 如果不是可识别的格式，返回原值
-            return str(dt_value)
-        except Exception as e:
-            logger.error(f"日期时间格式化失败: {str(e)}")
-            return "格式化错误"
-
-
-# 创建全局转换器实例，方便其他模块直接导入使用
-date_converter = SQLServerDateConverter()
 
 
 class ParkingDB:
@@ -490,9 +374,11 @@ class ParkingService:
                     self.review_api_url.replace('/review', '/client_alive'),
                     params=process_info,
                     headers=HEADERS,
-                    timeout=10
+                    timeout=10,
+                    verify=CONFIG.get('ssl_verify', False)  # 使用配置文件中的SSL验证设置
                 )
                 if response.status_code == 200:
+                    logger.info(f"[调试] 远程API连接成功")
                     return True
                 else:
                     logger.warning(
@@ -514,7 +400,7 @@ class ParkingService:
         """获取待处理的续期请求"""
         try:
 
-            response = requests.get(self.review_api_url, headers=HEADERS)
+            response = requests.get(self.review_api_url, headers=HEADERS, verify=CONFIG.get('ssl_verify', False))
 
             if response.status_code == 200:
                 result = response.json()
@@ -543,7 +429,7 @@ class ParkingService:
 
             # 使用全局配置中的HEADERS
             response = requests.post(
-                self.review_api_url, json=data, headers=HEADERS)
+                self.review_api_url, json=data, headers=HEADERS, verify=CONFIG.get('ssl_verify', False))
 
             # 检查响应状态
             if response.status_code == 401:
@@ -557,6 +443,100 @@ class ParkingService:
             logger.error(f"更新续期状态异常: {str(e)}")
             return False
 
+    def _process_plate_change(self, review_info, conn, cursor):
+        """
+        处理车牌修改请求
+        
+        Args:
+            review_info (dict): 修改请求信息
+            conn: 数据库连接
+            cursor: 数据库游标
+            
+        Returns:
+            bool: 处理是否成功
+        """
+        try:
+            old_plate = review_info["car_number"]
+            new_plate = review_info.get("remark", "")  # 新车牌在remark字段中
+            
+            if not new_plate:
+                logger.error(f"[调试] 车牌修改失败：缺少新车牌信息")
+                return False
+            
+            logger.info(f"[调试] 开始处理车牌修改：{old_plate} -> {new_plate}")
+            
+            # 检查原车牌是否存在
+            cursor.execute("""
+                SELECT TOP 1 id, plateNumber, endTime, personId
+                FROM Sys_Park_Plate
+                WHERE plateNumber = ?
+                ORDER BY endTime DESC
+            """, old_plate)
+            
+            plate_row = cursor.fetchone()
+            if not plate_row:
+                logger.error(f"[调试] 原车牌 {old_plate} 不存在")
+                return False
+            
+            plate_id, current_plate, end_time, person_id = plate_row
+            
+            # 检查新车牌是否已存在
+            cursor.execute("""
+                SELECT TOP 1 plateNumber
+                FROM Sys_Park_Plate
+                WHERE plateNumber = ?
+            """, new_plate)
+            
+            if cursor.fetchone():
+                logger.error(f"[调试] 新车牌 {new_plate} 已存在")
+                return False
+            
+            if not DEBUG:
+                try:
+                    # 更新车牌号
+                    cursor.execute("""
+                        UPDATE Sys_Park_Plate 
+                        SET plateNumber = ?,
+                            upload_yun = 0,
+                            upload_yun2 = 0
+                        WHERE id = ?
+                    """, (new_plate, plate_id))
+                    
+                    # 更新相关的Sys_Park_PlateCharge记录
+                    cursor.execute("""
+                        UPDATE Sys_Park_PlateCharge 
+                        SET plateNumber = ?
+                        WHERE plateNumber = ?
+                    """, (new_plate, old_plate))
+                    
+                    # 更新状态为完成
+                    if self.update_review_status(
+                        review_id=review_info["id"],
+                        status="changed",
+                        car_number=old_plate,
+                        error_msg=f"车牌由{old_plate}改为{new_plate}"
+                    ):
+                        conn.commit()
+                        logger.info(f"[调试] 车牌修改成功：{old_plate} -> {new_plate}")
+                        return True
+                    else:
+                        conn.rollback()
+                        logger.error(f"[调试] 更新修改状态失败，回滚数据库操作")
+                        return False
+                        
+                except Exception as e:
+                    if conn:
+                        conn.rollback()
+                    logger.error(f"[调试] 车牌修改数据库操作异常，回滚事务: {str(e)}")
+                    return False
+            else:
+                logger.info(f"[调试] DEBUG模式：跳过车牌修改数据库操作")
+                return True
+                
+        except Exception as e:
+            logger.error(f"[调试] 处理车牌修改请求失败: {str(e)}")
+            return False
+
     def process_review(self, review_info):
         """
         处理单个续期请求
@@ -567,10 +547,16 @@ class ParkingService:
         Returns:
             bool: 处理是否成功
         """
+        conn = None
+        cursor = None
         try:
             # 连接SQL Server数据库
             conn = pyodbc.connect(CONFIG["conn_str"])
             cursor = conn.cursor()
+
+            # 检查是否为车牌修改请求
+            if review_info.get("status") == "change":
+                return self._process_plate_change(review_info, conn, cursor)
 
             # 获取Sys_Park_Plate中的当前记录
             cursor.execute("""
@@ -635,90 +621,92 @@ class ParkingService:
             logger.info(f"[调试] - 新的到期时间: {new_end_time}")
 
             if not DEBUG:
-                # 1. 更新Sys_Park_Plate表
-                cursor.execute("""
-                    UPDATE Sys_Park_Plate 
-                    SET endTime = ?,
-                        upload_yun = 0,
-                        upload_yun2 = 0
-                    WHERE plateNumber = ?
-                """, (new_end_time, review_info["car_number"]))
+                try:
+                    # 1. 更新Sys_Park_Plate表
+                    cursor.execute("""
+                        UPDATE Sys_Park_Plate 
+                        SET endTime = ?,
+                            upload_yun = 0,
+                            upload_yun2 = 0
+                        WHERE plateNumber = ?
+                    """, (new_end_time, review_info["car_number"]))
 
-                # 2. 插入新的Sys_Park_PlateCharge记录
-                insert_sql = """
-                    INSERT INTO Sys_Park_PlateCharge 
-                    (personName, personPhone, personAddress, pParkSpaceCount,
-                    plateParkingSpaceName, plateNumber, authType, beginTime, endTime,
-                    createTime, createName, receiveMoney, factMoney, upload_yun,
-                    chargeType, personId, remark, yunPayChannel, yunPayTime,
-                    yunOrderNumber, orderNumber, payCount, payUnit, upload_third,
-                    upload_yun2, plateIdStr, personIdStr)
-                    VALUES 
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?,
-                     GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                     ?, ?, ?, ?, ?, ?, ?, ?)
-                """
+                    # 2. 插入新的Sys_Park_PlateCharge记录
+                    insert_sql = """
+                        INSERT INTO Sys_Park_PlateCharge 
+                        (personName, personPhone, personAddress, pParkSpaceCount,
+                        plateParkingSpaceName, plateNumber, authType, beginTime, endTime,
+                        createTime, createName, receiveMoney, factMoney, upload_yun,
+                        chargeType, personId, remark, yunPayChannel, yunPayTime,
+                        yunOrderNumber, orderNumber, payCount, payUnit, upload_third,
+                        upload_yun2, plateIdStr, personIdStr)
+                        VALUES 
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?,
+                         GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                         ?, ?, ?, ?, ?, ?, ?, ?)
+                    """
 
-                # 生成订单号
-                order_number = f"M{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    # 生成订单号
+                    order_number = f"M{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-                # 准备插入数据，优先使用历史数据，必要时更新
-                insert_data = (
-                    review_info["owner"],                          # personName
-                    charge_data.get("personPhone", ""),           # personPhone
-                    # personAddress
-                    charge_data.get("personAddress", ""),
-                    # pParkSpaceCount
-                    charge_data.get("pParkSpaceCount", 1),
-                    # plateParkingSpaceName
-                    charge_data.get("plateParkingSpaceName", ""),
-                    review_info["car_number"],                    # plateNumber
-                    charge_data.get("authType", 1),              # authType
-                    current_end_time,                            # beginTime
-                    new_end_time,                                # endTime
-                    "自动续约系统",                              # createName
-                    charge_data.get("receiveMoney", 0.0),        # receiveMoney
-                    charge_data.get("factMoney", 0.0),           # factMoney
-                    0,                                           # upload_yun
-                    charge_data.get("chargeType", 1),            # chargeType
-                    charge_data.get("personId", None),           # personId
-                    f"自动续约{review_info['parktime']}个月",     # remark
-                    # yunPayChannel
-                    charge_data.get("yunPayChannel", ""),
-                    None,                                        # yunPayTime
-                    "",                                          # yunOrderNumber
-                    order_number,                                # orderNumber
-                    review_info["parktime"],                     # payCount
-                    "月",                                        # payUnit
-                    charge_data.get("upload_third", None),       # upload_third
-                    0,                                           # upload_yun2
-                    charge_data.get("plateIdStr", ""),           # plateIdStr
-                    charge_data.get("personIdStr", "")           # personIdStr
-                )
+                    # 准备插入数据，优先使用历史数据，必要时更新
+                    insert_data = (
+                        review_info["owner"],                          # personName
+                        charge_data.get("personPhone", ""),           # personPhone
+                        charge_data.get("personAddress", ""),         # personAddress
+                        charge_data.get("pParkSpaceCount", 1),       # pParkSpaceCount
+                        charge_data.get("plateParkingSpaceName", ""), # plateParkingSpaceName
+                        review_info["car_number"],                    # plateNumber
+                        charge_data.get("authType", 1),              # authType
+                        current_end_time,                            # beginTime
+                        new_end_time,                                # endTime
+                        "自动续约系统",                              # createName
+                        charge_data.get("receiveMoney", 0.0),        # receiveMoney
+                        charge_data.get("factMoney", 0.0),           # factMoney
+                        0,                                           # upload_yun
+                        charge_data.get("chargeType", 1),            # chargeType
+                        charge_data.get("personId", None),           # personId
+                        f"自动续约{review_info['parktime']}个月",     # remark
+                        charge_data.get("yunPayChannel", ""),        # yunPayChannel
+                        None,                                        # yunPayTime
+                        "",                                          # yunOrderNumber
+                        order_number,                                # orderNumber
+                        review_info["parktime"],                     # payCount
+                        "月",                                        # payUnit
+                        charge_data.get("upload_third", None),       # upload_third
+                        0,                                           # upload_yun2
+                        charge_data.get("plateIdStr", ""),           # plateIdStr
+                        charge_data.get("personIdStr", "")           # personIdStr
+                    )
 
-                cursor.execute(insert_sql, insert_data)
+                    cursor.execute(insert_sql, insert_data)
 
-                # 提交事务
-                conn.commit()
-                logger.info(f"[调试] 数据库事务提交成功")
+                    # 更新续期状态为完成，传递车牌号
+                    if self.update_review_status(
+                        review_id=review_info["id"],
+                        status="complete",
+                        car_number=review_info["car_number"],
+                        error_msg=f"{review_info['parktime']}个月，新的到期时间: {new_end_time}"
+                    ):
+                        # 只有在更新状态成功后才提交事务
+                        conn.commit()
+                        logger.info(f"[调试] 数据库事务提交成功")
+                        return True
+                    else:
+                        # 如果更新状态失败，回滚事务
+                        conn.rollback()
+                        logger.error(f"[调试] 更新续期状态失败，回滚数据库操作")
+                        return False
 
-                # 更新续期状态为完成，传递车牌号 如果失败回滚数据库操作
-                if not self.update_review_status(
-                    review_id=review_info["id"],
-                    status="complete",
-                    car_number=review_info["car_number"],
-                    error_msg=f"{review_info['parktime']}个月，新的到期时间: {new_end_time}"
-                ):
-                    conn.rollback()
-                    logger.error(f"[调试] 更新续期状态失败，回滚数据库操作")
-                    conn.close()
+                except Exception as e:
+                    # 发生任何异常都回滚事务
+                    if conn:
+                        conn.rollback()
+                    logger.error(f"[调试] 数据库操作异常，回滚事务: {str(e)}")
                     return False
             else:
                 logger.info("[调试] DEBUG模式：跳过数据库更新操作")
-
-            conn.close()
-            logger.info(f"[调试] 处理续期请求成功: {review_info['car_number']}")
-            return True
+                return True
 
         except Exception as e:
             error_msg = f"处理续期请求失败: {str(e)}"
@@ -731,7 +719,13 @@ class ParkingService:
                     error_msg=error_msg,
                     car_number=review_info["car_number"]
                 )
-                return False
+            return False
+        finally:
+            # 确保关闭数据库连接
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
 
     def sync_parking_data(self) -> bool:
         """同步停车场数据到服务器"""
@@ -763,7 +757,6 @@ class ParkingService:
                         person[col[0]] = value
                 local_persons.append(person)
 
-            # 修改车牌查询，移除不存在的字段
             cursor.execute("""
                 SELECT id, personId, plateNumber, plateType, plateParkingSpaceName,
                        beginTime, endTime, createTime, authType, upload_yun,
@@ -792,7 +785,8 @@ class ParkingService:
             response = requests.get(
                 car_park_url,
                 headers=HEADERS,
-                timeout=30
+                timeout=30,
+                verify=CONFIG.get('ssl_verify', False)
             )
 
             if response.status_code != 200:
@@ -871,7 +865,8 @@ class ParkingService:
                     car_park_url,
                     json=sync_data,
                     headers=HEADERS,
-                    timeout=30
+                    timeout=30,
+                    verify=CONFIG.get('ssl_verify', False)
                 )
 
                 if response.status_code == 200:
@@ -924,9 +919,12 @@ class ParkingService:
         """检查并处理续期请求"""
         try:
             logger.info("检查续期请求")
+            # 检查check_remote_connection状态
+            if not self.check_remote_connection():
+                logger.error("[调试] 无法连接到远端服务器，服务启动失败")
+                return
             reviews = self.get_pending_reviews()
             has_updates = False
-
             for review in reviews:
                 logger.info(f"处理续期请求: {review}")
                 if self.process_review(review):
