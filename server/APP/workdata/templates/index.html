@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WorkData - 数据库管理</title>
+    <script src="/static/layui/layui.js"></script>
+    <!-- 使用主应用的layui资源 -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+        background-color: #f0f2f5;
+      }
+      .header {
+        background-color: #1e9fff;
+        color: white;
+        padding: 10px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .header-title {
+        font-size: 20px;
+        font-weight: bold;
+      }
+      .header-user {
+        display: flex;
+        align-items: center;
+      }
+      .header-user span {
+        margin-right: 15px;
+      }
+      .status-bar {
+        background-color: #ffffff;
+        padding: 5px 20px;
+        font-size: 12px;
+        color: #666;
+        border-bottom: 1px solid #e6e6e6;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+      .main-content {
+        padding: 20px;
+      }
+      .db-selector {
+        margin-bottom: 20px;
+      }
+      .table-container {
+        background-color: #ffffff;
+        border-radius: 4px;
+        padding: 15px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+      }
+      .search-toolbar {
+        margin-bottom: 15px;
+        padding: 10px;
+        background-color: #f5f7fa;
+        border-radius: 4px;
+      }
+      .layui-table {
+        margin-top: 0;
+        background-color: #ffffff;
+      }
+      .table-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+      .table-title {
+        font-size: 16px;
+        font-weight: bold;
+        color: #333;
+      }
+      .layui-form-item {
+        margin-bottom: 10px;
+      }
+      .loading-mask {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.3);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        display: none;
+      }
+      .loading-content {
+        background-color: white;
+        padding: 20px 40px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+      }
+      .loading-icon {
+        margin-right: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 顶部导航栏 -->
+    <div class="header">
+      <div class="header-title">WorkData - 数据库管理系统</div>
+      <div class="header-user">
+        <span>欢迎您，{{ user.username }}</span>
+        <a href="{{ url_for('workdata.logout') }}" class="layui-btn layui-btn-sm layui-btn-primary"> <i class="layui-icon layui-icon-logout"></i> 退出登录 </a>
+      </div>
+    </div>
+
+    <!-- 状态栏 -->
+    <div class="status-bar" id="status-bar">
+      <span id="current-path">当前路径: 未选择</span>
+      <span style="margin-left: 20px" id="data-count">数据统计: 0 条</span>
+      <span style="margin-left: 20px" id="last-update">最后更新: 无</span>
+    </div>
+
+    <!-- 全局加载遮罩 -->
+    <div class="loading-mask" id="loading-mask">
+      <div class="loading-content">
+        <i class="layui-icon layui-icon-loading layui-icon layui-anim layui-anim-spin loading-icon"></i>
+        <span id="loading-text">加载中...</span>
+      </div>
+    </div>
+
+    <!-- 主内容区域 -->
+    <div class="main-content">
+      <!-- 数据库选择器 -->
+      <div class="layui-form db-selector">
+        <div class="layui-form-item">
+          <div class="layui-inline">
+            <label class="layui-form-label">选择数据库</label>
+            <div class="layui-input-block">
+              <select id="db-select" lay-filter="db-select">
+                <!-- 数据库列表将通过JS动态加载 -->
+                <option value="">请选择数据库</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="layui-inline">
+            <label class="layui-form-label">选择表格</label>
+            <div class="layui-input-block">
+              <select id="table-select" lay-filter="table-select">
+                <option value="">请先选择数据库</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="layui-inline">
+            <button class="layui-btn layui-btn-primary" id="load-data-btn"><i class="layui-icon layui-icon-refresh"></i> 加载数据</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 表格内容区域 -->
+      <div class="table-container">
+        <div class="table-header">
+          <div class="table-title" id="table-title">数据表信息</div>
+          <div>
+            <button class="layui-btn layui-btn-sm layui-btn-primary" id="add-data-btn"><i class="layui-icon layui-icon-add-circle"></i> 添加数据</button>
+            <button class="layui-btn layui-btn-sm layui-btn-primary" id="refresh-table-btn"><i class="layui-icon layui-icon-refresh"></i> 刷新表格</button>
+            <button class="layui-btn layui-btn-sm layui-btn-primary" id="export-data-btn"><i class="layui-icon layui-icon-download"></i> 导出数据</button>
+          </div>
+        </div>
+
+        <!-- 搜索工具栏 -->
+        <div class="search-toolbar">
+          <div class="layui-form layui-form-item">
+            <div class="layui-inline">
+              <label class="layui-form-label">搜索:</label>
+              <div class="layui-input-block" style="width: 200px">
+                <input type="text" id="search-input" placeholder="搜索内容" class="layui-input" />
+              </div>
+            </div>
+            <div class="layui-inline">
+              <button class="layui-btn layui-btn-sm layui-btn-primary" id="search-btn"><i class="layui-icon layui-icon-search"></i> 搜索</button>
+            </div>
+            <div class="layui-inline">
+              <button class="layui-btn layui-btn-sm layui-btn-primary" id="reset-search-btn"><i class="layui-icon layui-icon-refresh"></i> 重置</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 数据表格 -->
+        <table id="data-table" lay-filter="data-table"></table>
+      </div>
+    </div>
+
+    <!-- 数据表格操作列模板 -->
+    <script type="text/html" id="action-col">
+      <a class="layui-btn layui-btn-xs layui-btn-primary" lay-event="edit"> <i class="layui-icon layui-icon-edit"></i> 编辑 </a>
+      <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="delete"> <i class="layui-icon layui-icon-delete"></i> 删除 </a>
+    </script>
+
+    <!-- 主脚本 -->
+    <script src="/workdata/static/js/index.js"></script>
+  </body>
+</html>

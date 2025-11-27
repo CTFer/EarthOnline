@@ -1,7 +1,7 @@
 {
     "DEBUG": false,
     "CONFIG": {
-        "review_api_url": "https://1.95.11.164/car_park/review",
+        "review_api_url": "https://111.229.150.104/car_park/review",
         "conn_str": "DRIVER={SQL Server};SERVER=localhost;DATABASE=Park_DB;UID=sa;PWD=123",
         "sync_interval": 60,
         "sys_check_interval": 5,

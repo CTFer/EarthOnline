@@ -4,13 +4,14 @@ import logging
 import time
 import json
 import traceback
-from flask_socketio import emit
 from datetime import datetime
 import serial
 import serial.tools.list_ports
 import re
 from utils.response_handler import ResponseHandler, StatusCode
 from config.config import ENV
+# 导入SSE服务
+from function.SSEService import sse_service
 if ENV == 'local':
     from ndef import message, record
     from function.NFC_Device import NFC_Device
@@ -514,8 +515,10 @@ class NFCService:
                 msg=f'写入异常: {str(e)}'
             )
 
-    def handle_nfc_card(self, card_id, player_id, socketio):
+    def handle_nfc_card(self, card_id, player_id):
         """处理NFC卡片扫描"""
+        # 导入SSE服务
+        from function.SSEService import sse_service
         print("[NFC] ====== 开始处理NFC卡片 ======")
         print(f"[NFC] 卡片ID: {card_id}, 玩家ID: {player_id}")
         
@@ -547,7 +550,7 @@ class NFCService:
 
             # 任务卡片处理
             if card_type == 'TASK':
-                return self._handle_task_card(cursor, conn, value, player_id, socketio, room)
+                return self._handle_task_card(cursor, conn, value, player_id, room)
                 
             # 积分卡片处理
             elif card_type == 'POINTS':
@@ -579,10 +582,7 @@ class NFCService:
                 conn.rollback()
                 print("[NFC] 数据库事务已回滚")
 
-            socketio.emit('nfc_task_update', {
-                'type': 'ERROR',
-                'message': error_msg
-            }, room=room)
+            self._send_sse_message(room, 'ERROR', error_msg)
 
             return {
                 'code': 500,
@@ -595,10 +595,9 @@ class NFCService:
                 conn.close()
                 print("[NFC] 数据库连接已关闭")
 
-    def _send_socket_message(self, socketio, room, msg_type, message, task=None, task_id=None, rewards=None, timestamp=None):
-        """统一的Socket消息发送函数
+    def _send_sse_message(self, room, msg_type, message, task=None, task_id=None, rewards=None, timestamp=None):
+        """统一的SSE消息发送函数
         Args:
-            socketio: SocketIO实例
             room: 房间ID
             msg_type: 消息类型 ('ERROR', 'SUCCESS', 'INFO', 'COMPLETE', 'CHECK', 'ALREADY_COMPLETED' 等)
             message: 消息内容
@@ -607,24 +606,26 @@ class NFCService:
             rewards: 奖励信息（可选）
             timestamp: 时间戳（可选）
         """
-        print(f"[NFC] 发送Socket消息 - 类型: {msg_type}")
+        print(f"[NFC] 发送SSE消息 - 类型: {msg_type}")
         print(f"[NFC] 消息内容: {message}")
         
-        socket_data = {
+        sse_data = {
             'type': msg_type,
             'message': message
         }
         
         if task:
-            socket_data['task'] = task
+            sse_data['task'] = task
         if task_id:
-            socket_data['task_id'] = task_id
+            sse_data['task_id'] = task_id
         if rewards:
-            socket_data['rewards'] = rewards
+            sse_data['rewards'] = rewards
         if timestamp:
-            socket_data['timestamp'] = timestamp
+            sse_data['timestamp'] = timestamp
         
-        socketio.emit('nfc_task_update', socket_data, room=room)
+        # 导入SSE服务（避免循环导入）
+        from function.SSEService import sse_service
+        sse_service.broadcast_to_room(room, 'nfc_task_update', sse_data)
 
     def _format_task_message(self, task, status_msg="", extra_msg=""):
         """格式化任务相关消息
@@ -645,7 +646,7 @@ class NFCService:
         
         return message
 
-    def _handle_task_card(self, cursor, conn, task_id, player_id, socketio, room):
+    def _handle_task_card(self, cursor, conn, task_id, player_id, room):
         """处理任务卡片"""
         from function.TaskService import task_service  # 导入任务服务
         
@@ -657,18 +658,16 @@ class NFCService:
             
             if result['code'] == 0:
                 # 任务完成成功
-                self._send_socket_message(
-                    socketio, 
+                self._send_sse_message(
                     room, 
                     'COMPLETE' if not result.get('data', {}).get('need_check') else 'CHECK',
                     "任务提交成功",
-                    result.get('data', {})
+                    task=result.get('data', {})
                 )
                 return result
             else:
                 # 任务完成失败
-                self._send_socket_message(
-                    socketio,
+                self._send_sse_message(
                     room,
                     'ERROR',
                     result['msg']
@@ -678,7 +677,7 @@ class NFCService:
         except Exception as e:
             error_msg = f"处理任务卡片失败: {str(e)}"
             print(f"[NFC] 错误: {error_msg}")
-            self._send_socket_message(socketio, room, 'ERROR', error_msg)
+            self._send_sse_message(room, 'ERROR', error_msg)
             return ResponseHandler.error(
                 code=StatusCode.SERVER_ERROR,
                 msg=error_msg

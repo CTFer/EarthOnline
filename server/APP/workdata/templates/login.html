@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkData - 登录</title>
+    <!-- 使用主应用的layui资源 -->
+    <script src="/static/layui/layui.js"></script>
+    <link rel="stylesheet" href="/static/layui/css/layui.css" />
+    <style>
+        body {
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        }
+        .login-title {
+            text-align: center;
+            font-size: 24px;
+            color: #1E9FFF;
+            margin-bottom: 30px;
+            font-weight: bold;
+        }
+        .login-form .layui-form-item {
+            margin-bottom: 20px;
+        }
+        .login-form .layui-form-label {
+            width: 80px;
+            text-align: right;
+        }
+        .login-form .layui-input-block {
+            margin-left: 110px;
+        }
+        .login-btn {
+            width: 100%;
+            height: 40px;
+            font-size: 16px;
+        }
+        .error-message {
+            color: #FF5722;
+            margin-top: 10px;
+            text-align: center;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-title">WorkData系统登录</div>
+        
+        <form class="layui-form login-form" method="post" action="{{ url_for('workdata.login') }}">
+            <div class="layui-form-item">
+                <label class="layui-form-label">用户名</label>
+                <div class="layui-input-block">
+                    <input type="text" name="username" required lay-verify="required" placeholder="请输入用户名" class="layui-input">
+                </div>
+            </div>
+            
+            <div class="layui-form-item">
+                <label class="layui-form-label">密码</label>
+                <div class="layui-input-block">
+                    <input type="password" name="password" required lay-verify="required" placeholder="请输入密码" class="layui-input">
+                </div>
+            </div>
+            
+            <div class="layui-form-item">
+                <div class="layui-input-block" style="margin-left: 0;">
+                    <button class="layui-btn layui-btn-primary login-btn" type="submit">
+                        <i class="layui-icon layui-icon-user"></i> 登录
+                    </button>
+                </div>
+            </div>
+            
+            {% if error %}
+            <div class="error-message">{{ error }}</div>
+            {% endif %}
+        </form>
+    </div>
+    
+    <script>
+        layui.use(['form'], function() {
+            var form = layui.form;
+            
+            // 表单验证
+            form.verify({
+                username: function(value) {
+                    if (value.length === 0) {
+                        return '请输入用户名';
+                    }
+                },
+                password: function(value) {
+                    if (value.length === 0) {
+                        return '请输入密码';
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

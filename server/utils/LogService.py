@@ -32,6 +32,7 @@ class LogService:
         self.request_logs = []  # 请求记录列表
         self.MAX_LOGS = 100    # 最多保存100条记录
         self.websocket_service = None  # 将在init_websocket中设置
+        self.sse_service = None  # 将在init_sse中设置
         
     def setup_logging(self, debug_mode: bool = False) -> logging.Logger:
         """配置日志系统
@@ -126,6 +127,10 @@ class LogService:
     def init_websocket(self, websocket_service) -> None:
         """初始化WebSocket服务"""
         self.websocket_service = websocket_service
+        
+    def init_sse(self, sse_service) -> None:
+        """初始化SSE服务"""
+        self.sse_service = sse_service
             
     def add_request_log(self, log_entry: Dict) -> None:
         """添加新的请求记录"""
@@ -235,9 +240,9 @@ class LogService:
             # 记录请求日志
             self.add_request_log(log_entry)
 
-            # 通过WebSocket广播日志更新
-            if self.websocket_service:
-                self.websocket_service.broadcast_log_update(
+            # 通过SSE广播日志更新
+            if self.sse_service and hasattr(self.sse_service, 'broadcast_log_update'):
+                self.sse_service.broadcast_log_update(
                     self.get_request_logs(),
                     log_entry
                 )
@@ -247,4 +252,4 @@ class LogService:
         return decorated_function
 
 # 创建日志服务实例
-log_service = LogService() 
+log_service = LogService()

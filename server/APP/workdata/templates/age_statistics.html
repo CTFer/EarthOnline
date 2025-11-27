@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>年龄分布统计 - 数据库管理系统</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <script src="/static/js/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f6f6f6;
+        }
+        .header {
+            background-color: #1e9fff;
+            color: white;
+            padding: 15px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin-top: 20px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            border-left: 4px solid #1e9fff;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1e9fff;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+            font-size: 14px;
+        }
+        .table-container {
+            margin-top: 20px;
+        }
+        .layui-table {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .data-info {
+            background: #f0f9eb;
+            border: 1px solid #e1f3d8;
+            border-radius: 4px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            color: #67c23a;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <i class="layui-icon layui-icon-data-line" style="margin-right: 8px;"></i>
+        年龄分布统计
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h3 style="margin: 0 0 15px 0; padding-bottom: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                统计信息
+                <button id="range-settings-btn" class="layui-btn layui-btn-sm layui-btn-normal">
+                    <i class="layui-icon layui-icon-set"></i> 年龄段设置
+                </button>
+            </h3>
+            <div class="data-info">
+                <i class="layui-icon layui-icon-database"></i> 数据源：通讯录数据库 - 通讯录表
+            </div>
+        </div>
+        
+        <!-- 年龄段设置模态框 -->
+        <div id="range-settings-modal" style="display: none;">
+            <div class="modal-header" style="padding: 15px; border-bottom: 1px solid #eee;">
+                <h4 style="margin: 0;">自定义年龄段设置</h4>
+                <button id="close-modal" class="layui-btn layui-btn-sm layui-btn-primary" style="float: right;">
+                    关闭
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div id="range-settings-container">
+                    <div class="range-setting-item" style="margin-bottom: 15px; display: flex; align-items: center;">
+                        <input type="text" placeholder="起始年龄" class="range-start layui-input" style="width: 100px; margin-right: 10px;">
+                        <span style="margin: 0 10px;">-</span>
+                        <input type="text" placeholder="结束年龄" class="range-end layui-input" style="width: 100px; margin-right: 10px;">
+                        <input type="text" placeholder="备注" class="range-remark layui-input" style="flex: 1; margin-right: 10px;">
+                        <button class="remove-range-btn layui-btn layui-btn-sm layui-btn-danger" style="display: none;">
+                            <i class="layui-icon layui-icon-close"></i>
+                        </button>
+                    </div>
+                    <div class="range-setting-item" style="margin-bottom: 15px; display: flex; align-items: center;">
+                        <input type="text" placeholder="起始年龄" class="range-start layui-input" style="width: 100px; margin-right: 10px;">
+                        <span style="margin: 0 10px;">-</span>
+                        <input type="text" placeholder="结束年龄" class="range-end layui-input" style="width: 100px; margin-right: 10px;">
+                        <input type="text" placeholder="备注" class="range-remark layui-input" style="flex: 1; margin-right: 10px;">
+                        <button class="remove-range-btn layui-btn layui-btn-sm layui-btn-danger" style="display: none;">
+                            <i class="layui-icon layui-icon-close"></i>
+                        </button>
+                    </div>
+                </div>
+                <button id="add-range-btn" class="layui-btn layui-btn-sm layui-btn-warm" style="margin-bottom: 20px;">
+                    <i class="layui-icon layui-icon-plus"></i> 添加年龄段
+                </button>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                    <p style="margin: 0; color: #666; font-size: 14px;">
+                        <i class="layui-icon layui-icon-tips"></i> 提示：
+                    </p>
+                    <ul style="margin: 10px 0 0 20px; color: #666; font-size: 14px; line-height: 1.6;">
+                        <li>起始年龄必须小于结束年龄</li>
+                        <li>年龄段不能重叠</li>
+                        <li>最后一个年龄段可以设置为"+"（如：65+）</li>
+                        <li>至少需要设置两个年龄段</li>
+                    </ul>
+                </div>
+                <div style="display: flex; justify-content: flex-end;">
+                    <button id="reset-default-btn" class="layui-btn layui-btn-sm layui-btn-primary" style="margin-right: 10px;">
+                        恢复默认
+                    </button>
+                    <button id="apply-settings-btn" class="layui-btn layui-btn-sm layui-btn-normal">
+                        应用设置
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 模态框遮罩层 -->
+        <div id="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 9998;"></div>
+
+        <div class="card">
+            <h3 style="margin: 0 0 20px 0; padding-bottom: 15px; border-bottom: 1px solid #eee;">
+                统计结果
+            </h3>
+            <div id="result-container">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-count">0</div>
+                        <div class="stat-label">总人数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="valid-count">0</div>
+                        <div class="stat-label">有效数据</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="avg-age">0</div>
+                        <div class="stat-label">平均年龄</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="main-range">--</div>
+                        <div class="stat-label">主要年龄段</div>
+                    </div>
+                </div>
+                
+                <div class="chart-container" id="age-chart"></div>
+                
+                <div class="table-container">
+                    <table class="layui-table" lay-even>
+                        <thead>
+                            <tr>
+                                <th>年龄段</th>
+                                <th>人数</th>
+                                <th>占比</th>
+                                <th>备注</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stats-table-body">
+                            <!-- 统计数据将通过JS动态添加 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loading">
+        <div class="layui-spinner layui-spinner-lg" style="color: #1e9fff;"></div>
+        <p style="margin-top: 20px; color: #666;">正在加载统计数据，请稍候...</p>
+    </div>
+
+    <script src="/static/layui/layui.js"></script>
+    <script>
+        // 初始化layui
+        layui.use(['layer'], function() {
+            const layer = layui.layer;
+            let ageChart = null;
+            let customAgeRanges = null; // 存储自定义年龄段设置
+            
+            // 初始化函数
+            function init() {
+                // 直接调用获取统计数据，layui回调时DOM已经加载完成
+                fetchStatistics();
+                // 初始化年龄段设置相关事件
+                initRangeSettings();
+            }
+            
+            // 初始化年龄段设置功能
+            function initRangeSettings() {
+                const settingsBtn = document.getElementById('range-settings-btn');
+                const modal = document.getElementById('range-settings-modal');
+                const overlay = document.getElementById('modal-overlay');
+                const closeBtn = document.getElementById('close-modal');
+                const addBtn = document.getElementById('add-range-btn');
+                const applyBtn = document.getElementById('apply-settings-btn');
+                const resetBtn = document.getElementById('reset-default-btn');
+                const container = document.getElementById('range-settings-container');
+                
+                // 打开模态框
+                settingsBtn.addEventListener('click', function() {
+                    // 设置模态框样式
+                    modal.style.position = 'fixed';
+                    modal.style.top = '50%';
+                    modal.style.left = '50%';
+                    modal.style.transform = 'translate(-50%, -50%)';
+                    modal.style.width = '800px';
+                    modal.style.maxWidth = '90%';
+                    modal.style.maxHeight = '90vh';
+                    modal.style.overflowY = 'auto';
+                    modal.style.backgroundColor = 'white';
+                    modal.style.borderRadius = '8px';
+                    modal.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                    modal.style.zIndex = '9999';
+                    
+                    // 如果有自定义设置，加载它们，否则加载默认设置
+                    loadRangeSettings();
+                    
+                    modal.style.display = 'block';
+                    overlay.style.display = 'block';
+                    
+                    // 显示删除按钮（如果有多个项目）
+                    updateRemoveButtonsVisibility();
+                });
+                
+                // 关闭模态框
+                function closeModal() {
+                    modal.style.display = 'none';
+                    overlay.style.display = 'none';
+                }
+                
+                closeBtn.addEventListener('click', closeModal);
+                overlay.addEventListener('click', closeModal);
+                
+                // 添加年龄段
+                addBtn.addEventListener('click', function() {
+                    const newItem = document.createElement('div');
+                    newItem.className = 'range-setting-item';
+                    newItem.style.marginBottom = '15px';
+                    newItem.style.display = 'flex';
+                    newItem.style.alignItems = 'center';
+                    newItem.innerHTML = `
+                        <input type="text" placeholder="起始年龄" class="range-start layui-input" style="width: 100px; margin-right: 10px;">
+                        <span style="margin: 0 10px;">-</span>
+                        <input type="text" placeholder="结束年龄" class="range-end layui-input" style="width: 100px; margin-right: 10px;">
+                        <input type="text" placeholder="备注" class="range-remark layui-input" style="flex: 1; margin-right: 10px;">
+                        <button class="remove-range-btn layui-btn layui-btn-sm layui-btn-danger">
+                            <i class="layui-icon layui-icon-close"></i>
+                        </button>
+                    `;
+                    container.appendChild(newItem);
+                    
+                    // 添加删除事件
+                    newItem.querySelector('.remove-range-btn').addEventListener('click', function() {
+                        container.removeChild(newItem);
+                        updateRemoveButtonsVisibility();
+                    });
+                    
+                    updateRemoveButtonsVisibility();
+                });
+                
+                // 更新删除按钮可见性
+                function updateRemoveButtonsVisibility() {
+                    const items = container.querySelectorAll('.range-setting-item');
+                    const removeBtns = container.querySelectorAll('.remove-range-btn');
+                    
+                    if (items.length <= 2) {
+                        // 至少保留两个年龄段
+                        removeBtns.forEach(btn => {
+                            btn.style.display = 'none';
+                        });
+                    } else {
+                        removeBtns.forEach(btn => {
+                            btn.style.display = 'inline-block';
+                        });
+                    }
+                }
+                
+                // 为初始的删除按钮添加事件
+                container.querySelectorAll('.remove-range-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const item = btn.closest('.range-setting-item');
+                        container.removeChild(item);
+                        updateRemoveButtonsVisibility();
+                    });
+                });
+                
+                // 应用设置
+                applyBtn.addEventListener('click', function() {
+                    const ranges = collectRangeSettings();
+                    
+                    // 验证设置
+                    const validationResult = validateRangeSettings(ranges);
+                    if (!validationResult.valid) {
+                        layer.msg(validationResult.error, {icon: 2});
+                        return;
+                    }
+                    
+                    // 保存设置
+                    customAgeRanges = ranges;
+                    closeModal();
+                    
+                    // 重新获取数据
+                    fetchStatistics();
+                    
+                    layer.msg('年龄段设置已应用', {icon: 1});
+                });
+                
+                // 恢复默认设置
+                resetBtn.addEventListener('click', function() {
+                    customAgeRanges = null;
+                    loadDefaultRangeSettings();
+                    layer.msg('已恢复默认设置，请点击应用', {icon: 0});
+                });
+            }
+            
+            // 加载默认年龄段设置
+            function loadDefaultRangeSettings() {
+                const container = document.getElementById('range-settings-container');
+                container.innerHTML = '';
+                
+                const defaultRanges = [
+                    {start: '0', end: '18', remark: '未成年人'},
+                    {start: '19', end: '25', remark: '青年'},
+                    {start: '26', end: '35', remark: '青壮年'},
+                    {start: '36', end: '45', remark: '中年'},
+                    {start: '46', end: '55', remark: '中老年'},
+                    {start: '56', end: '65', remark: '老年前期'},
+                    {start: '65', end: '+', remark: '老年'}
+                ];
+                
+                defaultRanges.forEach(range => {
+                    const item = document.createElement('div');
+                    item.className = 'range-setting-item';
+                    item.style.marginBottom = '15px';
+                    item.style.display = 'flex';
+                    item.style.alignItems = 'center';
+                    item.innerHTML = `
+                        <input type="text" value="${range.start}" class="range-start layui-input" style="width: 100px; margin-right: 10px;">
+                        <span style="margin: 0 10px;">-</span>
+                        <input type="text" value="${range.end}" class="range-end layui-input" style="width: 100px; margin-right: 10px;">
+                        <input type="text" value="${range.remark}" class="range-remark layui-input" style="flex: 1; margin-right: 10px;">
+                        <button class="remove-range-btn layui-btn layui-btn-sm layui-btn-danger">
+                            <i class="layui-icon layui-icon-close"></i>
+                        </button>
+                    `;
+                    container.appendChild(item);
+                    
+                    item.querySelector('.remove-range-btn').addEventListener('click', function() {
+                        container.removeChild(item);
+                        updateRemoveButtonsVisibility();
+                    });
+                });
+                
+                function updateRemoveButtonsVisibility() {
+                    const items = container.querySelectorAll('.range-setting-item');
+                    const removeBtns = container.querySelectorAll('.remove-range-btn');
+                    
+                    if (items.length <= 2) {
+                        removeBtns.forEach(btn => {
+                            btn.style.display = 'none';
+                        });
+                    }
+                }
+                
+                updateRemoveButtonsVisibility();
+            }
+            
+            // 加载当前的年龄段设置
+            function loadRangeSettings() {
+                if (customAgeRanges) {
+                    const container = document.getElementById('range-settings-container');
+                    container.innerHTML = '';
+                    
+                    customAgeRanges.forEach(range => {
+                        const [start, end] = range.split('-');
+                        // 为最后一个+的情况特殊处理
+                        const endValue = end === '+' ? '+' : end;
+                        const remark = getRangeRemark(range);
+                        
+                        const item = document.createElement('div');
+                        item.className = 'range-setting-item';
+                        item.style.marginBottom = '15px';
+                        item.style.display = 'flex';
+                        item.style.alignItems = 'center';
+                        item.innerHTML = `
+                            <input type="text" value="${start}" class="range-start layui-input" style="width: 100px; margin-right: 10px;">
+                            <span style="margin: 0 10px;">-</span>
+                            <input type="text" value="${endValue}" class="range-end layui-input" style="width: 100px; margin-right: 10px;">
+                            <input type="text" value="${remark}" class="range-remark layui-input" style="flex: 1; margin-right: 10px;">
+                            <button class="remove-range-btn layui-btn layui-btn-sm layui-btn-danger">
+                                <i class="layui-icon layui-icon-close"></i>
+                            </button>
+                        `;
+                        container.appendChild(item);
+                        
+                        item.querySelector('.remove-range-btn').addEventListener('click', function() {
+                            container.removeChild(item);
+                            updateRemoveButtonsVisibility();
+                        });
+                    });
+                } else {
+                    loadDefaultRangeSettings();
+                }
+            }
+            
+            // 收集年龄段设置
+            function collectRangeSettings() {
+                const items = document.querySelectorAll('.range-setting-item');
+                const ranges = [];
+                const remarksMap = {};
+                
+                items.forEach(item => {
+                    const start = item.querySelector('.range-start').value.trim();
+                    const end = item.querySelector('.range-end').value.trim();
+                    const remark = item.querySelector('.range-remark').value.trim();
+                    
+                    if (start && end) {
+                        const rangeStr = end === '+' ? `${start}+` : `${start}-${end}`;
+                        ranges.push(rangeStr);
+                        remarksMap[rangeStr] = remark;
+                    }
+                });
+                
+                // 保存备注映射到全局
+                window.ageRangeRemarks = remarksMap;
+                
+                return ranges;
+            }
+            
+            // 验证年龄段设置
+            function validateRangeSettings(ranges) {
+                if (ranges.length < 2) {
+                    return { valid: false, error: '至少需要设置两个年龄段' };
+                }
+                
+                // 验证每个年龄段
+                for (let i = 0; i < ranges.length; i++) {
+                    const range = ranges[i];
+                    let start, end;
+                    
+                    if (range.endsWith('+')) {
+                        // 处理 65+ 这种格式
+                        start = parseInt(range.replace('+', ''));
+                        if (isNaN(start)) {
+                            return { valid: false, error: `年龄段 ${range} 格式错误` };
+                        }
+                        
+                        // 只能是最后一个年龄段
+                        if (i !== ranges.length - 1) {
+                            return { valid: false, error: '"+"格式只能用在最后一个年龄段' };
+                        }
+                    } else {
+                        // 处理 0-18 这种格式
+                        const parts = range.split('-');
+                        if (parts.length !== 2) {
+                            return { valid: false, error: `年龄段 ${range} 格式错误` };
+                        }
+                        
+                        start = parseInt(parts[0]);
+                        end = parseInt(parts[1]);
+                        
+                        if (isNaN(start) || isNaN(end)) {
+                            return { valid: false, error: `年龄段 ${range} 包含非数字字符` };
+                        }
+                        
+                        if (start >= end) {
+                            return { valid: false, error: `年龄段 ${range} 的起始年龄必须小于结束年龄` };
+                        }
+                        
+                        if (start < 0) {
+                            return { valid: false, error: `年龄段 ${range} 的起始年龄不能为负数` };
+                        }
+                    }
+                }
+                
+                // 验证年龄段不重叠且连续
+                for (let i = 0; i < ranges.length - 1; i++) {
+                    const current = ranges[i];
+                    const next = ranges[i + 1];
+                    
+                    let currentEnd, nextStart;
+                    
+                    // 获取当前年龄段的结束值
+                    if (current.includes('-')) {
+                        currentEnd = parseInt(current.split('-')[1]);
+                    }
+                    
+                    // 获取下一个年龄段的起始值
+                    if (next.includes('-')) {
+                        nextStart = parseInt(next.split('-')[0]);
+                    } else {
+                        nextStart = parseInt(next.replace('+', ''));
+                    }
+                    
+                    // 验证不重叠且连续（允许相邻）
+                    if (currentEnd >= nextStart) {
+                        return { valid: false, error: `年龄段 ${current} 和 ${next} 重叠或不连续` };
+                    }
+                }
+                
+                return { valid: true, error: '' };
+            }
+            
+            // 获取统计数据
+            function fetchStatistics() {
+                // 显示加载中
+                document.getElementById('loading').style.display = 'flex';
+                
+                // 构建请求URL，添加自定义年龄段参数
+                let url = '/workdata/api/age_distribution';
+                if (customAgeRanges && customAgeRanges.length > 0) {
+                    url += `?age_ranges=${encodeURIComponent(JSON.stringify(customAgeRanges))}`;
+                }
+                
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('loading').style.display = 'none';
+                        
+                        if (data.code === 0) {
+                            // 更新统计信息
+                            updateStatistics(data.data);
+                            // 渲染图表
+                            renderChart(data.data);
+                        } else {
+                            layer.msg('统计失败: ' + data.msg, {icon: 2});
+                        }
+                    })
+                    .catch(error => {
+                        document.getElementById('loading').style.display = 'none';
+                        layer.msg('加载数据时发生错误', {icon: 2});
+                        console.error('Error fetching statistics:', error);
+                    });
+            }
+            
+            // 更新统计信息
+            function updateStatistics(data) {
+                // 更新总人数
+                document.getElementById('total-count').textContent = data.total_count;
+                document.getElementById('valid-count').textContent = data.total_count;
+                
+                // 计算平均年龄（估算）
+                let totalAgeSum = 0;
+                let maxCount = 0;
+                let mainRange = '--';
+                
+                data.age_distribution.forEach(item => {
+                    // 获取年龄段的中间值作为估算
+                    const ageMid = getAgeRangeMid(item.range);
+                    totalAgeSum += ageMid * item.count;
+                    
+                    // 找出人数最多的年龄段
+                    if (item.count > maxCount) {
+                        maxCount = item.count;
+                        mainRange = item.range;
+                    }
+                });
+                
+                const avgAge = data.total_count > 0 ? Math.round(totalAgeSum / data.total_count) : 0;
+                document.getElementById('avg-age').textContent = avgAge;
+                document.getElementById('main-range').textContent = mainRange;
+                
+                // 更新表格
+                const tableBody = document.getElementById('stats-table-body');
+                tableBody.innerHTML = '';
+                
+                data.age_distribution.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${item.range}</td>
+                        <td>${item.count}</td>
+                        <td>${item.percentage}%</td>
+                        <td>${getRangeRemark(item.range)}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+            
+            // 获取年龄段中间值
+            function getAgeRangeMid(range) {
+                if (range.includes('+')) {
+                    // 对于 65+ 这种格式，返回一个估算值
+                    const baseAge = parseInt(range.replace('+', ''));
+                    return baseAge + 5;
+                }
+                const [min, max] = range.split('-').map(Number);
+                return Math.round((min + max) / 2);
+            }
+            
+            // 获取年龄段备注
+            function getRangeRemark(range) {
+                // 首先检查自定义备注
+                if (window.ageRangeRemarks && window.ageRangeRemarks[range]) {
+                    return window.ageRangeRemarks[range];
+                }
+                
+                // 默认备注
+                const defaultRemarks = {
+                    '0-18': '未成年人',
+                    '19-25': '青年',
+                    '26-35': '青壮年',
+                    '36-45': '中年',
+                    '46-55': '中老年',
+                    '56-65': '老年前期',
+                    '65+': '老年'
+                };
+                return defaultRemarks[range] || '';
+            }
+            
+            // 渲染图表
+            function renderChart(data) {
+                const chartDom = document.getElementById('age-chart');
+                
+                if (!ageChart) {
+                    ageChart = echarts.init(chartDom);
+                }
+                
+                const option = {
+                    title: {
+                        text: '年龄分布统计',
+                        left: 'center'
+                    },
+                    tooltip: {
+                        trigger: 'axis',
+                        formatter: function(params) {
+                            const data = params[0];
+                            return `${data.name}<br/>人数: ${data.value}<br/>占比: ${data.data.percent}%`;
+                        }
+                    },
+                    legend: {
+                        bottom: 0,
+                        data: ['人数']
+                    },
+                    grid: {
+                        left: '3%',
+                        right: '4%',
+                        bottom: '15%',
+                        containLabel: true
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: data.age_distribution.map(item => item.range),
+                        axisLabel: {
+                            rotate: 0
+                        }
+                    },
+                    yAxis: {
+                        type: 'value',
+                        name: '人数',
+                        axisLabel: {
+                            formatter: '{value}'
+                        }
+                    },
+                    series: [
+                        {
+                            name: '人数',
+                            type: 'bar',
+                            data: data.age_distribution.map(item => ({
+                                value: item.count,
+                                percent: item.percentage
+                            })),
+                            itemStyle: {
+                                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                    { offset: 0, color: '#83bff6' },
+                                    { offset: 0.5, color: '#188df0' },
+                                    { offset: 1, color: '#188df0' }
+                                ])
+                            },
+                            emphasis: {
+                                itemStyle: {
+                                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                        { offset: 0, color: '#2378f7' },
+                                        { offset: 0.7, color: '#2378f7' },
+                                        { offset: 1, color: '#83bff6' }
+                                    ])
+                                }
+                            },
+                            label: {
+                                show: true,
+                                position: 'top',
+                                formatter: function(params) {
+                                    return params.value > 0 ? `${params.value}\n(${params.data.percent}%)` : '';
+                                }
+                            }
+                        }
+                    ]
+                };
+                
+                ageChart.setOption(option);
+                
+                // 响应式调整
+                window.addEventListener('resize', function() {
+                    ageChart.resize();
+                });
+            }
+            
+            // 初始化
+            init();
+        });
+    </script>
+</body>
+</html>

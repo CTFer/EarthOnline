@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2023-11-14 13:28:31
-# LastEditTime: 2025-11-01 20:47:48
+# LastEditTime: 2025-11-05 08:56:45
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -68,36 +68,6 @@ def get_cursor():
     conn = get_db_connection()
     return conn.cursor(), conn
 
-# 确保默认管理员用户存在
-def ensure_admin_user():
-    """确保默认管理员用户存在于数据库中"""
-    cursor, conn = get_cursor()
-    try:
-        # 计算密码的MD5哈希
-        md5_hash = hashlib.md5('325299'.encode()).hexdigest()
-        
-        # 检查用户是否已存在
-        cursor.execute("SELECT * FROM user WHERE user = ?", ('emanon',))
-        user = cursor.fetchone()
-        
-        if not user:
-            # 创建默认管理员用户
-            cursor.execute(
-                "INSERT INTO user (user, password, remark) VALUES (?, ?, ?)",
-                ('emanon', md5_hash, '默认管理员')
-            )
-            conn.commit()
-            print("默认管理员用户已创建: emanon/325299")
-    except Exception as e:
-        print(f"创建默认管理员用户失败: {e}")
-    finally:
-        conn.close()
-
-# 初始化时确保管理员用户存在
-try:
-    ensure_admin_user()
-except Exception as e:
-    print(f"初始化管理员用户时出错: {e}")
 
 # 认证相关函数
 def login_required(f):

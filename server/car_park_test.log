@@ -1,0 +1,940 @@
+2025-11-10 09:13:24,313 - car_park_migration_test - INFO - =====================================
+2025-11-10 09:13:24,314 - car_park_migration_test - INFO - 开始测试 car_park 功能迁移
+2025-11-10 09:13:24,314 - car_park_migration_test - INFO - =====================================
+2025-11-10 09:13:24,314 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:13:24,314 - car_park_migration_test - INFO - 测试1: 验证新模块导入
+2025-11-10 09:13:24,555 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:13:24,557 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:13:24,557 - car_park_migration_test - INFO - 测试2: 验证数据库连接
+2025-11-10 09:13:24,564 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:13:24,564 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:13:24,565 - car_park_migration_test - INFO - 测试3: 验证企业微信服务
+2025-11-10 09:13:24,568 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:13:24,569 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:13:24,569 - car_park_migration_test - INFO - 测试4: 验证/api/cars接口
+2025-11-10 09:13:28,739 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:13:28,740 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:13:28,740 - car_park_migration_test - INFO - 测试5: 验证工具函数
+2025-11-10 09:13:28,747 - car_park_migration_test - INFO - 标准化 '粤A12345' -> '粤A12345'
+2025-11-10 09:13:28,747 - car_park_migration_test - INFO - 标准化 '粤A 12345' -> '粤A12345'
+2025-11-10 09:13:28,748 - car_park_migration_test - INFO - 标准化 '粤a-12345' -> '粤A12345'
+2025-11-10 09:13:28,748 - car_park_migration_test - INFO - 标准化 '测试文本' -> '测试文本'
+2025-11-10 09:13:28,752 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:13:28,754 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:13:28,756 - car_park_migration_test - INFO - 测试6: 验证car_park记录相关接口
+2025-11-10 09:13:32,886 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:13:32,888 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:13:32,889 - car_park_migration_test - INFO - 测试7: 功能对比分析
+2025-11-10 09:13:32,889 - car_park_migration_test - INFO - 
+=== 功能迁移状态报告 ===
+2025-11-10 09:13:32,889 - car_park_migration_test - INFO - 
+数据库操作:
+2025-11-10 09:13:32,900 - car_park_migration_test - INFO - 
+API密钥验证:
+2025-11-10 09:13:32,910 - car_park_migration_test - INFO - 
+企业微信消息处理:
+2025-11-10 09:13:32,937 - car_park_migration_test - INFO - 
+车辆信息查询:
+2025-11-10 09:13:32,946 - car_park_migration_test - INFO - 
+输入标准化:
+2025-11-10 09:13:32,954 - car_park_migration_test - INFO - 
+权限检查:
+2025-11-10 09:13:32,961 - car_park_migration_test - INFO - 
+心跳管理:
+2025-11-10 09:13:32,970 - car_park_migration_test - INFO - 
+审批处理:
+2025-11-10 09:13:32,976 - car_park_migration_test - INFO - 
+记录管理:
+2025-11-10 09:13:33,008 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:13:33,009 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:13:33,009 - car_park_migration_test - INFO - 测试8: 路由对比分析
+2025-11-10 09:13:33,010 - car_park_migration_test - INFO - 
+=== 路由迁移状态报告 ===
+2025-11-10 09:13:33,010 - car_park_migration_test - INFO - 注意：新路由使用car_park_new蓝图，路径前缀可能有所变化
+2025-11-10 09:13:33,010 - car_park_migration_test - INFO - 建议手动检查以下路由是否正确实现：
+2025-11-10 09:13:33,011 - car_park_migration_test - INFO - - 登录: /emanon
+2025-11-10 09:13:33,011 - car_park_migration_test - INFO - - 首页: /
+2025-11-10 09:13:33,011 - car_park_migration_test - INFO - - 企业微信接口: /qy
+2025-11-10 09:13:33,012 - car_park_migration_test - INFO - - 获取access_token: /qy/access_token
+2025-11-10 09:13:33,012 - car_park_migration_test - INFO - - 刷新access_token: /qy/access_token/refresh
+2025-11-10 09:13:33,012 - car_park_migration_test - INFO - - 发送消息: /qy/message/send
+2025-11-10 09:13:33,012 - car_park_migration_test - INFO - - 车辆API: /api/cars
+2025-11-10 09:13:33,012 - car_park_migration_test - INFO - - 停车场记录API: /api/car_park
+2025-11-10 09:13:33,014 - car_park_migration_test - INFO - - 处理审批: /review
+2025-11-10 09:13:33,014 - car_park_migration_test - INFO - 
+请确保新实现中的路由功能与原功能一致
+2025-11-10 09:13:33,014 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:13:33,016 - car_park_migration_test - INFO - 
+=====================================
+2025-11-10 09:13:33,016 - car_park_migration_test - INFO - 测试完成：运行 8 个测试
+2025-11-10 09:13:33,018 - car_park_migration_test - ERROR -   - __main__.CarParkMigrationTest.test_02_database_connection: Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\test_car_park_migration.py", l...
+2025-11-10 09:13:33,020 - car_park_migration_test - INFO - =====================================
+2025-11-10 09:13:33,020 - car_park_migration_test - INFO - 
+=== 迁移建议 ===
+2025-11-10 09:13:33,021 - car_park_migration_test - INFO - 1. 确保数据库连接使用相同的数据库文件
+2025-11-10 09:13:33,021 - car_park_migration_test - INFO - 2. 验证所有API路由功能与原实现一致
+2025-11-10 09:13:33,021 - car_park_migration_test - INFO - 3. 检查企业微信配置是否与原配置匹配
+2025-11-10 09:13:33,021 - car_park_migration_test - INFO - 4. 确认所有工具函数的参数和返回值兼容
+2025-11-10 09:13:33,022 - car_park_migration_test - INFO - 5. 测试微信消息的收发功能是否正常
+2025-11-10 09:13:33,022 - car_park_migration_test - INFO - 6. 验证审批流程的处理逻辑
+2025-11-10 09:13:33,022 - car_park_migration_test - INFO - 7. 确保用户认证和权限管理功能正常
+2025-11-10 09:13:33,022 - car_park_migration_test - INFO - 8. 测试异常处理和错误响应是否完善
+2025-11-10 09:13:33,023 - car_park_migration_test - INFO - 
+请根据测试结果和建议进行必要的调整
+2025-11-10 09:14:20,187 - car_park_migration_test - INFO - =====================================
+2025-11-10 09:14:20,189 - car_park_migration_test - INFO - 开始测试 car_park 功能迁移
+2025-11-10 09:14:20,191 - car_park_migration_test - INFO - =====================================
+2025-11-10 09:14:20,192 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:14:20,194 - car_park_migration_test - INFO - 测试1: 验证新模块导入
+2025-11-10 09:14:20,502 - car_park_migration_test - INFO - 模块导入成功
+2025-11-10 09:14:20,503 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:14:20,504 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:14:20,504 - car_park_migration_test - INFO - 测试2: 验证数据库连接
+2025-11-10 09:14:20,506 - car_park_migration_test - INFO - 数据库连接成功，发现表: ['car_park', '_Sys_Park_Person_old_20250330', 'sqlite_sequence', 'Sys_Park_Plate', 'Sys_Park_Person', 'user']
+2025-11-10 09:14:20,525 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:14:20,527 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:14:20,528 - car_park_migration_test - INFO - 测试3: 验证企业微信服务
+2025-11-10 09:14:20,531 - car_park_migration_test - INFO - 企业微信服务实例化成功
+2025-11-10 09:14:20,531 - car_park_migration_test - INFO - 配置加载成功，已验证关键配置项
+2025-11-10 09:14:20,532 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:14:20,533 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:14:20,534 - car_park_migration_test - INFO - 测试4: 验证/api/cars接口
+2025-11-10 09:14:24,666 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:14:24,667 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:14:24,668 - car_park_migration_test - INFO - 测试5: 验证工具函数
+2025-11-10 09:14:24,674 - car_park_migration_test - INFO - 标准化 '粤A12345' -> '粤A12345'
+2025-11-10 09:14:24,674 - car_park_migration_test - INFO - 标准化 '粤A 12345' -> '粤A12345'
+2025-11-10 09:14:24,675 - car_park_migration_test - INFO - 标准化 '粤a-12345' -> '粤A12345'
+2025-11-10 09:14:24,677 - car_park_migration_test - INFO - 标准化 '测试文本' -> '测试文本'
+2025-11-10 09:14:24,677 - car_park_migration_test - INFO - 工具函数测试成功
+2025-11-10 09:14:24,678 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:14:24,679 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:14:24,680 - car_park_migration_test - INFO - 测试6: 验证car_park记录相关接口
+2025-11-10 09:14:28,805 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:14:28,808 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:14:28,812 - car_park_migration_test - INFO - 测试7: 功能对比分析
+2025-11-10 09:14:28,814 - car_park_migration_test - INFO - 
+=== 功能迁移状态报告 ===
+2025-11-10 09:14:28,816 - car_park_migration_test - INFO - 
+数据库操作:
+2025-11-10 09:14:28,818 - car_park_migration_test - INFO -   - get_db_connection: 已迁移
+2025-11-10 09:14:28,819 - car_park_migration_test - INFO -   数据库操作 全部功能已迁移
+2025-11-10 09:14:28,820 - car_park_migration_test - INFO - 
+API密钥验证:
+2025-11-10 09:14:28,821 - car_park_migration_test - INFO -   - check_api_key: 已迁移
+2025-11-10 09:14:28,822 - car_park_migration_test - INFO -   API密钥验证 全部功能已迁移
+2025-11-10 09:14:28,824 - car_park_migration_test - INFO - 
+企业微信消息处理:
+2025-11-10 09:14:28,826 - car_park_migration_test - INFO -   - decrypt_message: 已迁移
+2025-11-10 09:14:28,827 - car_park_migration_test - INFO -   - encrypt_message: 已迁移
+2025-11-10 09:14:28,828 - car_park_migration_test - INFO -   - verify_url: 已迁移
+2025-11-10 09:14:28,828 - car_park_migration_test - INFO -   - send_text_message: 已迁移
+2025-11-10 09:14:28,830 - car_park_migration_test - INFO -   企业微信消息处理 全部功能已迁移
+2025-11-10 09:14:28,830 - car_park_migration_test - INFO - 
+车辆信息查询:
+2025-11-10 09:14:28,830 - car_park_migration_test - INFO -   - _query_car_info: 已迁移
+2025-11-10 09:14:28,832 - car_park_migration_test - INFO -   车辆信息查询 全部功能已迁移
+2025-11-10 09:14:28,832 - car_park_migration_test - INFO - 
+输入标准化:
+2025-11-10 09:14:28,832 - car_park_migration_test - INFO -   - _normalize_input: 已迁移
+2025-11-10 09:14:28,832 - car_park_migration_test - INFO -   输入标准化 全部功能已迁移
+2025-11-10 09:14:28,834 - car_park_migration_test - INFO - 
+权限检查:
+2025-11-10 09:14:28,835 - car_park_migration_test - INFO -   - _check_permission: 已迁移
+2025-11-10 09:14:28,836 - car_park_migration_test - INFO -   权限检查 全部功能已迁移
+2025-11-10 09:14:28,836 - car_park_migration_test - INFO - 
+心跳管理:
+2025-11-10 09:14:28,837 - car_park_migration_test - INFO -   - update_heartbeat_time: 已迁移
+2025-11-10 09:14:28,838 - car_park_migration_test - INFO -   心跳管理 全部功能已迁移
+2025-11-10 09:14:28,838 - car_park_migration_test - INFO - 
+审批处理:
+2025-11-10 09:14:28,839 - car_park_migration_test - INFO -   - parse_approval_data: 已迁移
+2025-11-10 09:14:28,839 - car_park_migration_test - INFO -   审批处理 全部功能已迁移
+2025-11-10 09:14:28,840 - car_park_migration_test - INFO - 
+记录管理:
+2025-11-10 09:14:28,840 - car_park_migration_test - INFO -   - get_car_park_records: 已迁移
+2025-11-10 09:14:28,841 - car_park_migration_test - INFO -   - add_car_park_record: 已迁移
+2025-11-10 09:14:28,842 - car_park_migration_test - INFO -   - update_car_park_record: 已迁移
+2025-11-10 09:14:28,842 - car_park_migration_test - INFO -   - delete_car_park_record: 已迁移
+2025-11-10 09:14:28,843 - car_park_migration_test - INFO -   记录管理 全部功能已迁移
+2025-11-10 09:14:28,845 - car_park_migration_test - INFO - 
+恭喜！所有核心功能已成功迁移！
+2025-11-10 09:14:28,845 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:14:28,847 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:14:28,847 - car_park_migration_test - INFO - 测试8: 路由对比分析
+2025-11-10 09:14:28,847 - car_park_migration_test - INFO - 
+=== 路由迁移状态报告 ===
+2025-11-10 09:14:28,848 - car_park_migration_test - INFO - 注意：新路由使用car_park_new蓝图，路径前缀可能有所变化
+2025-11-10 09:14:28,848 - car_park_migration_test - INFO - 建议手动检查以下路由是否正确实现：
+2025-11-10 09:14:28,850 - car_park_migration_test - INFO - - 登录: /emanon
+2025-11-10 09:14:28,850 - car_park_migration_test - INFO - - 首页: /
+2025-11-10 09:14:28,851 - car_park_migration_test - INFO - - 企业微信接口: /qy
+2025-11-10 09:14:28,851 - car_park_migration_test - INFO - - 获取access_token: /qy/access_token
+2025-11-10 09:14:28,852 - car_park_migration_test - INFO - - 刷新access_token: /qy/access_token/refresh
+2025-11-10 09:14:28,852 - car_park_migration_test - INFO - - 发送消息: /qy/message/send
+2025-11-10 09:14:28,853 - car_park_migration_test - INFO - - 车辆API: /api/cars
+2025-11-10 09:14:28,853 - car_park_migration_test - INFO - - 停车场记录API: /api/car_park
+2025-11-10 09:14:28,854 - car_park_migration_test - INFO - - 处理审批: /review
+2025-11-10 09:14:28,854 - car_park_migration_test - INFO - 
+请确保新实现中的路由功能与原功能一致
+2025-11-10 09:14:28,855 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:14:28,858 - car_park_migration_test - INFO - 
+=====================================
+2025-11-10 09:14:28,859 - car_park_migration_test - INFO - 测试完成：运行 8 个测试
+2025-11-10 09:14:28,859 - car_park_migration_test - ERROR - 发现 1 个失败
+2025-11-10 09:14:28,860 - car_park_migration_test - ERROR -   - __main__.CarParkMigrationTest.test_02_database_connection: Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\test_car_park_migration.py", l...
+2025-11-10 09:14:28,860 - car_park_migration_test - WARNING - 测试未全部通过，请检查问题
+2025-11-10 09:14:28,860 - car_park_migration_test - INFO - =====================================
+2025-11-10 09:14:28,861 - car_park_migration_test - INFO - 
+=== 迁移建议 ===
+2025-11-10 09:14:28,862 - car_park_migration_test - INFO - 1. 确保数据库连接使用相同的数据库文件
+2025-11-10 09:14:28,862 - car_park_migration_test - INFO - 2. 验证所有API路由功能与原实现一致
+2025-11-10 09:14:28,862 - car_park_migration_test - INFO - 3. 检查企业微信配置是否与原配置匹配
+2025-11-10 09:14:28,864 - car_park_migration_test - INFO - 4. 确认所有工具函数的参数和返回值兼容
+2025-11-10 09:14:28,864 - car_park_migration_test - INFO - 5. 测试微信消息的收发功能是否正常
+2025-11-10 09:14:28,864 - car_park_migration_test - INFO - 6. 验证审批流程的处理逻辑
+2025-11-10 09:14:28,865 - car_park_migration_test - INFO - 7. 确保用户认证和权限管理功能正常
+2025-11-10 09:14:28,865 - car_park_migration_test - INFO - 8. 测试异常处理和错误响应是否完善
+2025-11-10 09:14:28,866 - car_park_migration_test - INFO - 
+请根据测试结果和建议进行必要的调整
+2025-11-10 09:15:17,107 - car_park_migration_test - INFO - =====================================
+2025-11-10 09:15:17,107 - car_park_migration_test - INFO - 开始测试 car_park 功能迁移
+2025-11-10 09:15:17,108 - car_park_migration_test - INFO - =====================================
+2025-11-10 09:15:17,117 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:15:17,119 - car_park_migration_test - INFO - 测试1: 验证新模块导入
+2025-11-10 09:15:17,411 - car_park_migration_test - INFO - 模块导入成功
+2025-11-10 09:15:17,412 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:15:17,412 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:15:17,412 - car_park_migration_test - INFO - 测试2: 验证数据库连接
+2025-11-10 09:15:17,415 - car_park_migration_test - INFO - 数据库连接成功，发现表: ['car_park', '_Sys_Park_Person_old_20250330', 'sqlite_sequence', 'Sys_Park_Plate', 'Sys_Park_Person', 'user']
+2025-11-10 09:15:17,416 - car_park_migration_test - WARNING - 注意：缺少表 ['Sys_Park_Plate', 'Sys_Park_Person', 'user']，但不影响测试继续
+2025-11-10 09:15:17,416 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:15:17,417 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:15:17,418 - car_park_migration_test - INFO - 测试3: 验证企业微信服务
+2025-11-10 09:15:17,419 - car_park_migration_test - INFO - 企业微信服务实例化成功
+2025-11-10 09:15:17,421 - car_park_migration_test - INFO - 配置加载成功，已验证关键配置项
+2025-11-10 09:15:17,421 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:15:17,422 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:15:17,422 - car_park_migration_test - INFO - 测试4: 验证/api/cars接口
+2025-11-10 09:15:21,565 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:15:21,566 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:15:21,567 - car_park_migration_test - INFO - 测试5: 验证工具函数
+2025-11-10 09:15:21,576 - car_park_migration_test - INFO - 标准化 '粤A12345' -> '粤A12345'
+2025-11-10 09:15:21,577 - car_park_migration_test - INFO - 标准化 '粤A 12345' -> '粤A12345'
+2025-11-10 09:15:21,578 - car_park_migration_test - INFO - 标准化 '粤a-12345' -> '粤A12345'
+2025-11-10 09:15:21,580 - car_park_migration_test - INFO - 标准化 '测试文本' -> '测试文本'
+2025-11-10 09:15:21,580 - car_park_migration_test - INFO - 工具函数测试成功
+2025-11-10 09:15:21,581 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:15:21,582 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:15:21,583 - car_park_migration_test - INFO - 测试6: 验证car_park记录相关接口
+2025-11-10 09:15:25,711 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:15:25,714 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:15:25,715 - car_park_migration_test - INFO - 测试7: 功能对比分析
+2025-11-10 09:15:25,717 - car_park_migration_test - INFO - 
+=== 功能迁移状态报告 ===
+2025-11-10 09:15:25,717 - car_park_migration_test - INFO - 
+数据库操作:
+2025-11-10 09:15:25,718 - car_park_migration_test - INFO -   - get_db_connection: 已迁移
+2025-11-10 09:15:25,719 - car_park_migration_test - INFO -   数据库操作 全部功能已迁移
+2025-11-10 09:15:25,720 - car_park_migration_test - INFO - 
+API密钥验证:
+2025-11-10 09:15:25,720 - car_park_migration_test - INFO -   - check_api_key: 已迁移
+2025-11-10 09:15:25,721 - car_park_migration_test - INFO -   API密钥验证 全部功能已迁移
+2025-11-10 09:15:25,722 - car_park_migration_test - INFO - 
+企业微信消息处理:
+2025-11-10 09:15:25,722 - car_park_migration_test - INFO -   - decrypt_message: 已迁移
+2025-11-10 09:15:25,724 - car_park_migration_test - INFO -   - encrypt_message: 已迁移
+2025-11-10 09:15:25,725 - car_park_migration_test - INFO -   - verify_url: 已迁移
+2025-11-10 09:15:25,725 - car_park_migration_test - INFO -   - send_text_message: 已迁移
+2025-11-10 09:15:25,726 - car_park_migration_test - INFO -   企业微信消息处理 全部功能已迁移
+2025-11-10 09:15:25,726 - car_park_migration_test - INFO - 
+车辆信息查询:
+2025-11-10 09:15:25,727 - car_park_migration_test - INFO -   - _query_car_info: 已迁移
+2025-11-10 09:15:25,727 - car_park_migration_test - INFO -   车辆信息查询 全部功能已迁移
+2025-11-10 09:15:25,728 - car_park_migration_test - INFO - 
+输入标准化:
+2025-11-10 09:15:25,729 - car_park_migration_test - INFO -   - _normalize_input: 已迁移
+2025-11-10 09:15:25,730 - car_park_migration_test - INFO -   输入标准化 全部功能已迁移
+2025-11-10 09:15:25,731 - car_park_migration_test - INFO - 
+权限检查:
+2025-11-10 09:15:25,731 - car_park_migration_test - INFO -   - _check_permission: 已迁移
+2025-11-10 09:15:25,732 - car_park_migration_test - INFO -   权限检查 全部功能已迁移
+2025-11-10 09:15:25,732 - car_park_migration_test - INFO - 
+心跳管理:
+2025-11-10 09:15:25,732 - car_park_migration_test - INFO -   - update_heartbeat_time: 已迁移
+2025-11-10 09:15:25,733 - car_park_migration_test - INFO -   心跳管理 全部功能已迁移
+2025-11-10 09:15:25,733 - car_park_migration_test - INFO - 
+审批处理:
+2025-11-10 09:15:25,734 - car_park_migration_test - INFO -   - parse_approval_data: 已迁移
+2025-11-10 09:15:25,735 - car_park_migration_test - INFO -   审批处理 全部功能已迁移
+2025-11-10 09:15:25,736 - car_park_migration_test - INFO - 
+记录管理:
+2025-11-10 09:15:25,737 - car_park_migration_test - INFO -   - get_car_park_records: 已迁移
+2025-11-10 09:15:25,738 - car_park_migration_test - INFO -   - add_car_park_record: 已迁移
+2025-11-10 09:15:25,738 - car_park_migration_test - INFO -   - update_car_park_record: 已迁移
+2025-11-10 09:15:25,739 - car_park_migration_test - INFO -   - delete_car_park_record: 已迁移
+2025-11-10 09:15:25,739 - car_park_migration_test - INFO -   记录管理 全部功能已迁移
+2025-11-10 09:15:25,741 - car_park_migration_test - INFO - 
+恭喜！所有核心功能已成功迁移！
+2025-11-10 09:15:25,742 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:15:25,743 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 09:15:25,743 - car_park_migration_test - INFO - 测试8: 路由对比分析
+2025-11-10 09:15:25,743 - car_park_migration_test - INFO - 
+=== 路由迁移状态报告 ===
+2025-11-10 09:15:25,744 - car_park_migration_test - INFO - 注意：新路由使用car_park_new蓝图，路径前缀可能有所变化
+2025-11-10 09:15:25,744 - car_park_migration_test - INFO - 建议手动检查以下路由是否正确实现：
+2025-11-10 09:15:25,744 - car_park_migration_test - INFO - - 登录: /emanon
+2025-11-10 09:15:25,745 - car_park_migration_test - INFO - - 首页: /
+2025-11-10 09:15:25,745 - car_park_migration_test - INFO - - 企业微信接口: /qy
+2025-11-10 09:15:25,746 - car_park_migration_test - INFO - - 获取access_token: /qy/access_token
+2025-11-10 09:15:25,747 - car_park_migration_test - INFO - - 刷新access_token: /qy/access_token/refresh
+2025-11-10 09:15:25,747 - car_park_migration_test - INFO - - 发送消息: /qy/message/send
+2025-11-10 09:15:25,748 - car_park_migration_test - INFO - - 车辆API: /api/cars
+2025-11-10 09:15:25,748 - car_park_migration_test - INFO - - 停车场记录API: /api/car_park
+2025-11-10 09:15:25,749 - car_park_migration_test - INFO - - 处理审批: /review
+2025-11-10 09:15:25,749 - car_park_migration_test - INFO - 
+请确保新实现中的路由功能与原功能一致
+2025-11-10 09:15:25,750 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 09:15:25,750 - car_park_migration_test - INFO - 
+=====================================
+2025-11-10 09:15:25,751 - car_park_migration_test - INFO - 测试完成：运行 8 个测试
+2025-11-10 09:15:25,751 - car_park_migration_test - INFO - 所有测试通过！
+2025-11-10 09:15:25,752 - car_park_migration_test - INFO - =====================================
+2025-11-10 09:15:25,752 - car_park_migration_test - INFO - 
+=== 迁移建议 ===
+2025-11-10 09:15:25,754 - car_park_migration_test - INFO - 1. 确保数据库连接使用相同的数据库文件
+2025-11-10 09:15:25,754 - car_park_migration_test - INFO - 2. 验证所有API路由功能与原实现一致
+2025-11-10 09:15:25,754 - car_park_migration_test - INFO - 3. 检查企业微信配置是否与原配置匹配
+2025-11-10 09:15:25,755 - car_park_migration_test - INFO - 4. 确认所有工具函数的参数和返回值兼容
+2025-11-10 09:15:25,755 - car_park_migration_test - INFO - 5. 测试微信消息的收发功能是否正常
+2025-11-10 09:15:25,755 - car_park_migration_test - INFO - 6. 验证审批流程的处理逻辑
+2025-11-10 09:15:25,755 - car_park_migration_test - INFO - 7. 确保用户认证和权限管理功能正常
+2025-11-10 09:15:25,756 - car_park_migration_test - INFO - 8. 测试异常处理和错误响应是否完善
+2025-11-10 09:15:25,756 - car_park_migration_test - INFO - 
+请根据测试结果和建议进行必要的调整
+2025-11-10 10:15:21,849 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:15:21,850 - car_park_migration_test - INFO - 开始测试 car_park 功能迁移
+2025-11-10 10:15:21,851 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:15:21,853 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:15:21,854 - car_park_migration_test - INFO - 测试1: 验证新模块导入
+2025-11-10 10:15:22,259 - car_park_migration_test - INFO - 模块导入成功
+2025-11-10 10:15:22,260 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:15:22,263 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:15:22,263 - car_park_migration_test - INFO - 测试2: 验证数据库连接
+2025-11-10 10:15:22,264 - car_park_migration_test - INFO - 数据库连接成功，发现表: ['car_park', '_Sys_Park_Person_old_20250330', 'sqlite_sequence', 'Sys_Park_Plate', 'Sys_Park_Person', 'user']
+2025-11-10 10:15:22,265 - car_park_migration_test - WARNING - 注意：缺少表 ['Sys_Park_Plate', 'Sys_Park_Person', 'user']，但不影响测试继续
+2025-11-10 10:15:22,266 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:15:22,267 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:15:22,268 - car_park_migration_test - INFO - 测试3: 验证企业微信服务
+2025-11-10 10:15:22,271 - car_park_migration_test - INFO - 企业微信服务实例化成功
+2025-11-10 10:15:22,271 - car_park_migration_test - INFO - 权限检查结果 (管理员): True
+2025-11-10 10:15:22,272 - APP.car_park.services.qywechat_service - ERROR - [Car_Park] 输入内容处理异常: name 're' is not defined
+Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\APP\car_park\services\qywechat_service.py", line 434, in _normalize_input
+    content = re.sub(pattern, '', content).strip()
+              ^^
+NameError: name 're' is not defined. Did you forget to import 're'
+2025-11-10 10:15:22,277 - car_park_migration_test - INFO - 输入标准化结果: content=审批 粤A12345，张三，3个月, parts=[]
+2025-11-10 10:15:22,277 - car_park_migration_test - INFO - 配置加载成功，已验证关键配置项
+2025-11-10 10:15:22,277 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:15:22,278 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:15:22,278 - car_park_migration_test - INFO - 测试4: 验证/api/cars接口
+2025-11-10 10:15:26,413 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:15:26,413 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:15:26,415 - car_park_migration_test - INFO - 测试5: 验证工具函数
+2025-11-10 10:15:26,420 - car_park_migration_test - INFO - 标准化 '粤A12345' -> '粤A12345'
+2025-11-10 10:15:26,421 - car_park_migration_test - INFO - 标准化 '粤A 12345' -> '粤A12345'
+2025-11-10 10:15:26,421 - car_park_migration_test - INFO - 标准化 '粤a-12345' -> '粤A12345'
+2025-11-10 10:15:26,422 - car_park_migration_test - INFO - 标准化 '测试文本' -> '测试文本'
+2025-11-10 10:15:26,422 - car_park_migration_test - INFO - 工具函数测试成功
+2025-11-10 10:15:26,422 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:15:26,423 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:15:26,423 - car_park_migration_test - INFO - 测试6: 验证car_park记录相关接口
+2025-11-10 10:15:30,555 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:15:30,556 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:15:30,557 - car_park_migration_test - INFO - 测试7: 功能对比分析
+2025-11-10 10:15:30,558 - car_park_migration_test - INFO - 
+=== 功能迁移状态报告 ===
+2025-11-10 10:15:30,561 - car_park_migration_test - INFO - 
+数据库操作:
+2025-11-10 10:15:30,561 - car_park_migration_test - INFO -   - get_db_connection: 已迁移
+2025-11-10 10:15:30,562 - car_park_migration_test - INFO -   数据库操作 全部功能已迁移
+2025-11-10 10:15:30,564 - car_park_migration_test - INFO - 
+API密钥验证:
+2025-11-10 10:15:30,565 - car_park_migration_test - INFO -   - check_api_key: 已迁移
+2025-11-10 10:15:30,565 - car_park_migration_test - INFO -   API密钥验证 全部功能已迁移
+2025-11-10 10:15:30,566 - car_park_migration_test - INFO - 
+企业微信消息处理:
+2025-11-10 10:15:30,568 - car_park_migration_test - INFO -   - decrypt_message: 已迁移
+2025-11-10 10:15:30,568 - car_park_migration_test - INFO -   - encrypt_message: 已迁移
+2025-11-10 10:15:30,568 - car_park_migration_test - INFO -   - verify_url: 已迁移
+2025-11-10 10:15:30,572 - car_park_migration_test - INFO -   - send_text_message: 已迁移
+2025-11-10 10:15:30,584 - car_park_migration_test - INFO -   企业微信消息处理 全部功能已迁移
+2025-11-10 10:15:30,586 - car_park_migration_test - INFO - 
+车辆信息查询:
+2025-11-10 10:15:30,587 - car_park_migration_test - INFO -   - _query_car_info: 已迁移
+2025-11-10 10:15:30,588 - car_park_migration_test - INFO -   车辆信息查询 全部功能已迁移
+2025-11-10 10:15:30,590 - car_park_migration_test - INFO - 
+输入标准化:
+2025-11-10 10:15:30,591 - car_park_migration_test - INFO -   - _normalize_input: 已迁移
+2025-11-10 10:15:30,592 - car_park_migration_test - INFO -   输入标准化 全部功能已迁移
+2025-11-10 10:15:30,594 - car_park_migration_test - INFO - 
+权限检查:
+2025-11-10 10:15:30,599 - car_park_migration_test - INFO -   - _check_permission: 已迁移
+2025-11-10 10:15:30,601 - car_park_migration_test - INFO -   权限检查 全部功能已迁移
+2025-11-10 10:15:30,604 - car_park_migration_test - INFO - 
+心跳管理:
+2025-11-10 10:15:30,605 - car_park_migration_test - INFO -   - update_heartbeat_time: 已迁移
+2025-11-10 10:15:30,607 - car_park_migration_test - INFO -   心跳管理 全部功能已迁移
+2025-11-10 10:15:30,610 - car_park_migration_test - INFO - 
+审批处理:
+2025-11-10 10:15:30,612 - car_park_migration_test - INFO -   - parse_approval_data: 已迁移
+2025-11-10 10:15:30,613 - car_park_migration_test - INFO -   审批处理 全部功能已迁移
+2025-11-10 10:15:30,614 - car_park_migration_test - INFO - 
+记录管理:
+2025-11-10 10:15:30,616 - car_park_migration_test - INFO -   - get_car_park_records: 已迁移
+2025-11-10 10:15:30,618 - car_park_migration_test - INFO -   - add_car_park_record: 已迁移
+2025-11-10 10:15:30,619 - car_park_migration_test - INFO -   - update_car_park_record: 已迁移
+2025-11-10 10:15:30,621 - car_park_migration_test - INFO -   - delete_car_park_record: 已迁移
+2025-11-10 10:15:30,623 - car_park_migration_test - INFO -   记录管理 全部功能已迁移
+2025-11-10 10:15:30,625 - car_park_migration_test - INFO - 
+恭喜！所有核心功能已成功迁移！
+2025-11-10 10:15:30,625 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:15:30,631 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:15:30,633 - car_park_migration_test - INFO - 测试8: 路由对比分析
+2025-11-10 10:15:30,635 - car_park_migration_test - INFO - 
+=== 路由迁移状态报告 ===
+2025-11-10 10:15:30,636 - car_park_migration_test - INFO - 注意：新路由使用car_park_new蓝图，路径前缀可能有所变化
+2025-11-10 10:15:30,638 - car_park_migration_test - INFO - 建议手动检查以下路由是否正确实现：
+2025-11-10 10:15:30,639 - car_park_migration_test - INFO - - 登录: /emanon
+2025-11-10 10:15:30,642 - car_park_migration_test - INFO - - 首页: /
+2025-11-10 10:15:30,643 - car_park_migration_test - INFO - - 企业微信接口: /qy
+2025-11-10 10:15:30,645 - car_park_migration_test - INFO - - 获取access_token: /qy/access_token
+2025-11-10 10:15:30,647 - car_park_migration_test - INFO - - 刷新access_token: /qy/access_token/refresh
+2025-11-10 10:15:30,648 - car_park_migration_test - INFO - - 发送消息: /qy/message/send
+2025-11-10 10:15:30,649 - car_park_migration_test - INFO - - 车辆API: /api/cars
+2025-11-10 10:15:30,649 - car_park_migration_test - INFO - - 停车场记录API: /api/car_park
+2025-11-10 10:15:30,649 - car_park_migration_test - INFO - - 处理审批: /review
+2025-11-10 10:15:30,650 - car_park_migration_test - INFO - 
+请确保新实现中的路由功能与原功能一致
+2025-11-10 10:15:30,650 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:15:30,651 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:15:30,651 - car_park_migration_test - INFO - 测试9: 验证parse_approval_data函数
+2025-11-10 10:15:30,653 - APP.car_park.utils - INFO - [Car_Park] 原始数据: {'sp_no': 'SP202401010001', 'apply_time': '2024-01-01 10:00:00', 'apply_user': {'userid': 'testuser', 'name': '测试用户'}, 'apply_department': {'id': '101', 'name': '测试部门'}, 'apply_data': {'contents': [{'control': {'id': 'Text-1568693962000'}, 'value': '测试用户'}, {'control': {'id': 'Department-1568693963000'}, 'value': '测试部门'}, {'control': {'id': 'Text-1568693964000'}, 'value': '粤A12345'}, {'control': {'id': 'Select-1568693965000'}, 'value': '业主首车'}, {'control': {'id': 'Number-1568693967000'}, 'value': '3'}, {'control': {'id': 'Date-1568693968000'}, 'value': '2024-01-01'}, {'control': {'id': 'Date-1568693969000'}, 'value': '2024-03-31'}]}}
+2025-11-10 10:15:30,654 - APP.car_park.utils - ERROR - [Car_Park] 未找到车牌号
+2025-11-10 10:15:30,654 - car_park_migration_test - INFO - 解析结果: null
+2025-11-10 10:15:30,661 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:15:30,662 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:15:30,664 - car_park_migration_test - INFO - 测试10: 验证save_car_park_info函数
+2025-11-10 10:15:30,666 - APP.car_park.utils - ERROR - [Car_Park] 保存车辆信息失败: 'car_number'
+Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\APP\car_park\utils.py", line 896, in save_car_park_info
+    (car_info["car_number"].strip(),))
+     ~~~~~~~~^^^^^^^^^^^^^^
+KeyError: 'car_number'
+2025-11-10 10:15:30,680 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:15:30,683 - car_park_migration_test - INFO - 
+=====================================
+2025-11-10 10:15:30,683 - car_park_migration_test - INFO - 测试完成：运行 10 个测试
+2025-11-10 10:15:30,683 - car_park_migration_test - ERROR - 发现 1 个失败
+2025-11-10 10:15:30,683 - car_park_migration_test - ERROR -   - __main__.CarParkMigrationTest.test_09_parse_approval_data: Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\test_car_park_migration.py", l...
+2025-11-10 10:15:30,684 - car_park_migration_test - WARNING - 测试未全部通过，请检查问题
+2025-11-10 10:15:30,684 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:15:30,684 - car_park_migration_test - INFO - 
+=== 迁移建议 ===
+2025-11-10 10:15:30,685 - car_park_migration_test - INFO - 1. 确保数据库连接使用相同的数据库文件
+2025-11-10 10:15:30,685 - car_park_migration_test - INFO - 2. 验证所有API路由功能与原实现一致
+2025-11-10 10:15:30,685 - car_park_migration_test - INFO - 3. 检查企业微信配置是否与原配置匹配
+2025-11-10 10:15:30,686 - car_park_migration_test - INFO - 4. 确认所有工具函数的参数和返回值兼容
+2025-11-10 10:15:30,686 - car_park_migration_test - INFO - 5. 测试微信消息的收发功能是否正常
+2025-11-10 10:15:30,687 - car_park_migration_test - INFO - 6. 验证审批流程的处理逻辑
+2025-11-10 10:15:30,687 - car_park_migration_test - INFO - 7. 确保用户认证和权限管理功能正常
+2025-11-10 10:15:30,688 - car_park_migration_test - INFO - 8. 测试异常处理和错误响应是否完善
+2025-11-10 10:15:30,688 - car_park_migration_test - INFO - 
+请根据测试结果和建议进行必要的调整
+2025-11-10 10:17:16,232 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:17:16,233 - car_park_migration_test - INFO - 开始测试 car_park 功能迁移
+2025-11-10 10:17:16,234 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:17:16,235 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:17:16,235 - car_park_migration_test - INFO - 测试1: 验证新模块导入
+2025-11-10 10:17:16,551 - car_park_migration_test - INFO - 模块导入成功
+2025-11-10 10:17:16,552 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:17:16,554 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:17:16,554 - car_park_migration_test - INFO - 测试2: 验证数据库连接
+2025-11-10 10:17:16,556 - car_park_migration_test - INFO - 数据库连接成功，发现表: ['car_park', '_Sys_Park_Person_old_20250330', 'sqlite_sequence', 'Sys_Park_Plate', 'Sys_Park_Person', 'user']
+2025-11-10 10:17:16,556 - car_park_migration_test - WARNING - 注意：缺少表 ['Sys_Park_Plate', 'Sys_Park_Person', 'user']，但不影响测试继续
+2025-11-10 10:17:16,557 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:17:16,558 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:17:16,558 - car_park_migration_test - INFO - 测试3: 验证企业微信服务
+2025-11-10 10:17:16,559 - car_park_migration_test - INFO - 企业微信服务实例化成功
+2025-11-10 10:17:16,560 - car_park_migration_test - INFO - 权限检查结果 (管理员): True
+2025-11-10 10:17:16,560 - APP.car_park.services.qywechat_service - ERROR - [Car_Park] 输入内容处理异常: name 're' is not defined
+Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\APP\car_park\services\qywechat_service.py", line 434, in _normalize_input
+    content = re.sub(pattern, '', content).strip()
+              ^^
+NameError: name 're' is not defined. Did you forget to import 're'
+2025-11-10 10:17:16,563 - car_park_migration_test - INFO - 输入标准化结果: content=审批 粤A12345，张三，3个月, parts=[]
+2025-11-10 10:17:16,564 - car_park_migration_test - INFO - 配置加载成功，已验证关键配置项
+2025-11-10 10:17:16,565 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:17:16,565 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:17:16,565 - car_park_migration_test - INFO - 测试4: 验证/api/cars接口
+2025-11-10 10:17:20,715 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:17:20,716 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:17:20,717 - car_park_migration_test - INFO - 测试5: 验证工具函数
+2025-11-10 10:17:20,721 - car_park_migration_test - INFO - 标准化 '粤A12345' -> '粤A12345'
+2025-11-10 10:17:20,721 - car_park_migration_test - INFO - 标准化 '粤A 12345' -> '粤A12345'
+2025-11-10 10:17:20,722 - car_park_migration_test - INFO - 标准化 '粤a-12345' -> '粤A12345'
+2025-11-10 10:17:20,723 - car_park_migration_test - INFO - 标准化 '测试文本' -> '测试文本'
+2025-11-10 10:17:20,723 - car_park_migration_test - INFO - 工具函数测试成功
+2025-11-10 10:17:20,723 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:17:20,724 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:17:20,725 - car_park_migration_test - INFO - 测试6: 验证car_park记录相关接口
+2025-11-10 10:17:24,849 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:17:24,851 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:17:24,852 - car_park_migration_test - INFO - 测试7: 功能对比分析
+2025-11-10 10:17:24,852 - car_park_migration_test - INFO - 
+=== 功能迁移状态报告 ===
+2025-11-10 10:17:24,854 - car_park_migration_test - INFO - 
+数据库操作:
+2025-11-10 10:17:24,855 - car_park_migration_test - INFO -   - get_db_connection: 已迁移
+2025-11-10 10:17:24,856 - car_park_migration_test - INFO -   数据库操作 全部功能已迁移
+2025-11-10 10:17:24,856 - car_park_migration_test - INFO - 
+API密钥验证:
+2025-11-10 10:17:24,857 - car_park_migration_test - INFO -   - check_api_key: 已迁移
+2025-11-10 10:17:24,857 - car_park_migration_test - INFO -   API密钥验证 全部功能已迁移
+2025-11-10 10:17:24,858 - car_park_migration_test - INFO - 
+企业微信消息处理:
+2025-11-10 10:17:24,859 - car_park_migration_test - INFO -   - decrypt_message: 已迁移
+2025-11-10 10:17:24,861 - car_park_migration_test - INFO -   - encrypt_message: 已迁移
+2025-11-10 10:17:24,862 - car_park_migration_test - INFO -   - verify_url: 已迁移
+2025-11-10 10:17:24,863 - car_park_migration_test - INFO -   - send_text_message: 已迁移
+2025-11-10 10:17:24,863 - car_park_migration_test - INFO -   企业微信消息处理 全部功能已迁移
+2025-11-10 10:17:24,864 - car_park_migration_test - INFO - 
+车辆信息查询:
+2025-11-10 10:17:24,864 - car_park_migration_test - INFO -   - _query_car_info: 已迁移
+2025-11-10 10:17:24,864 - car_park_migration_test - INFO -   车辆信息查询 全部功能已迁移
+2025-11-10 10:17:24,865 - car_park_migration_test - INFO - 
+输入标准化:
+2025-11-10 10:17:24,866 - car_park_migration_test - INFO -   - _normalize_input: 已迁移
+2025-11-10 10:17:24,866 - car_park_migration_test - INFO -   输入标准化 全部功能已迁移
+2025-11-10 10:17:24,867 - car_park_migration_test - INFO - 
+权限检查:
+2025-11-10 10:17:24,867 - car_park_migration_test - INFO -   - _check_permission: 已迁移
+2025-11-10 10:17:24,867 - car_park_migration_test - INFO -   权限检查 全部功能已迁移
+2025-11-10 10:17:24,868 - car_park_migration_test - INFO - 
+心跳管理:
+2025-11-10 10:17:24,868 - car_park_migration_test - INFO -   - update_heartbeat_time: 已迁移
+2025-11-10 10:17:24,868 - car_park_migration_test - INFO -   心跳管理 全部功能已迁移
+2025-11-10 10:17:24,869 - car_park_migration_test - INFO - 
+审批处理:
+2025-11-10 10:17:24,869 - car_park_migration_test - INFO -   - parse_approval_data: 已迁移
+2025-11-10 10:17:24,870 - car_park_migration_test - INFO -   审批处理 全部功能已迁移
+2025-11-10 10:17:24,870 - car_park_migration_test - INFO - 
+记录管理:
+2025-11-10 10:17:24,871 - car_park_migration_test - INFO -   - get_car_park_records: 已迁移
+2025-11-10 10:17:24,871 - car_park_migration_test - INFO -   - add_car_park_record: 已迁移
+2025-11-10 10:17:24,871 - car_park_migration_test - INFO -   - update_car_park_record: 已迁移
+2025-11-10 10:17:24,872 - car_park_migration_test - INFO -   - delete_car_park_record: 已迁移
+2025-11-10 10:17:24,872 - car_park_migration_test - INFO -   记录管理 全部功能已迁移
+2025-11-10 10:17:24,872 - car_park_migration_test - INFO - 
+恭喜！所有核心功能已成功迁移！
+2025-11-10 10:17:24,873 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:17:24,874 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:17:24,874 - car_park_migration_test - INFO - 测试8: 路由对比分析
+2025-11-10 10:17:24,874 - car_park_migration_test - INFO - 
+=== 路由迁移状态报告 ===
+2025-11-10 10:17:24,875 - car_park_migration_test - INFO - 注意：新路由使用car_park_new蓝图，路径前缀可能有所变化
+2025-11-10 10:17:24,876 - car_park_migration_test - INFO - 建议手动检查以下路由是否正确实现：
+2025-11-10 10:17:24,876 - car_park_migration_test - INFO - - 登录: /emanon
+2025-11-10 10:17:24,876 - car_park_migration_test - INFO - - 首页: /
+2025-11-10 10:17:24,877 - car_park_migration_test - INFO - - 企业微信接口: /qy
+2025-11-10 10:17:24,877 - car_park_migration_test - INFO - - 获取access_token: /qy/access_token
+2025-11-10 10:17:24,878 - car_park_migration_test - INFO - - 刷新access_token: /qy/access_token/refresh
+2025-11-10 10:17:24,878 - car_park_migration_test - INFO - - 发送消息: /qy/message/send
+2025-11-10 10:17:24,879 - car_park_migration_test - INFO - - 车辆API: /api/cars
+2025-11-10 10:17:24,879 - car_park_migration_test - INFO - - 停车场记录API: /api/car_park
+2025-11-10 10:17:24,879 - car_park_migration_test - INFO - - 处理审批: /review
+2025-11-10 10:17:24,879 - car_park_migration_test - INFO - 
+请确保新实现中的路由功能与原功能一致
+2025-11-10 10:17:24,881 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:17:24,882 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:17:24,882 - car_park_migration_test - INFO - 测试9: 验证parse_approval_data函数
+2025-11-10 10:17:24,882 - APP.car_park.utils - ERROR - [Car_Park] 未找到车牌号
+2025-11-10 10:17:24,882 - car_park_migration_test - INFO - 解析结果: null
+2025-11-10 10:17:24,891 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:17:24,892 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:17:24,892 - car_park_migration_test - INFO - 测试10: 验证save_car_park_info函数
+2025-11-10 10:17:24,893 - APP.car_park.utils - ERROR - [Car_Park] 保存车辆信息失败: 'car_number'
+Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\APP\car_park\utils.py", line 918, in save_car_park_info
+    (car_info["car_number"].strip(),))
+     ~~~~~~~~^^^^^^^^^^^^^^
+KeyError: 'car_number'
+2025-11-10 10:17:24,900 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:17:24,903 - car_park_migration_test - INFO - 
+=====================================
+2025-11-10 10:17:24,903 - car_park_migration_test - INFO - 测试完成：运行 10 个测试
+2025-11-10 10:17:24,903 - car_park_migration_test - ERROR - 发现 1 个失败
+2025-11-10 10:17:24,904 - car_park_migration_test - ERROR -   - __main__.CarParkMigrationTest.test_09_parse_approval_data: Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\test_car_park_migration.py", l...
+2025-11-10 10:17:24,904 - car_park_migration_test - WARNING - 测试未全部通过，请检查问题
+2025-11-10 10:17:24,905 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:17:24,905 - car_park_migration_test - INFO - 
+=== 迁移建议 ===
+2025-11-10 10:17:24,905 - car_park_migration_test - INFO - 1. 确保数据库连接使用相同的数据库文件
+2025-11-10 10:17:24,906 - car_park_migration_test - INFO - 2. 验证所有API路由功能与原实现一致
+2025-11-10 10:17:24,907 - car_park_migration_test - INFO - 3. 检查企业微信配置是否与原配置匹配
+2025-11-10 10:17:24,907 - car_park_migration_test - INFO - 4. 确认所有工具函数的参数和返回值兼容
+2025-11-10 10:17:24,908 - car_park_migration_test - INFO - 5. 测试微信消息的收发功能是否正常
+2025-11-10 10:17:24,908 - car_park_migration_test - INFO - 6. 验证审批流程的处理逻辑
+2025-11-10 10:17:24,908 - car_park_migration_test - INFO - 7. 确保用户认证和权限管理功能正常
+2025-11-10 10:17:24,909 - car_park_migration_test - INFO - 8. 测试异常处理和错误响应是否完善
+2025-11-10 10:17:24,909 - car_park_migration_test - INFO - 
+请根据测试结果和建议进行必要的调整
+2025-11-10 10:18:48,369 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:18:48,370 - car_park_migration_test - INFO - 开始测试 car_park 功能迁移
+2025-11-10 10:18:48,371 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:18:48,372 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:18:48,372 - car_park_migration_test - INFO - 测试1: 验证新模块导入
+2025-11-10 10:18:48,720 - car_park_migration_test - INFO - 模块导入成功
+2025-11-10 10:18:48,720 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:18:48,721 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:18:48,722 - car_park_migration_test - INFO - 测试2: 验证数据库连接
+2025-11-10 10:18:48,724 - car_park_migration_test - INFO - 数据库连接成功，发现表: ['car_park', '_Sys_Park_Person_old_20250330', 'sqlite_sequence', 'Sys_Park_Plate', 'Sys_Park_Person', 'user']
+2025-11-10 10:18:48,724 - car_park_migration_test - WARNING - 注意：缺少表 ['Sys_Park_Plate', 'Sys_Park_Person', 'user']，但不影响测试继续
+2025-11-10 10:18:48,725 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:18:48,727 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:18:48,729 - car_park_migration_test - INFO - 测试3: 验证企业微信服务
+2025-11-10 10:18:48,730 - car_park_migration_test - INFO - 企业微信服务实例化成功
+2025-11-10 10:18:48,731 - car_park_migration_test - INFO - 权限检查结果 (管理员): True
+2025-11-10 10:18:48,733 - APP.car_park.services.qywechat_service - ERROR - [Car_Park] 输入内容处理异常: name 're' is not defined
+Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\APP\car_park\services\qywechat_service.py", line 434, in _normalize_input
+    content = re.sub(pattern, '', content).strip()
+              ^^
+NameError: name 're' is not defined. Did you forget to import 're'
+2025-11-10 10:18:48,736 - car_park_migration_test - INFO - 输入标准化结果: content=审批 粤A12345，张三，3个月, parts=[]
+2025-11-10 10:18:48,736 - car_park_migration_test - INFO - 配置加载成功，已验证关键配置项
+2025-11-10 10:18:48,738 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:18:48,741 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:18:48,744 - car_park_migration_test - INFO - 测试4: 验证/api/cars接口
+2025-11-10 10:18:52,873 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:18:52,875 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:18:52,875 - car_park_migration_test - INFO - 测试5: 验证工具函数
+2025-11-10 10:18:52,881 - car_park_migration_test - INFO - 标准化 '粤A12345' -> '粤A12345'
+2025-11-10 10:18:52,882 - car_park_migration_test - INFO - 标准化 '粤A 12345' -> '粤A12345'
+2025-11-10 10:18:52,883 - car_park_migration_test - INFO - 标准化 '粤a-12345' -> '粤A12345'
+2025-11-10 10:18:52,884 - car_park_migration_test - INFO - 标准化 '测试文本' -> '测试文本'
+2025-11-10 10:18:52,884 - car_park_migration_test - INFO - 工具函数测试成功
+2025-11-10 10:18:52,885 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:18:52,887 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:18:52,887 - car_park_migration_test - INFO - 测试6: 验证car_park记录相关接口
+2025-11-10 10:18:56,997 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:18:56,998 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:18:56,999 - car_park_migration_test - INFO - 测试7: 功能对比分析
+2025-11-10 10:18:56,999 - car_park_migration_test - INFO - 
+=== 功能迁移状态报告 ===
+2025-11-10 10:18:57,000 - car_park_migration_test - INFO - 
+数据库操作:
+2025-11-10 10:18:57,000 - car_park_migration_test - INFO -   - get_db_connection: 已迁移
+2025-11-10 10:18:57,007 - car_park_migration_test - INFO -   数据库操作 全部功能已迁移
+2025-11-10 10:18:57,009 - car_park_migration_test - INFO - 
+API密钥验证:
+2025-11-10 10:18:57,010 - car_park_migration_test - INFO -   - check_api_key: 已迁移
+2025-11-10 10:18:57,010 - car_park_migration_test - INFO -   API密钥验证 全部功能已迁移
+2025-11-10 10:18:57,010 - car_park_migration_test - INFO - 
+企业微信消息处理:
+2025-11-10 10:18:57,012 - car_park_migration_test - INFO -   - decrypt_message: 已迁移
+2025-11-10 10:18:57,013 - car_park_migration_test - INFO -   - encrypt_message: 已迁移
+2025-11-10 10:18:57,013 - car_park_migration_test - INFO -   - verify_url: 已迁移
+2025-11-10 10:18:57,014 - car_park_migration_test - INFO -   - send_text_message: 已迁移
+2025-11-10 10:18:57,017 - car_park_migration_test - INFO -   企业微信消息处理 全部功能已迁移
+2025-11-10 10:18:57,017 - car_park_migration_test - INFO - 
+车辆信息查询:
+2025-11-10 10:18:57,018 - car_park_migration_test - INFO -   - _query_car_info: 已迁移
+2025-11-10 10:18:57,018 - car_park_migration_test - INFO -   车辆信息查询 全部功能已迁移
+2025-11-10 10:18:57,019 - car_park_migration_test - INFO - 
+输入标准化:
+2025-11-10 10:18:57,019 - car_park_migration_test - INFO -   - _normalize_input: 已迁移
+2025-11-10 10:18:57,021 - car_park_migration_test - INFO -   输入标准化 全部功能已迁移
+2025-11-10 10:18:57,021 - car_park_migration_test - INFO - 
+权限检查:
+2025-11-10 10:18:57,022 - car_park_migration_test - INFO -   - _check_permission: 已迁移
+2025-11-10 10:18:57,023 - car_park_migration_test - INFO -   权限检查 全部功能已迁移
+2025-11-10 10:18:57,024 - car_park_migration_test - INFO - 
+心跳管理:
+2025-11-10 10:18:57,024 - car_park_migration_test - INFO -   - update_heartbeat_time: 已迁移
+2025-11-10 10:18:57,024 - car_park_migration_test - INFO -   心跳管理 全部功能已迁移
+2025-11-10 10:18:57,026 - car_park_migration_test - INFO - 
+审批处理:
+2025-11-10 10:18:57,027 - car_park_migration_test - INFO -   - parse_approval_data: 已迁移
+2025-11-10 10:18:57,028 - car_park_migration_test - INFO -   审批处理 全部功能已迁移
+2025-11-10 10:18:57,028 - car_park_migration_test - INFO - 
+记录管理:
+2025-11-10 10:18:57,029 - car_park_migration_test - INFO -   - get_car_park_records: 已迁移
+2025-11-10 10:18:57,029 - car_park_migration_test - INFO -   - add_car_park_record: 已迁移
+2025-11-10 10:18:57,030 - car_park_migration_test - INFO -   - update_car_park_record: 已迁移
+2025-11-10 10:18:57,030 - car_park_migration_test - INFO -   - delete_car_park_record: 已迁移
+2025-11-10 10:18:57,030 - car_park_migration_test - INFO -   记录管理 全部功能已迁移
+2025-11-10 10:18:57,031 - car_park_migration_test - INFO - 
+恭喜！所有核心功能已成功迁移！
+2025-11-10 10:18:57,034 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:18:57,036 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:18:57,037 - car_park_migration_test - INFO - 测试8: 路由对比分析
+2025-11-10 10:18:57,038 - car_park_migration_test - INFO - 
+=== 路由迁移状态报告 ===
+2025-11-10 10:18:57,039 - car_park_migration_test - INFO - 注意：新路由使用car_park_new蓝图，路径前缀可能有所变化
+2025-11-10 10:18:57,039 - car_park_migration_test - INFO - 建议手动检查以下路由是否正确实现：
+2025-11-10 10:18:57,040 - car_park_migration_test - INFO - - 登录: /emanon
+2025-11-10 10:18:57,043 - car_park_migration_test - INFO - - 首页: /
+2025-11-10 10:18:57,044 - car_park_migration_test - INFO - - 企业微信接口: /qy
+2025-11-10 10:18:57,044 - car_park_migration_test - INFO - - 获取access_token: /qy/access_token
+2025-11-10 10:18:57,045 - car_park_migration_test - INFO - - 刷新access_token: /qy/access_token/refresh
+2025-11-10 10:18:57,047 - car_park_migration_test - INFO - - 发送消息: /qy/message/send
+2025-11-10 10:18:57,047 - car_park_migration_test - INFO - - 车辆API: /api/cars
+2025-11-10 10:18:57,047 - car_park_migration_test - INFO - - 停车场记录API: /api/car_park
+2025-11-10 10:18:57,048 - car_park_migration_test - INFO - - 处理审批: /review
+2025-11-10 10:18:57,048 - car_park_migration_test - INFO - 
+请确保新实现中的路由功能与原功能一致
+2025-11-10 10:18:57,049 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:18:57,050 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:18:57,054 - car_park_migration_test - INFO - 测试9: 验证parse_approval_data函数
+2025-11-10 10:18:57,064 - APP.car_park.utils - ERROR - [Car_Park] 解析审批数据失败: 'str' object cannot be interpreted as an integer
+2025-11-10 10:18:57,064 - car_park_migration_test - INFO - 解析结果: null
+2025-11-10 10:18:57,077 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:18:57,079 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:18:57,079 - car_park_migration_test - INFO - 测试10: 验证save_car_park_info函数
+2025-11-10 10:18:57,080 - APP.car_park.utils - ERROR - [Car_Park] 保存车辆信息失败: 'car_number'
+Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\APP\car_park\utils.py", line 899, in save_car_park_info
+    (car_info["car_number"].strip(),))
+     ~~~~~~~~^^^^^^^^^^^^^^
+KeyError: 'car_number'
+2025-11-10 10:18:57,097 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:18:57,101 - car_park_migration_test - INFO - 
+=====================================
+2025-11-10 10:18:57,101 - car_park_migration_test - INFO - 测试完成：运行 10 个测试
+2025-11-10 10:18:57,102 - car_park_migration_test - ERROR - 发现 1 个失败
+2025-11-10 10:18:57,103 - car_park_migration_test - ERROR -   - __main__.CarParkMigrationTest.test_09_parse_approval_data: Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\test_car_park_migration.py", l...
+2025-11-10 10:18:57,103 - car_park_migration_test - WARNING - 测试未全部通过，请检查问题
+2025-11-10 10:18:57,103 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:18:57,104 - car_park_migration_test - INFO - 
+=== 迁移建议 ===
+2025-11-10 10:18:57,104 - car_park_migration_test - INFO - 1. 确保数据库连接使用相同的数据库文件
+2025-11-10 10:18:57,106 - car_park_migration_test - INFO - 2. 验证所有API路由功能与原实现一致
+2025-11-10 10:18:57,107 - car_park_migration_test - INFO - 3. 检查企业微信配置是否与原配置匹配
+2025-11-10 10:18:57,107 - car_park_migration_test - INFO - 4. 确认所有工具函数的参数和返回值兼容
+2025-11-10 10:18:57,107 - car_park_migration_test - INFO - 5. 测试微信消息的收发功能是否正常
+2025-11-10 10:18:57,108 - car_park_migration_test - INFO - 6. 验证审批流程的处理逻辑
+2025-11-10 10:18:57,108 - car_park_migration_test - INFO - 7. 确保用户认证和权限管理功能正常
+2025-11-10 10:18:57,108 - car_park_migration_test - INFO - 8. 测试异常处理和错误响应是否完善
+2025-11-10 10:18:57,108 - car_park_migration_test - INFO - 
+请根据测试结果和建议进行必要的调整
+2025-11-10 10:20:34,220 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:20:34,220 - car_park_migration_test - INFO - 开始测试 car_park 功能迁移
+2025-11-10 10:20:34,221 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:20:34,222 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:20:34,223 - car_park_migration_test - INFO - 测试1: 验证新模块导入
+2025-11-10 10:20:34,573 - car_park_migration_test - INFO - 模块导入成功
+2025-11-10 10:20:34,574 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:20:34,575 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:20:34,576 - car_park_migration_test - INFO - 测试2: 验证数据库连接
+2025-11-10 10:20:34,578 - car_park_migration_test - INFO - 数据库连接成功，发现表: ['car_park', '_Sys_Park_Person_old_20250330', 'sqlite_sequence', 'Sys_Park_Plate', 'Sys_Park_Person', 'user']
+2025-11-10 10:20:34,579 - car_park_migration_test - WARNING - 注意：缺少表 ['Sys_Park_Plate', 'Sys_Park_Person', 'user']，但不影响测试继续
+2025-11-10 10:20:34,580 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:20:34,581 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:20:34,581 - car_park_migration_test - INFO - 测试3: 验证企业微信服务
+2025-11-10 10:20:34,582 - car_park_migration_test - INFO - 企业微信服务实例化成功
+2025-11-10 10:20:34,583 - car_park_migration_test - INFO - 权限检查结果 (管理员): True
+2025-11-10 10:20:34,584 - APP.car_park.services.qywechat_service - ERROR - [Car_Park] 输入内容处理异常: name 're' is not defined
+Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\APP\car_park\services\qywechat_service.py", line 434, in _normalize_input
+    content = re.sub(pattern, '', content).strip()
+              ^^
+NameError: name 're' is not defined. Did you forget to import 're'
+2025-11-10 10:20:34,588 - car_park_migration_test - INFO - 输入标准化结果: content=审批 粤A12345，张三，3个月, parts=[]
+2025-11-10 10:20:34,589 - car_park_migration_test - INFO - 配置加载成功，已验证关键配置项
+2025-11-10 10:20:34,589 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:20:34,592 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:20:34,593 - car_park_migration_test - INFO - 测试4: 验证/api/cars接口
+2025-11-10 10:20:38,721 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:20:38,728 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:20:38,729 - car_park_migration_test - INFO - 测试5: 验证工具函数
+2025-11-10 10:20:38,736 - car_park_migration_test - INFO - 标准化 '粤A12345' -> '粤A12345'
+2025-11-10 10:20:38,739 - car_park_migration_test - INFO - 标准化 '粤A 12345' -> '粤A12345'
+2025-11-10 10:20:38,740 - car_park_migration_test - INFO - 标准化 '粤a-12345' -> '粤A12345'
+2025-11-10 10:20:38,741 - car_park_migration_test - INFO - 标准化 '测试文本' -> '测试文本'
+2025-11-10 10:20:38,741 - car_park_migration_test - INFO - 工具函数测试成功
+2025-11-10 10:20:38,743 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:20:38,745 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:20:38,748 - car_park_migration_test - INFO - 测试6: 验证car_park记录相关接口
+2025-11-10 10:20:42,868 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:20:42,871 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:20:42,874 - car_park_migration_test - INFO - 测试7: 功能对比分析
+2025-11-10 10:20:42,874 - car_park_migration_test - INFO - 
+=== 功能迁移状态报告 ===
+2025-11-10 10:20:42,875 - car_park_migration_test - INFO - 
+数据库操作:
+2025-11-10 10:20:42,875 - car_park_migration_test - INFO -   - get_db_connection: 已迁移
+2025-11-10 10:20:42,876 - car_park_migration_test - INFO -   数据库操作 全部功能已迁移
+2025-11-10 10:20:42,876 - car_park_migration_test - INFO - 
+API密钥验证:
+2025-11-10 10:20:42,877 - car_park_migration_test - INFO -   - check_api_key: 已迁移
+2025-11-10 10:20:42,877 - car_park_migration_test - INFO -   API密钥验证 全部功能已迁移
+2025-11-10 10:20:42,877 - car_park_migration_test - INFO - 
+企业微信消息处理:
+2025-11-10 10:20:42,877 - car_park_migration_test - INFO -   - decrypt_message: 已迁移
+2025-11-10 10:20:42,878 - car_park_migration_test - INFO -   - encrypt_message: 已迁移
+2025-11-10 10:20:42,878 - car_park_migration_test - INFO -   - verify_url: 已迁移
+2025-11-10 10:20:42,879 - car_park_migration_test - INFO -   - send_text_message: 已迁移
+2025-11-10 10:20:42,879 - car_park_migration_test - INFO -   企业微信消息处理 全部功能已迁移
+2025-11-10 10:20:42,879 - car_park_migration_test - INFO - 
+车辆信息查询:
+2025-11-10 10:20:42,880 - car_park_migration_test - INFO -   - _query_car_info: 已迁移
+2025-11-10 10:20:42,880 - car_park_migration_test - INFO -   车辆信息查询 全部功能已迁移
+2025-11-10 10:20:42,881 - car_park_migration_test - INFO - 
+输入标准化:
+2025-11-10 10:20:42,881 - car_park_migration_test - INFO -   - _normalize_input: 已迁移
+2025-11-10 10:20:42,881 - car_park_migration_test - INFO -   输入标准化 全部功能已迁移
+2025-11-10 10:20:42,881 - car_park_migration_test - INFO - 
+权限检查:
+2025-11-10 10:20:42,882 - car_park_migration_test - INFO -   - _check_permission: 已迁移
+2025-11-10 10:20:42,882 - car_park_migration_test - INFO -   权限检查 全部功能已迁移
+2025-11-10 10:20:42,882 - car_park_migration_test - INFO - 
+心跳管理:
+2025-11-10 10:20:42,882 - car_park_migration_test - INFO -   - update_heartbeat_time: 已迁移
+2025-11-10 10:20:42,884 - car_park_migration_test - INFO -   心跳管理 全部功能已迁移
+2025-11-10 10:20:42,884 - car_park_migration_test - INFO - 
+审批处理:
+2025-11-10 10:20:42,885 - car_park_migration_test - INFO -   - parse_approval_data: 已迁移
+2025-11-10 10:20:42,885 - car_park_migration_test - INFO -   审批处理 全部功能已迁移
+2025-11-10 10:20:42,885 - car_park_migration_test - INFO - 
+记录管理:
+2025-11-10 10:20:42,886 - car_park_migration_test - INFO -   - get_car_park_records: 已迁移
+2025-11-10 10:20:42,887 - car_park_migration_test - INFO -   - add_car_park_record: 已迁移
+2025-11-10 10:20:42,887 - car_park_migration_test - INFO -   - update_car_park_record: 已迁移
+2025-11-10 10:20:42,888 - car_park_migration_test - INFO -   - delete_car_park_record: 已迁移
+2025-11-10 10:20:42,888 - car_park_migration_test - INFO -   记录管理 全部功能已迁移
+2025-11-10 10:20:42,888 - car_park_migration_test - INFO - 
+恭喜！所有核心功能已成功迁移！
+2025-11-10 10:20:42,889 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:20:42,890 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:20:42,890 - car_park_migration_test - INFO - 测试8: 路由对比分析
+2025-11-10 10:20:42,890 - car_park_migration_test - INFO - 
+=== 路由迁移状态报告 ===
+2025-11-10 10:20:42,891 - car_park_migration_test - INFO - 注意：新路由使用car_park_new蓝图，路径前缀可能有所变化
+2025-11-10 10:20:42,891 - car_park_migration_test - INFO - 建议手动检查以下路由是否正确实现：
+2025-11-10 10:20:42,891 - car_park_migration_test - INFO - - 登录: /emanon
+2025-11-10 10:20:42,891 - car_park_migration_test - INFO - - 首页: /
+2025-11-10 10:20:42,891 - car_park_migration_test - INFO - - 企业微信接口: /qy
+2025-11-10 10:20:42,892 - car_park_migration_test - INFO - - 获取access_token: /qy/access_token
+2025-11-10 10:20:42,892 - car_park_migration_test - INFO - - 刷新access_token: /qy/access_token/refresh
+2025-11-10 10:20:42,892 - car_park_migration_test - INFO - - 发送消息: /qy/message/send
+2025-11-10 10:20:42,893 - car_park_migration_test - INFO - - 车辆API: /api/cars
+2025-11-10 10:20:42,893 - car_park_migration_test - INFO - - 停车场记录API: /api/car_park
+2025-11-10 10:20:42,893 - car_park_migration_test - INFO - - 处理审批: /review
+2025-11-10 10:20:42,895 - car_park_migration_test - INFO - 
+请确保新实现中的路由功能与原功能一致
+2025-11-10 10:20:42,895 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:20:42,895 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:20:42,895 - car_park_migration_test - INFO - 测试9: 验证parse_approval_data函数
+2025-11-10 10:20:42,896 - car_park_migration_test - INFO - 解析结果: null
+2025-11-10 10:20:42,904 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:20:42,905 - car_park_migration_test - INFO - 开始新的测试用例...
+2025-11-10 10:20:42,906 - car_park_migration_test - INFO - 测试10: 验证save_car_park_info函数
+2025-11-10 10:20:42,907 - APP.car_park.utils - ERROR - [Car_Park] 保存车辆信息失败: 'car_number'
+Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\APP\car_park\utils.py", line 902, in save_car_park_info
+    (car_info["car_number"].strip(),))
+     ~~~~~~~~^^^^^^^^^^^^^^
+KeyError: 'car_number'
+2025-11-10 10:20:42,914 - car_park_migration_test - INFO - 测试用例结束
+
+2025-11-10 10:20:42,920 - car_park_migration_test - INFO - 
+=====================================
+2025-11-10 10:20:42,920 - car_park_migration_test - INFO - 测试完成：运行 10 个测试
+2025-11-10 10:20:42,920 - car_park_migration_test - ERROR - 发现 1 个失败
+2025-11-10 10:20:42,921 - car_park_migration_test - ERROR -   - __main__.CarParkMigrationTest.test_09_parse_approval_data: Traceback (most recent call last):
+  File "D:\code\EarthOnline\server\test_car_park_migration.py", l...
+2025-11-10 10:20:42,922 - car_park_migration_test - WARNING - 测试未全部通过，请检查问题
+2025-11-10 10:20:42,922 - car_park_migration_test - INFO - =====================================
+2025-11-10 10:20:42,922 - car_park_migration_test - INFO - 
+=== 迁移建议 ===
+2025-11-10 10:20:42,922 - car_park_migration_test - INFO - 1. 确保数据库连接使用相同的数据库文件
+2025-11-10 10:20:42,923 - car_park_migration_test - INFO - 2. 验证所有API路由功能与原实现一致
+2025-11-10 10:20:42,923 - car_park_migration_test - INFO - 3. 检查企业微信配置是否与原配置匹配
+2025-11-10 10:20:42,923 - car_park_migration_test - INFO - 4. 确认所有工具函数的参数和返回值兼容
+2025-11-10 10:20:42,925 - car_park_migration_test - INFO - 5. 测试微信消息的收发功能是否正常
+2025-11-10 10:20:42,925 - car_park_migration_test - INFO - 6. 验证审批流程的处理逻辑
+2025-11-10 10:20:42,926 - car_park_migration_test - INFO - 7. 确保用户认证和权限管理功能正常
+2025-11-10 10:20:42,926 - car_park_migration_test - INFO - 8. 测试异常处理和错误响应是否完善
+2025-11-10 10:20:42,927 - car_park_migration_test - INFO - 
+请根据测试结果和建议进行必要的调整

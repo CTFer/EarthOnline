@@ -6,6 +6,7 @@ import os
 import ssl
 import logging
 import threading
+import socket
 import eventlet
 from datetime import datetime, time,timedelta
 from eventlet import wsgi
@@ -20,15 +21,55 @@ from config.config import (
     HTTPS_PORT,
     HTTPS_ENABLED,
     ENV,
-    LOCAL_SSL,
     SSL_CERT_DIR,
     SSL_CERT_FILE,
     SSL_KEY_FILE,
-    DOMAIN,
-    CLOUDFLARE
+    DOMAIN
 )
 
 logger = logging.getLogger(__name__)
+
+def acme_challenge(app, path):
+    """
+    Let's Encrypt验证接口
+    处理ACME挑战验证请求
+    
+    Args:
+        app: Flask应用实例
+        path: ACME挑战令牌路径
+        
+    Returns:
+        文件内容或错误响应
+    """
+    try:
+        # 确保静态目录存在
+        if not hasattr(app, 'static_folder') or not app.static_folder:
+            logger.error("ACME challenge失败: 应用实例没有static_folder属性")
+            return "静态目录配置错误", 500
+            
+        # 构建ACME挑战目录路径
+        challenge_dir = os.path.join(app.static_folder, '.well-known', 'acme-challenge')
+        
+        # 确保ACME挑战目录存在
+        if not os.path.exists(challenge_dir):
+            try:
+                os.makedirs(challenge_dir)
+                logger.info(f"创建ACME挑战目录: {challenge_dir}")
+            except Exception as e:
+                logger.error(f"创建ACME挑战目录失败: {str(e)}")
+                return f"创建验证目录失败: {str(e)}", 500
+        
+        # 检查文件是否存在
+        challenge_file = os.path.join(challenge_dir, path)
+        if not os.path.exists(challenge_file):
+            logger.error(f"ACME挑战文件不存在: {challenge_file}")
+            return "验证文件不存在", 404
+        
+        # 读取并返回验证文件
+        return send_from_directory(challenge_dir, path)
+    except Exception as e:
+        logger.error(f"ACME challenge处理失败: {str(e)}")
+        return f"验证失败: {str(e)}", 500
 
 class ServerService:
     """服务器管理类"""
@@ -109,198 +150,183 @@ class ServerService:
             max_age=3600               # 预检请求缓存1小时
         )
         
-        # 添加Cloudflare代理支持
-        if CLOUDFLARE['enabled']:
-            from werkzeug.middleware.proxy_fix import ProxyFix
-            app.wsgi_app = ProxyFix(
-                app.wsgi_app,
-                x_for=CLOUDFLARE['headers']['X-Forwarded-For'],
-                x_proto=CLOUDFLARE['headers']['X-Forwarded-Proto'],
-                x_host=CLOUDFLARE['headers']['X-Forwarded-Host'],
-                x_port=CLOUDFLARE['headers']['X-Forwarded-Port'],
-                x_prefix=CLOUDFLARE['headers']['X-Forwarded-Prefix']
-            )
-            
-            # 只在非本地环境且需要强制 HTTPS 时添加 SchemeEnforcingMiddleware
-            if ENV != 'local' and (HTTPS_ENABLED or CLOUDFLARE['flexible_ssl']):
-                class SchemeEnforcingMiddleware:
-                    def __init__(self, app):
-                        self.app = app
-
-                    def __call__(self, environ, start_response):
-                        environ['wsgi.url_scheme'] = 'https'
-                        return self.app(environ, start_response)
-
-                app.wsgi_app = SchemeEnforcingMiddleware(app.wsgi_app)
-        
+    
         # 打印配置信息
         self.logger.info(f"[Server] 配置应用完成，Session配置: SESSION_COOKIE_NAME={app.config.get('SESSION_COOKIE_NAME')}, SESSION_COOKIE_DOMAIN={app.config.get('SESSION_COOKIE_DOMAIN')}, SESSION_COOKIE_SECURE={app.config.get('SESSION_COOKIE_SECURE')}, SESSION_COOKIE_SAMESITE={app.config.get('SESSION_COOKIE_SAMESITE')}, SESSION_COOKIE_PARTITIONED={app.config.get('SESSION_COOKIE_PARTITIONED')}")
         
         return app
 
     def setup_ssl(self, ssl_dir: str) -> Tuple[bool, Optional[ssl.SSLContext]]:
-        """配置SSL上下文"""
+        """配置SSL上下文 - 简化版"""
         try:
             # 创建SSL上下文
             ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             
-            # 优化 SSL 配置
+            # 基础SSL安全配置
             ssl_context.options |= (
                 ssl.OP_NO_COMPRESSION |  # 禁用压缩以减少CPU开销
-                ssl.OP_NO_RENEGOTIATION |  # 禁用重新协商以提高安全性
-                ssl.OP_CIPHER_SERVER_PREFERENCE |  # 使用服务器的密码套件优先级
-                ssl.OP_SINGLE_DH_USE |  # 每次连接使用新的DH密钥
-                ssl.OP_CIPHER_SERVER_PREFERENCE  # 使用服务器的密码套件优先级
+                ssl.OP_NO_RENEGOTIATION   # 禁用重新协商以提高安全性
             )
             
-            # 设置现代密码套件，按优先级排序
-            ssl_context.set_ciphers(
-                'ECDHE-ECDSA-AES256-GCM-SHA384:'
-                'ECDHE-RSA-AES256-GCM-SHA384:'
-                'ECDHE-ECDSA-CHACHA20-POLY1305:'
-                'ECDHE-RSA-CHACHA20-POLY1305:'
-                'ECDHE-ECDSA-AES128-GCM-SHA256:'
-                'ECDHE-RSA-AES128-GCM-SHA256'
-            )
+            # 设置安全的密码套件
+            ssl_context.set_ciphers('DEFAULT@SECLEVEL=2')
             
-            # 设置DH参数
-            ssl_context.set_ecdh_curve('prime256v1')  # 使用更快的椭圆曲线
-
             if ENV == 'local':
+                # 本地环境配置
                 ssl_context.check_hostname = False
                 ssl_context.verify_mode = ssl.CERT_NONE
-                # 本地开发环境使用自签名证书
-                logger.info("[SSL] 本地开发环境，使用自签名证书")
-                # 确保dev目录存在
-                dev_dir = os.path.join(ssl_dir, 'dev')
-                if not os.path.exists(dev_dir):
-                    os.makedirs(dev_dir)
-                    logger.info(f"[SSL] 创建本地开发证书目录: {dev_dir}")
+                logger.info("[SSL] 本地开发环境，使用简化SSL配置")
                 
-                # 如果需要自签名证书
-                if LOCAL_SSL['adhoc']:
+                # 使用配置文件中指定的本地证书路径
+                cert_file = SSL_CERT_FILE
+                key_file = SSL_KEY_FILE
+                
+                # 确保证书目录存在
+                cert_dir = os.path.dirname(cert_file)
+                if not os.path.exists(cert_dir):
+                    os.makedirs(cert_dir)
+                    logger.info(f"[SSL] 创建证书目录: {cert_dir}")
+                
+                # 如果本地证书不存在，生成简单的自签名证书
+                if not (os.path.exists(cert_file) and os.path.exists(key_file)):
+                    logger.info("[SSL] 本地证书不存在，生成自签名证书")
                     try:
-                        from OpenSSL import crypto
-                        # 创建自签名证书
-                        key = crypto.PKey()
-                        key.generate_key(crypto.TYPE_RSA, 2048)
+                        # 使用Python标准库生成简单证书
+                        from cryptography import x509
+                        from cryptography.x509.oid import NameOID
+                        from cryptography.hazmat.primitives import hashes
+                        from cryptography.hazmat.primitives.asymmetric import rsa
+                        from cryptography.hazmat.primitives import serialization
+                        from cryptography.hazmat.backends import default_backend
+                        import datetime
                         
-                        cert = crypto.X509()
-                        cert.get_subject().CN = "localhost"
-                        cert.set_serial_number(1000)
-                        cert.gmtime_adj_notBefore(0)
-                        cert.gmtime_adj_notAfter(365*24*60*60)  # 1年有效期
-                        cert.set_issuer(cert.get_subject())
-                        cert.set_pubkey(key)
-                        cert.sign(key, 'sha256')
-                        
-                        # 保存证书和私钥到dev目录
-                        cert_file = os.path.join(dev_dir, 'cert.pem')
-                        key_file = os.path.join(dev_dir, 'key.pem')
-                        
-                        with open(cert_file, "wb") as f:
-                            f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
-                        with open(key_file, "wb") as f:
-                            f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
-                            
-                        logger.info("[SSL] 已生成本地开发用的自签名证书")
-                        
-                        # 使用新生成的证书和私钥
-                        ssl_context.load_cert_chain(
-                            certfile=cert_file,
-                            keyfile=key_file
+                        # 生成私钥
+                        private_key = rsa.generate_private_key(
+                            public_exponent=65537,
+                            key_size=2048,
+                            backend=default_backend()
                         )
-                        return True, ssl_context
                         
-                    except ImportError:
-                        # 直接安装pyOpenSSL
-                        try:
-                            os.system("pip install pyOpenSSL")
-                            from OpenSSL import crypto
-                            # 重试证书生成
-                            return self.setup_ssl(ssl_dir)
-                        except Exception as e:
-                            logger.error(f"[SSL] 安装pyOpenSSL失败: {str(e)}")
-                            return False, None
+                        # 生成证书
+                        subject = issuer = x509.Name([
+                            x509.NameAttribute(NameOID.COMMON_NAME, u"localhost"),
+                        ])
+                        cert = x509.CertificateBuilder().subject_name(
+                            subject
+                        ).issuer_name(
+                            issuer
+                        ).public_key(
+                            private_key.public_key()
+                        ).serial_number(
+                            x509.random_serial_number()
+                        ).not_valid_before(
+                            datetime.datetime.utcnow()
+                        ).not_valid_after(
+                            datetime.datetime.utcnow() + datetime.timedelta(days=365)
+                        ).add_extension(
+                            x509.SubjectAlternativeName([x509.DNSName(u"localhost")]),
+                            critical=False,
+                        ).sign(private_key, hashes.SHA256(), default_backend())
+                        
+                        # 保存证书和私钥
+                        with open(cert_file, 'wb') as f:
+                            f.write(cert.public_bytes(serialization.Encoding.PEM))
+                        with open(key_file, 'wb') as f:
+                            f.write(private_key.private_bytes(
+                                encoding=serialization.Encoding.PEM,
+                                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                                encryption_algorithm=serialization.NoEncryption()
+                            ))
+                            
+                        logger.info(f"[SSL] 已生成本地自签名证书: {cert_file}")
                     except Exception as e:
-                        logger.error(f"[SSL] 生成自签名证书失败: {str(e)}")
-                        return False, None
-                
-                # 如果不需要自签名证书，使用已有的证书
-                try:
-                    ssl_context.load_cert_chain(
-                        certfile=LOCAL_SSL['cert_file'],
-                        keyfile=LOCAL_SSL['key_file']
-                    )
-                    logger.info("[SSL] 本地证书加载成功")
-                    return True, ssl_context
-                except Exception as e:
-                    logger.error(f"[SSL] 加载本地证书失败: {str(e)}")
-                    return False, None
+                        logger.warning(f"[SSL] 生成自签名证书失败，将使用简单配置: {str(e)}")
             
-            # 生产环境配置
-            else:
-                logger.info("[SSL] 生产环境，使用正式证书")
-                try:
-                    ssl_context.load_cert_chain(
-                        certfile=SSL_CERT_FILE,
-                        keyfile=SSL_KEY_FILE
-                    )
-                    logger.info("[SSL] 证书加载成功")
-                    return True, ssl_context
-                except Exception as e:
-                    logger.error(f"[SSL] 证书加载失败: {str(e)}")
-                    return False, None
+            # 加载证书（生产环境和本地环境共用）
+            try:
+                ssl_context.load_cert_chain(
+                    certfile=SSL_CERT_FILE,
+                    keyfile=SSL_KEY_FILE
+                )
+                logger.info(f"[SSL] 证书加载成功: {SSL_CERT_FILE}")
+                return True, ssl_context
+            except Exception as e:
+                logger.error(f"[SSL] 证书加载失败: {str(e)}")
+                return False, None
                 
         except Exception as e:
             logger.error(f"[SSL] SSL配置失败: {str(e)}")
             return False, None
 
-    def run_http_server(self, app: Flask) -> None:
+    def run_http_server(self, app: Flask, ssl_context=None) -> None:
         """
-        运行HTTP服务器
+        运行HTTP/HTTPS服务器，优化SSE长连接处理
         
         Args:
             app: Flask应用实例
+            ssl_context: SSL上下文对象，如果启用HTTPS
         """
         try:
-            # 创建一个新的Flask应用实例，只用于HTTP
-            http_app = Flask(__name__, static_folder='static')
-            CORS(http_app)
-            
-            # 只注册需要HTTP访问的路由
-            @http_app.route('/.well-known/acme-challenge/<path:path>')
-            def acme_challenge(path):
-                """Let's Encrypt验证接口"""
-                try:
-                    challenge_dir = os.path.join(app.static_folder, '.well-known', 'acme-challenge')
-                    return send_from_directory(challenge_dir, path)
-                except Exception as e:
-                    logger.error(f"ACME challenge失败: {str(e)}")
-                    return str(e), 404
+            # 使用eventlet的wsgi服务器启动，避免重复启动问题
+            # 确保在传入的app上注册ACME挑战路由（如果需要）
+            if not hasattr(app, '_acme_route_registered'):
+                @app.route('/.well-known/acme-challenge/<path:path>')
+                def http_acme_challenge(path):
+                    """Let's Encrypt验证接口，调用模块级别的acme_challenge函数"""
+                    return acme_challenge(app, path)
+                app._acme_route_registered = True
 
-            # 启动HTTP服务器
-            logger.info(f"启动HTTP服务器，端口 {PORT}")
-            http_app.run(
-                host=SERVER_IP,
-                port=PORT,
-                debug=True,  # HTTP服务器不需要debug模式
-                use_reloader=True  # 禁用reloader以避免与HTTPS服务器冲突
+            # 根据是否启用HTTPS选择端口
+            port = HTTPS_PORT if HTTPS_ENABLED else PORT
+            
+            # 创建工作线程池，优化SSE连接处理
+            pool = eventlet.GreenPool(2000)  # 适合处理大量SSE长连接
+            
+            # 创建socket，增加backlog以支持更多并发连接
+            sock = listen(
+                (SERVER_IP, port),
+                backlog=4096  # 增加backlog以支持更多连接请求
+            )
+            
+            # 设置socket选项以优化长连接性能
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)  # 启用keepalive
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # 启用TCP_NODELAY
+            
+            # 如果提供了SSL上下文，应用它到socket
+            if ssl_context and HTTPS_ENABLED:
+                sock = ssl_context.wrap_socket(sock, server_side=True)
+                logger.info("SSL配置完成")
+            
+            protocol = 'https' if HTTPS_ENABLED else 'http'
+            logger.info(f"服务器启动于 {protocol}://{SERVER_IP}:{port}")
+            logger.info(f"SSE优化配置：工作线程池大小=2000，backlog=4096，保持连接超时=30秒")
+            
+            # 使用eventlet的wsgi.server启动服务器，优化SSE长连接处理
+            wsgi.server(
+                sock,
+                app,
+                custom_pool=pool,  # 使用自定义线程池
+                log_output=True,
+                socket_timeout=30,
+                keepalive=30,  # 设置keepalive以避免连接过早断开
+                max_size=20000  # 增加最大连接数
             )
         except Exception as e:
-            logger.error(f"HTTP服务器启动失败: {str(e)}")
+            logger.error(f"服务器启动失败: {str(e)}", exc_info=True)
+            raise RuntimeError(f"服务器启动失败: {str(e)}")
 
-    def _run_socketio_server(self, app: Flask, socketio, **config) -> None:
-        """
-        运行SocketIO服务器
-        
-        Args:
-            app: Flask应用实例
-            socketio: SocketIO实例
-            config: 服务器配置参数
-        """
+    # 注意：SSE不需要单独的服务器实现，直接使用标准HTTP长连接即可
+    # 移除了_run_sse_server方法，统一使用run_http_server方法，因为SSE基于标准HTTP协议
+
+    def start_server(self, app: Flask) -> None:
+        """启动服务器（HTTP或HTTPS），使用SSE模式"""
         try:
-            # 基础配置
+            # 配置应用
+            app = self.configure_app(app)
+            self.logger.info(f"[Server] 应用配置完成，Session配置：{app.config.get('SESSION_COOKIE_DOMAIN')}, {app.config.get('SESSION_COOKIE_SECURE')}")
+            
+            # 准备服务器配置
             server_config = {
                 'host': SERVER_IP,
                 'port': HTTPS_PORT if HTTPS_ENABLED else PORT,
@@ -314,198 +340,45 @@ class ServerService:
                 'client_max_body_size': '50M'
             }
             
-            # 更新配置
-            if config:
-                server_config.update(config)
-
-            # SocketIO配置
-            socketio_config = {
-                'cors_allowed_origins': '*',
-                'async_mode': 'eventlet',
-                'ping_timeout': 10,
-                'ping_interval': 25,
-                'max_http_buffer_size': 10e6,
-                'manage_session': False,
-                'transports': ['websocket'],
-                'http_compression': True,
-                'websocket_compression': True,
-                'always_connect': True,
-                'async_handlers': True
-            }
-
-            # 如果启用了Cloudflare，添加websocket配置
-            if CLOUDFLARE['enabled'] and CLOUDFLARE['websocket']:
-                socketio_config.update({
-                    'path': CLOUDFLARE['websocket'].get('path', '/socket.io'),
-                    'transports': ['websocket']
-                })
-
-            logger.info(f"[SocketIO] 服务器配置: {server_config}")
-            logger.info(f"[SocketIO] SocketIO配置: {socketio_config}")
-            
-            # 更新SocketIO配置
-            for key, value in socketio_config.items():
-                if hasattr(socketio, key):
-                    setattr(socketio, key, value)
-            
-            # 创建工作线程池
-            pool = eventlet.GreenPool(2000)
-            
-            # 创建监听socket
-            sock = listen(
-                (server_config['host'], server_config['port']), 
-                backlog=server_config['backlog']
-            )
-            
-            # 配置SSL（如果启用）
+            # 如果启用HTTPS，获取SSL配置
             if HTTPS_ENABLED:
-                try:
-                    ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-                    
-                    # 根据环境加载证书
-                    if ENV == 'local':
-                        logger.info("本地环境：使用自签名证书")
-                        ssl_context.load_cert_chain(
-                            certfile=os.path.join(SSL_CERT_DIR, 'dev', 'cert.pem'),
-                            keyfile=os.path.join(SSL_CERT_DIR, 'dev', 'key.pem')
-                        )
-                    else:
-                        logger.info("生产环境：使用Cloudflare证书")
-                        ssl_context.load_cert_chain(
-                            certfile=SSL_CERT_FILE,
-                            keyfile=SSL_KEY_FILE
-                        )
-                    
-                    # 配置SSL选项
-                    ssl_context.options |= (
-                        ssl.OP_NO_COMPRESSION |  # 禁用压缩以减少CPU开销
-                        ssl.OP_NO_RENEGOTIATION |  # 禁用重新协商以提高安全性
-                        ssl.OP_CIPHER_SERVER_PREFERENCE |  # 使用服务器的密码套件优先级
-                        ssl.OP_SINGLE_DH_USE  # 每次连接使用新的DH密钥
-                    )
-                    
-                    # 设置现代密码套件
-                    ssl_context.set_ciphers(
-                        'ECDHE-ECDSA-AES256-GCM-SHA384:'
-                        'ECDHE-RSA-AES256-GCM-SHA384:'
-                        'ECDHE-ECDSA-CHACHA20-POLY1305:'
-                        'ECDHE-RSA-CHACHA20-POLY1305:'
-                        'ECDHE-ECDSA-AES128-GCM-SHA256:'
-                        'ECDHE-RSA-AES128-GCM-SHA256'
-                    )
-                    
-                    # 包装socket
-                    sock = ssl_context.wrap_socket(sock, server_side=True)
-                    logger.info("SSL配置完成")
-                    
-                except Exception as e:
-                    logger.error(f"SSL配置失败: {str(e)}")
-                    raise RuntimeError(f"SSL配置失败: {str(e)}")
-            
-            protocol = 'https' if HTTPS_ENABLED else 'http'
-            logger.info(f"服务器启动于 {protocol}://{server_config['host']}:{server_config['port']}")
-            
-            # 启动服务器
-            wsgi.server(
-                sock,
-                app,
-                custom_pool=pool,
-                log_output=server_config['log_output'],
-                max_size=server_config['worker_connections'],
-                keepalive=server_config['keepalive_timeout'],
-                socket_timeout=30
-            )
-
-        except Exception as e:
-            logger.error(f"启动SocketIO服务器失败: {str(e)}", exc_info=True)
-            raise RuntimeError(f"启动SocketIO服务器失败: {str(e)}")
-
-    def start_server(self, app: Flask, socketio) -> None:
-        """启动服务器（HTTP或HTTPS）"""
-        try:
-            # 配置应用
-            app = self.configure_app(app)
-            self.logger.info(f"[Server] 应用配置完成，Session配置：{app.config.get('SESSION_COOKIE_DOMAIN')}, {app.config.get('SESSION_COOKIE_SECURE')}")
-            
-            if HTTPS_ENABLED:
-                # 获取SSL配置
                 ssl_success, ssl_context = self.setup_ssl(SSL_CERT_DIR)
                 
                 if not ssl_success:
                     logger.error("SSL配置失败，服务器将退出")
                     raise RuntimeError("SSL配置失败")
                 
-                try:
-                    # 配置HTTPS服务器
-                    server_config = {
-                        'host': SERVER_IP,
-                        'port': HTTPS_PORT,
-                        'debug': DEBUG,
-                        'use_reloader': False,
-                        'log_output': True,
-                        'max_connections': 5000,
-                        'backlog': 4096,
-                        'worker_connections': 20000,
-                        'keepalive_timeout': 30,
-                        'client_max_body_size': '50M',
-                        'ssl_context': ssl_context
-                    }
-                    
-                    # 创建HTTPS服务器
-                    try:
-                        # 先尝试关闭可能占用的端口
-                        import socket
-                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                        s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)  # 启用keepalive
-                        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # 启用TCP_NODELAY
-                        try:
-                            s.bind((SERVER_IP, HTTPS_PORT))
-                            s.close()
-                            
-                            # 启动HTTPS服务器
-                            logger.info(f"启动HTTPS服务器，端口 {HTTPS_PORT}")
-                            self._run_socketio_server(app, socketio, **server_config)
-                            
-                        except Exception as e:
-                            logger.error(f"HTTPS端口 {HTTPS_PORT} 被占用: {str(e)}")
-                            s.close()
-                            raise RuntimeError(f"HTTPS端口 {HTTPS_PORT} 被占用")
-                        
-                    except Exception as e:
-                        logger.error(f"HTTPS服务器启动失败: {str(e)}")
-                        raise RuntimeError("HTTPS服务器启动失败")
-                
-                except Exception as e:
-                    logger.error(f"配置HTTPS服务器失败: {str(e)}")
-                    raise RuntimeError("配置HTTPS服务器失败")
-            
+                # 添加SSL上下文到服务器配置
+                server_config['ssl_context'] = ssl_context
+                logger.info(f"[Server] HTTPS配置完成，端口: {HTTPS_PORT}")
             else:
-                # 仅HTTP模式
-                try:
-                    # 先尝试关闭可能占用的端口
-                    import socket
-                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)  # 启用keepalive
-                    s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # 启用TCP_NODELAY
-                    try:
-                        s.bind((SERVER_IP, PORT))
-                        s.close()
-                        
-                        # 启动HTTP服务器
-                        logger.info(f"启动HTTP服务器，端口 {PORT}")
-                        self._run_socketio_server(app, socketio)
-                        
-                    except Exception as e:
-                        logger.error(f"HTTP端口 {PORT} 被占用: {str(e)}")
-                        s.close()
-                        raise RuntimeError(f"HTTP端口 {PORT} 被占用")
-                    
-                except Exception as e:
-                    logger.error(f"HTTP服务器启动失败: {str(e)}")
-                    raise RuntimeError("HTTP服务器启动失败")
+                logger.info(f"[Server] HTTP配置完成，端口: {PORT}")
             
+            # 检查端口是否被占用
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)  # 启用keepalive
+            s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # 启用TCP_NODELAY
+            try:
+                s.bind((SERVER_IP, server_config['port']))
+                s.close()
+                
+                # 启动服务器 - 使用SSE模式
+                protocol = 'HTTPS' if HTTPS_ENABLED else 'HTTP'
+                logger.info(f"启动{protocol}服务器，端口 {server_config['port']}")
+                logger.info("使用HTTP服务器启动（SSE基于标准HTTP协议）")
+                
+                # SSE基于标准HTTP协议，直接使用run_http_server方法即可
+                # 获取SSL上下文（如果启用了HTTPS）
+                ssl_context = server_config.get('ssl_context') if HTTPS_ENABLED else None
+                self.run_http_server(app, ssl_context=ssl_context)
+                
+            except Exception as e:
+                logger.error(f"端口 {server_config['port']} 被占用: {str(e)}")
+                s.close()
+                raise RuntimeError(f"端口 {server_config['port']} 被占用")
+                
         except Exception as e:
             logger.error(f"服务器启动失败: {str(e)}")
             raise

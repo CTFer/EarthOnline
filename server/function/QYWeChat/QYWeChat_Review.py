@@ -13,7 +13,13 @@ import logging
 import requests
 import time
 import json
+import sqlite3
+import os
 from typing import Dict, Any, List, Optional, Tuple
+
+# 数据库路径常量
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+GAME_DB_PATH = os.path.join(BASE_DIR, "database", "game.db")
 from .QYWeChat_Auth import qywechat_auth
 from config.private import QYWECHAT_APPROVAL_TEMPLATE_ID  # 导入审批模板ID
 
@@ -502,8 +508,7 @@ class QYWeChatReview:
             logger.info(f"[QYWeChat] 收到审批状态变更事件: 单号={sp_no}, 状态={sp_status}")
             
             # 查询数据库，找到对应的任务
-            import sqlite3
-            conn = sqlite3.connect("database/game.db")
+            conn = sqlite3.connect(GAME_DB_PATH)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             

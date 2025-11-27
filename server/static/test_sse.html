@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE服务测试页面</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        #connectBtn {
+            background-color: #27ae60;
+            color: white;
+        }
+        #connectBtn:hover {
+            background-color: #229954;
+        }
+        #disconnectBtn {
+            background-color: #e74c3c;
+            color: white;
+        }
+        #disconnectBtn:hover {
+            background-color: #c0392b;
+        }
+        #sendTestBtn {
+            background-color: #3498db;
+            color: white;
+        }
+        #sendTestBtn:hover {
+            background-color: #2980b9;
+        }
+        .status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .status.disconnected {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .status.connecting {
+            background-color: #f39c12;
+            color: white;
+        }
+        .status.connected {
+            background-color: #27ae60;
+            color: white;
+        }
+        .log-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: white;
+            border-left: 3px solid #3498db;
+            border-radius: 4px;
+        }
+        .log-entry.error {
+            border-left-color: #e74c3c;
+        }
+        .log-entry.event {
+            border-left-color: #27ae60;
+        }
+        .log-time {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .log-data {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .metrics {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #ecf0f1;
+            border-radius: 4px;
+        }
+        .metrics h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SSE服务测试页面</h1>
+        
+        <div class="controls">
+            <button id="connectBtn">连接SSE</button>
+            <button id="disconnectBtn" disabled>断开连接</button>
+            <button id="sendTestBtn" disabled>发送测试消息</button>
+        </div>
+        
+        <div id="status" class="status disconnected">未连接</div>
+        
+        <div class="metrics">
+            <h3>连接统计</h3>
+            <p>消息总数: <span id="messageCount">0</span></p>
+            <p>连接时间: <span id="connectionTime">0</span> 秒</p>
+            <p>重连次数: <span id="reconnectCount">0</span></p>
+        </div>
+        
+        <h2>消息日志</h2>
+        <div id="logContainer" class="log-container">
+            <div class="log-entry">
+                <div class="log-time">[初始化]</div>
+                <div class="log-data">测试页面已加载，请点击「连接SSE」开始测试</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // SSEService类定义
+        class SSEService {
+            constructor() {
+                this.eventSource = null;
+                this.state = 0; // DISCONNECTED
+                this.listeners = {};
+                this.reconnectAttempts = 0;
+                this.connectionTimer = null;
+                
+                console.log('SSEService实例已创建');
+            }
+            
+            on(event, callback) {
+                if (!this.listeners[event]) {
+                    this.listeners[event] = [];
+                }
+                this.listeners[event].push(callback);
+            }
+            
+            emit(event, data) {
+                if (this.listeners[event]) {
+                    this.listeners[event].forEach(callback => {
+                        try {
+                            callback(data);
+                        } catch (error) {
+                            console.error(`Error in SSE event handler for ${event}:`, error);
+                        }
+                    });
+                }
+            }
+            
+            connect(playerId = 1) {
+                console.log('正在连接SSE服务...', { playerId });
+                
+                try {
+                    const protocol = window.location.protocol;
+                    const host = window.location.host;
+                    const sseUrl = `${protocol}//${host}/api/sse/connect?player_id=${playerId}`;
+                    
+                    this.eventSource = new EventSource(sseUrl);
+                    
+                    this.eventSource.onopen = () => {
+                        console.log('SSE连接已建立');
+                        this.state = 2; // CONNECTED
+                        this.emit('connection_status', { status: 'connected' });
+                    };
+                    
+                    this.eventSource.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            console.log('收到SSE消息:', data);
+                            this.emit('message', data);
+                            
+                            // 处理特定事件
+                            if (data.type) {
+                                this.emit(data.type, data);
+                            }
+                        } catch (error) {
+                            console.error('解析SSE消息失败:', error);
+                        }
+                    };
+                    
+                    this.eventSource.onerror = (error) => {
+                        console.error('SSE连接错误:', error);
+                        this.emit('error', { message: 'SSE连接错误' });
+                        
+                        // 自动重连逻辑
+                        setTimeout(() => {
+                            if (this.reconnectAttempts < 5) {
+                                this.reconnectAttempts++;
+                                console.log(`尝试重连 (${this.reconnectAttempts}/5)...`);
+                                this.emit('reconnect', { attempt: this.reconnectAttempts, maxAttempts: 5 });
+                                this.connect(playerId);
+                            } else {
+                                this.state = 0; // DISCONNECTED
+                                this.emit('connection_status', { status: 'disconnected' });
+                            }
+                        }, 2000);
+                    };
+                    
+                } catch (error) {
+                    console.error('SSE连接失败:', error);
+                    this.emit('error', { message: error.message || '连接失败' });
+                    this.state = 0; // DISCONNECTED
+                    this.emit('connection_status', { status: 'disconnected' });
+                }
+            }
+            
+            disconnect() {
+                console.log('断开SSE连接');
+                if (this.eventSource) {
+                    this.eventSource.close();
+                    this.eventSource = null;
+                }
+                
+                if (this.connectionTimer) {
+                    clearInterval(this.connectionTimer);
+                    this.connectionTimer = null;
+                }
+                
+                this.state = 0; // DISCONNECTED
+                this.emit('connection_status', { status: 'disconnected' });
+            }
+        }
+        
+        // 将SSEService暴露到window对象，以便其他脚本可以访问
+        window.SSEService = SSEService;
+    </script>
+    
+    <script>
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 全局变量
+            let sseService = null;
+            let connectionStartTime = 0;
+            let messageCount = 0;
+            let reconnectCount = 0;
+            let connectionTimer = null;
+
+            // DOM元素
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const sendTestBtn = document.getElementById('sendTestBtn');
+            const statusEl = document.getElementById('status');
+            const logContainer = document.getElementById('logContainer');
+            const messageCountEl = document.getElementById('messageCount');
+            const connectionTimeEl = document.getElementById('connectionTime');
+            const reconnectCountEl = document.getElementById('reconnectCount');
+
+            // 更新状态显示
+            function updateStatus(status) {
+                if (status === 'connected') {
+                    statusEl.className = 'status connected';
+                    statusEl.textContent = '已连接';
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    sendTestBtn.disabled = false;
+                    
+                    // 开始计时
+                    connectionStartTime = Date.now();
+                    updateConnectionTime();
+                    connectionTimer = setInterval(updateConnectionTime, 1000);
+                } else if (status === 'connecting') {
+                    statusEl.className = 'status connecting';
+                    statusEl.textContent = '连接中...';
+                } else {
+                    statusEl.className = 'status disconnected';
+                    statusEl.textContent = '未连接';
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    sendTestBtn.disabled = true;
+                    
+                    // 停止计时
+                    if (connectionTimer) {
+                        clearInterval(connectionTimer);
+                        connectionTimer = null;
+                    }
+                }
+            }
+
+            // 更新连接时间
+            function updateConnectionTime() {
+                if (connectionStartTime > 0) {
+                    const seconds = Math.floor((Date.now() - connectionStartTime) / 1000);
+                    connectionTimeEl.textContent = seconds;
+                }
+            }
+
+            // 添加日志条目
+            function addLogEntry(type, data) {
+                const logEntry = document.createElement('div');
+                logEntry.className = `log-entry ${type}`;
+                
+                const logTime = document.createElement('div');
+                logTime.className = 'log-time';
+                logTime.textContent = `[${new Date().toLocaleTimeString()}]`;
+                
+                const logData = document.createElement('div');
+                logData.className = 'log-data';
+                
+                if (typeof data === 'string') {
+                    logData.textContent = data;
+                } else if (data) {
+                    logData.textContent = JSON.stringify(data, null, 2);
+                }
+                
+                logEntry.appendChild(logTime);
+                logEntry.appendChild(logData);
+                
+                logContainer.appendChild(logEntry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+                
+                // 更新消息计数
+                if (type === 'message' || type === 'event') {
+                    messageCount++;
+                    messageCountEl.textContent = messageCount;
+                }
+            }
+
+            try {
+                // 初始化SSE服务
+                sseService = new SSEService();
+                
+                // 注册事件监听器
+                sseService.on('connection_status', (data) => {
+                    console.log('连接状态更新:', data);
+                    updateStatus(data.status);
+                    addLogEntry('status', { type: 'connection', status: data.status });
+                });
+                
+                sseService.on('message', (data) => {
+                    console.log('收到消息:', data);
+                    addLogEntry('message', data);
+                });
+                
+                sseService.on('reconnect', (data) => {
+                    console.log('正在重连:', data);
+                    addLogEntry('reconnect', { type: 'reconnect', attempt: data.attempt, max: data.maxAttempts });
+                    reconnectCount++;
+                    reconnectCountEl.textContent = reconnectCount;
+                });
+                
+                sseService.on('error', (data) => {
+                    console.error('SSE错误:', data);
+                    addLogEntry('error', data);
+                });
+                
+                // 连接按钮点击事件
+                connectBtn.addEventListener('click', function() {
+                    updateStatus('connecting');
+                    addLogEntry('info', { type: 'action', message: '开始连接SSE服务器' });
+                    sseService.connect();
+                });
+                
+                // 断开按钮点击事件
+                disconnectBtn.addEventListener('click', function() {
+                    addLogEntry('info', { type: 'action', message: '断开SSE连接' });
+                    sseService.disconnect();
+                });
+                
+                // 发送测试消息按钮点击事件
+                sendTestBtn.addEventListener('click', function() {
+                    const testData = {
+                        type: 'test_message',
+                        timestamp: new Date().toISOString(),
+                        content: '这是一条测试消息'
+                    };
+                    
+                    addLogEntry('info', { type: 'send_test', data: testData });
+                    
+                    // 发送到服务器的测试API
+                    fetch('/api/sse/test', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(testData)
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('服务器响应错误');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        addLogEntry('success', { type: 'test_response', data });
+                    })
+                    .catch(error => {
+                        addLogEntry('error', { type: 'test_error', message: error.message });
+                    });
+                });
+                
+                // 页面卸载时断开连接
+                window.addEventListener('beforeunload', function() {
+                    if (sseService) {
+                        sseService.disconnect();
+                    }
+                });
+                
+            } catch (error) {
+                console.error('SSE初始化错误:', error);
+                updateStatus('disconnected');
+                addLogEntry('error', { type: 'init_error', message: error.message });
+            }
+        });
+    </script>
+</body>
+</html>

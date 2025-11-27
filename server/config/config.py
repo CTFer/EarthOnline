@@ -9,9 +9,9 @@
 import os
 
 # 服务器配置
-SERVER_IP = '0.0.0.0'
+SERVER_IP = '127.0.0.1'
 DOMAIN = 'duonline.top'
-DOMAIN_IP = '1.95.11.164'
+DOMAIN_IP = '111.229.150.104'
 PORT = 8000
 # 环境配置 本地开发环境 local 生产环境 prod 生产环境中NFC读写卡功能关闭
 ENV = 'local'
@@ -21,61 +21,25 @@ ENV = 'local'
 SSL_CERT_DIR = os.path.join(os.path.dirname(
     os.path.dirname(__file__)), 'config', 'ssl')
 SSL_DEV_DIR = os.path.join(SSL_CERT_DIR, 'dev')  # 本地开发证书目录
-
-# 本地开发HTTPS配置
-LOCAL_SSL = {
-    'enabled': True,  # 本地是否启用SSL
-    'cert_required': False,  # 本地开发是否强制要求证书
-    'adhoc': True,  # 使用临时自签名证书
-    'cert_dir': SSL_DEV_DIR,  # 本地证书目录
-    'cert_file': os.path.join(SSL_DEV_DIR, 'cert.pem'),  # 本地证书文件
-    'key_file': os.path.join(SSL_DEV_DIR, 'key.pem')  # 本地私钥文件
-}
+SSL_TX_DIR = os.path.join(SSL_CERT_DIR, 'duonline.top_TX')  # 腾讯云证书目录
 
 # HTTPS配置
-HTTPS_ENABLED = False  # 是否启用HTTPS
-HTTPS_PORT = 443     # HTTPS端口号
+HTTPS_ENABLED = True  # 是否启用HTTPS
+HTTPS_PORT = 443     # 本地环境使用8443端口，避免权限问题
 
 # 根据环境选择证书路径
 if ENV == 'local':
-    SSL_CERT_FILE = LOCAL_SSL['cert_file']
-    SSL_KEY_FILE = LOCAL_SSL['key_file']
+    # 本地环境使用开发证书目录
+    SSL_CERT_FILE = os.path.join(SSL_DEV_DIR, 'cert.pem')  # 本地开发证书
+    SSL_KEY_FILE = os.path.join(SSL_DEV_DIR, 'key.pem')      # 本地开发私钥
 else:
-    # 生产环境使用 Cloudflare 证书
-    SSL_CERT_FILE = os.path.join(
-        SSL_CERT_DIR, 'cloudfare.pem')  # Cloudflare 证书
-    SSL_KEY_FILE = os.path.join(SSL_CERT_DIR, 'domain.key')      # 私钥
+    # 生产环境使用腾讯云证书
+    SSL_CERT_FILE = os.path.join(SSL_TX_DIR, 'duonline.top_bundle.pem')  # 腾讯云证书（包含中间证书）
+    SSL_KEY_FILE = os.path.join(SSL_TX_DIR, 'duonline.top.key')      # 腾讯云私钥
 
 # ACME验证目录（用于Let's Encrypt证书续期）
 ACME_CHALLENGE_DIR = os.path.join('static', '.well-known', 'acme-challenge')
 
-# Cloudflare配置
-CLOUDFLARE = {
-    'enabled': True,  # 启用Cloudflare
-    'flexible_ssl': True,  # 使用Flexible SSL模式
-    'proxy_fix': True,  # 启用代理修复
-    'websocket': {
-        'enabled': True,
-        'path': '/socket.io',
-        'ping_interval': 25000,
-        'ping_timeout': 20000,
-        'max_http_buffer_size': 1e8,
-        'transports': ['websocket', 'polling'],
-        'async_mode': 'eventlet',
-        'logger': True,
-        'engineio_logger': True,
-        'always_connect': True
-    },
-    'headers': {
-        'X-Forwarded-For': 1,
-        'X-Forwarded-Proto': 1,
-        'X-Forwarded-Host': 1,
-        'X-Forwarded-Port': 1,
-        'X-Forwarded-Prefix': 1,
-        'X-Real-IP': 1
-    },
-    'domain_only_ssl': True  # 只对域名访问启用SSL重定向
-}
 
 # 数据库配置
 DATABASE_PATH = 'database/game.db'

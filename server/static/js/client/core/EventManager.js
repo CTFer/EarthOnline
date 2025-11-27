@@ -640,10 +640,10 @@ class EventManager {
   }
 
   /**
-   * 初始化WebSocket相关事件
+   * 初始化SSE相关事件（替代WebSocket）
    */
   initializeWSEvents() {
-    // WebSocket连接状态事件
+    // SSE连接状态事件
     this.eventBus.on(WS_EVENTS.CONNECTED, () => {
       this.uiService.updateWebSocketStatus("connected");
     });
@@ -654,7 +654,7 @@ class EventManager {
       this.uiService.updateWebSocketStatus("error");
     });
 
-    Logger.info("EventManager", "initializeWSEvents:320", "WebSocket事件监听器设置完成");
+    Logger.info("EventManager", "initializeWSEvents", "SSE事件监听器设置完成");
   }
 
   /**

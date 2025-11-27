@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-10-30 22:00:00
-# LastEditTime: 2025-10-31 15:54:59
+# LastEditTime: 2025-11-05 08:54:17
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -51,6 +51,14 @@ class AppIntegrationService:
                      template_dir: str = 'templates',
                      static_dir: str = 'static',
                      app_config: Dict = None) -> bool:
+        # 确保模板加载器相关属性已初始化
+        if not hasattr(app, '_blueprint_template_loaders'):
+            app._blueprint_template_loaders = {}
+        if not hasattr(app, '_blueprint_template_dirs'):
+            app._blueprint_template_dirs = {}
+        # 保存集成应用信息到app对象，供动态加载器使用
+        if not hasattr(app, '_integrated_apps'):
+            app._integrated_apps = {}
         """
         集成单个应用模块到主Flask应用
         
@@ -117,7 +125,7 @@ class AppIntegrationService:
                 # 创建蓝图模板链接，确保模板目录正确配置
                 self._create_blueprint_template_link(blueprint, template_path)
                 # 更新应用的模板加载器
-                self._update_template_loader(app, template_path)
+                self._update_template_loader(app, blueprint, template_path)
                 self.log(f"添加模板目录: {template_path}")
             
             # 配置静态文件路径
@@ -148,6 +156,10 @@ class AppIntegrationService:
                 'static_dir': static_path if os.path.exists(static_path) else None
             }
             
+            # 同时保存到app对象，供动态加载器使用
+            if hasattr(app, '_integrated_apps'):
+                app._integrated_apps[blueprint.name] = self.integrated_apps[blueprint.name]
+            
             # 打印集成信息
             self._print_integration_info(app_name, blueprint)
             
@@ -162,95 +174,157 @@ class AppIntegrationService:
             self.log(traceback.format_exc(), 'error')
             return False
     
-    def _update_template_loader(self, app: Flask, template_path: str):
+    def _update_template_loader(self, app: Flask, blueprint, template_path: str):
         """
-        更新Flask应用的模板加载器，添加新的模板目录，并确保支持蓝图命名空间
+        更新Flask应用的模板加载器，实现严格的蓝图模板隔离
+        确保每个蓝图只加载自己的模板目录，不加载其他蓝图或主应用的模板
+        
+        Args:
+            app: 主Flask应用实例
+            blueprint: 当前集成的蓝图对象
+            template_path: 模板目录路径
         """
-        # 1. 收集所有需要的模板目录
-        all_template_dirs = []
+        # 获取当前正在集成的蓝图名称
+        current_blueprint_name = blueprint.name
         
-        # 添加主应用的模板目录
-        if app.template_folder:
-            if os.path.isabs(app.template_folder):
-                main_template_dir = app.template_folder
-            else:
-                main_template_dir = os.path.join(app.root_path, app.template_folder)
-            if os.path.exists(main_template_dir) and main_template_dir not in all_template_dirs:
-                all_template_dirs.append(main_template_dir)
+        # 为每个蓝图创建独立的模板目录映射
+        if not hasattr(app, '_blueprint_template_dirs'):
+            app._blueprint_template_dirs = {}
         
-        # 添加新应用的模板目录
-        if os.path.exists(template_path) and template_path not in all_template_dirs:
-            all_template_dirs.append(template_path)
+        # 将当前蓝图的模板目录添加到映射中
+        if os.path.exists(template_path):
+            app._blueprint_template_dirs[current_blueprint_name] = template_path
+            self.log(f"为蓝图 '{current_blueprint_name}' 设置专属模板目录: {template_path}")
         
-        # 添加蓝图命名空间目录
-        # 对于蓝图命名空间 'route/index.html'，需要确保其存在于 'templates/route/index.html'
-        blueprint_name = os.path.basename(os.path.dirname(template_path))  # 获取蓝图名
-        parent_templates_dir = os.path.dirname(template_path)  # 父目录
-        namespace_dir = os.path.join(parent_templates_dir, 'templates', blueprint_name)
-        if os.path.exists(namespace_dir) and namespace_dir not in all_template_dirs:
-            all_template_dirs.append(namespace_dir)
+        # 为当前蓝图创建只包含自己模板目录的加载器
+        if not hasattr(app, '_blueprint_template_loaders'):
+            app._blueprint_template_loaders = {}
         
-        # 2. 确保目录列表包含所有已有的模板目录
-        if hasattr(app, 'jinja_loader') and isinstance(app.jinja_loader, FileSystemLoader):
-            for existing_dir in app.jinja_loader.searchpath:
-                if os.path.exists(existing_dir) and existing_dir not in all_template_dirs:
-                    all_template_dirs.append(existing_dir)
+        if os.path.exists(template_path):
+            # 为当前蓝图创建专属的文件系统加载器，只包含自己的模板目录
+            app._blueprint_template_loaders[current_blueprint_name] = FileSystemLoader([template_path])
+            self.log(f"为蓝图 '{current_blueprint_name}' 创建专属模板加载器，仅包含自己的模板目录")
         
-        # 3. 只在有变化时更新加载器
-        if all_template_dirs:
-            # 排序目录，确保主应用模板目录优先
-            main_template_dir = None
-            for i, dir_path in enumerate(all_template_dirs):
-                if app.template_folder and app.template_folder in dir_path:
-                    main_template_dir = all_template_dirs.pop(i)
-                    break
-            if main_template_dir:
-                all_template_dirs.insert(0, main_template_dir)
+        # 实现一个动态的模板加载器，根据当前蓝图返回对应的模板加载器
+        # 这是实现严格模板隔离的关键
+        if not hasattr(app, '_original_jinja_loader'):
+            # 保存原始加载器以备后用
+            app._original_jinja_loader = app.jinja_loader
             
-            current_dirs = set(app.jinja_loader.searchpath) if hasattr(app, 'jinja_loader') and isinstance(app.jinja_loader, FileSystemLoader) else set()
-            new_dirs = set(all_template_dirs)
+            # 创建一个新的动态加载器类
+            class DynamicBlueprintTemplateLoader:
+                def __init__(self, app_instance, integration_service):
+                    self.app = app_instance
+                    self.integration_service = integration_service  # 存储对集成服务的引用
+                    
+                def get_source(self, environment, template):
+                    from flask import request, current_app
+                    import jinja2
+                    
+                    # 尝试从请求上下文确定当前蓝图
+                    blueprint_name = None
+                    if request and hasattr(request, 'blueprint') and request.blueprint:
+                        blueprint_name = request.blueprint
+                        self.log(f"【模板加载】从请求上下文识别蓝图: {blueprint_name}")
+                    else:
+                        # 如果无法从请求上下文确定，尝试通过URL路径判断
+                        path = request.path if request else ''
+                        for name, info in self.app._integrated_apps.items():
+                            if info['url_prefix'] and path.startswith(info['url_prefix']):
+                                blueprint_name = name
+                                self.log(f"【模板加载】通过URL路径识别蓝图: {blueprint_name} (路径: {path})")
+                                break
+                    
+                    # 如果找到蓝图且有对应的专属加载器
+                    if blueprint_name and hasattr(self.app, '_blueprint_template_loaders'):
+                        blueprint_loader = self.app._blueprint_template_loaders.get(blueprint_name)
+                        if blueprint_loader:
+                            try:
+                                self.log(f"【模板加载】使用蓝图 '{blueprint_name}' 的专属加载器加载模板: {template}")
+                                return blueprint_loader.get_source(environment, template)
+                            except jinja2.TemplateNotFound:
+                                self.log(f"【模板加载】错误 - 模板 '{template}' 在蓝图 '{blueprint_name}' 的模板目录中未找到")
+                                # 只在当前蓝图的模板目录中查找，不回退到其他目录
+                                raise jinja2.TemplateNotFound(f"模板 '{template}' 不存在于蓝图 '{blueprint_name}' 的模板目录中")
+                    
+                    # 如果没有找到蓝图，使用原始加载器
+                    if self.app._original_jinja_loader:
+                        return self.app._original_jinja_loader.get_source(environment, template)
+                    
+                    raise jinja2.TemplateNotFound(template)
+                
+                def list_templates(self):
+                    # 返回一个空列表，因为我们不想让Flask扫描所有模板目录
+                    return []
+                
+                def log(self, message):
+                    # 使用AppIntegrationService的日志记录
+                    if self.integration_service:
+                        self.integration_service.log(message)
             
-            if current_dirs != new_dirs:
-                app.jinja_loader = FileSystemLoader(all_template_dirs)
-                
-                # 启用模板自动重载（开发环境）
-                app.config['TEMPLATES_AUTO_RELOAD'] = True
-                app.config['EXPLAIN_TEMPLATE_LOADING'] = True  # 启用模板加载调试
-                
-                self.log(f"更新模板加载器 - 已添加 {len(all_template_dirs)} 个模板目录")
-                self.log(f"模板搜索顺序: {all_template_dirs}")
-        else:
-            self.log(f"警告: 未找到有效的模板目录")
-    
+            # 创建动态加载器实例时传递当前AppIntegrationService实例
+            
+            # 将动态加载器设置为应用的jinja_loader
+            app.jinja_loader = DynamicBlueprintTemplateLoader(app, self)
+            self.log("已设置动态蓝图模板加载器，实现严格的模板隔离")
+        
+        # 启用模板自动重载和调试
+        app.config['TEMPLATES_AUTO_RELOAD'] = True
+        app.config['EXPLAIN_TEMPLATE_LOADING'] = True
+        
+        self.log(f"更新模板加载器 - 蓝图 '{current_blueprint_name}' 的专属模板加载已配置")
+        
     def _create_blueprint_template_link(self, blueprint, template_path):
         """
-        为蓝图创建模板目录链接，确保蓝图能正确加载自己的模板
-        这是一个辅助方法，用于确保蓝图的命名空间模板加载正常工作
+        为蓝图创建模板目录链接，确保蓝图可以正确加载自己的模板
         """
-        # 强制设置蓝图的template_folder为绝对路径
-        if os.path.exists(template_path):
-            # 设置绝对路径的模板目录
-            blueprint.template_folder = template_path
+        # 保存蓝图的名称和模板目录路径
+        blueprint_name = blueprint.name
+        
+        # 不设置蓝图的template_folder，避免Flask默认的模板查找机制
+        # 我们将完全依赖自定义的DynamicBlueprintTemplateLoader来处理模板加载
+        
+        # 添加一个自定义的模板渲染函数，确保每个蓝图只使用自己的模板
+        def custom_render_template(*args, **kwargs):
+            """
+            增强版模板渲染函数，确保每个蓝图只使用自己的模板目录
+            不会尝试加载其他蓝图或主应用的模板
+            """
+            from flask import current_app
+            from jinja2 import TemplateNotFound
             
-            # 确保蓝图的import_name是正确的模块路径
-            if not hasattr(blueprint, '_got_first_request'):
-                blueprint._got_first_request = False
+            # 获取模板名称
+            template_name = args[0]
+            self.log(f"【模板渲染】蓝图 '{blueprint_name}' 尝试渲染模板: {template_name}")
+            
+            # 只从当前蓝图的专属模板目录中查找模板
+            try:
+                # 获取当前蓝图的专属加载器
+                if hasattr(current_app, '_blueprint_template_loaders'):
+                    blueprint_loader = current_app._blueprint_template_loaders.get(blueprint_name)
+                    
+                    if blueprint_loader:
+                        # 尝试加载模板
+                        source, filename, uptodate = blueprint_loader.get_source(current_app.jinja_env, template_name)
+                        
+                        # 编译并渲染模板
+                        template = current_app.jinja_env.from_string(source)
+                        self.log(f"【模板渲染】成功 - 从蓝图 '{blueprint_name}' 的专属模板目录加载: {template_name}")
+                        return template.render(**kwargs)
                 
-            self.log(f"蓝图 '{blueprint.name}' 使用绝对路径模板目录: {blueprint.template_folder}")
-            
-            # 创建命名空间目录结构，确保模板可以通过命名空间加载
-            namespace_template_dir = os.path.join(os.path.dirname(template_path), 'templates', blueprint.name)
-            if not os.path.exists(namespace_template_dir) and os.path.exists(template_path):
-                try:
-                    # 如果命名空间目录不存在，创建符号链接或确保文件存在于正确位置
-                    # 检查是否存在与蓝图同名的子目录
-                    if not os.path.exists(namespace_template_dir):
-                        self.log(f"警告: 命名空间模板目录不存在: {namespace_template_dir}")
-                        # 但不创建实际目录，因为这可能会导致权限问题
-                except Exception as e:
-                    self.log(f"创建命名空间模板目录失败: {str(e)}", 'error')
-        else:
-            self.log(f"警告: 蓝图 '{blueprint.name}' 的模板目录不存在: {template_path}")
+                # 如果专属加载器不存在，抛出明确的错误
+                raise TemplateNotFound(f"模板 '{template_name}' 不存在于蓝图 '{blueprint_name}' 的模板目录中")
+                
+            except TemplateNotFound as e:
+                # 明确记录只查找了当前蓝图的模板
+                self.log(f"【模板渲染】失败 - 模板 '{template_name}' 不存在于蓝图 '{blueprint_name}' 的模板目录中", 'error')
+                raise
+            except Exception as e:
+                self.log(f"【模板渲染】失败 - 渲染模板 '{template_name}' 时出错: {str(e)}", 'error')
+                raise
+        
+        # 替换蓝图的render_template方法
+        blueprint.render_template = custom_render_template
     
     def _print_integration_info(self, app_name: str, blueprint):
         """

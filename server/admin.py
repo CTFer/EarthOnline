@@ -11,7 +11,7 @@ import hashlib  # 添加到文件顶部的导入
 from datetime import datetime
 import time
 from function.PlayerService import player_service
-from flask_socketio import SocketIO
+# 不再需要socketio导入，已替换为SSE服务
 from config.config import ENV
 from utils.response_handler import ResponseHandler, StatusCode, api_response  # 添加这行导入
 import logging
@@ -31,7 +31,8 @@ logger = logging.getLogger(__name__)
 
 # 创建蓝图
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
-socketio = SocketIO()
+# 不再需要socketio实例，使用SSE服务
+# 在需要时导入SSE服务
 nfc_device = None
 
 # 数据库路径
@@ -543,8 +544,9 @@ def admin_create_notification():
         with get_db_connection() as conn:
             notification = notification_service.add_notification(data)
             
-            # 通过WebSocket广播新通知
-            socketio.emit('notification:new', notification, broadcast=True)
+            # 广播通知给所有用户
+            from function.SSEService import sse_service
+            sse_service.broadcast_event('notification:new', notification)
             
             return json.dumps({
                 'code': 0,
@@ -566,8 +568,9 @@ def admin_update_notification(notification_id):
         with get_db_connection() as conn:
             notification = notification_service.update_notification(notification_id, data)
             
-            # 通过WebSocket广播通知更新
-            socketio.emit('notification:update', notification, broadcast=True)
+            # 广播通知更新给所有用户
+            from function.SSEService import sse_service
+            sse_service.broadcast_event('notification:update', notification)
             
             return json.dumps({
                 'code': 0,
@@ -588,8 +591,9 @@ def admin_delete_notification(notification_id):
         success = notification_service.delete_notification(notification_id)
             
         if success:
-            # 通过WebSocket广播通知删除
-            socketio.emit('notification:delete', {'id': notification_id}, broadcast=True)
+            # 广播通知删除给所有用户
+            from function.SSEService import sse_service
+            sse_service.broadcast_event('notification:delete', {'id': notification_id})
             
             return jsonify({
                 'code': 0,
@@ -724,4 +728,6 @@ def task_history():
     return render_template('admin/task_history.html')
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    # 使用标准Flask服务器启动（SSE模式）
+    from function.ServerService import server_service
+    server_service.start_server(app)

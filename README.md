@@ -1,7 +1,7 @@
 <!--
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-12 16:39:10
- * @LastEditTime: 2025-03-09 23:25:11
+ * @LastEditTime: 2025-11-20 14:20:16
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -86,6 +86,7 @@ server/
 ├── function/             # 业务功能模块
 ├── test/                 # 测试文件
 └── app.py               # 应用入口
+APP  # 附加应用目录
 ```
 
 ### 核心模块说明

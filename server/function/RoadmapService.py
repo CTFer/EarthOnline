@@ -469,7 +469,7 @@ class RoadmapService:
                 current_time,
                 current_time,
                 0,
-                session.get('user_id')
+                user_id
             ))
             
             new_id = cursor.lastrowid

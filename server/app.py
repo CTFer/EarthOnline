@@ -2,17 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-01-07 14:02:42
-# LastEditTime: 2025-11-01 19:41:18
-# LastEditors: 一根鱼骨棒
-# Description: 本开源代码使用GPL 3.0协议
-# Software: VScode
-# Copyright 2025 迷舍
-
-# -*- coding: utf-8 -*-
-
-# Author: 一根鱼骨棒 Email 775639471@qq.com
-# Date: 2025-01-07 14:02:42
-# LastEditTime: 2025-10-26 15:12:33
+# LastEditTime: 2025-11-20 15:00:14
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -56,7 +46,6 @@ from config.config import (
     HTTPS_ENABLED,
     SSL_CERT_FILE,
     SSL_KEY_FILE,
-    CLOUDFLARE,
     SECURITY,
     DOMAIN
 )
@@ -77,17 +66,17 @@ app = Flask(__name__, static_folder='static', template_folder=os.path.join(BASE_
 logger = log_service.setup_logging(DEBUG)
 
 # 导入其他依赖
-from flask_socketio import SocketIO, emit, join_room, leave_room
+# 不再需要socketio导入，已替换为SSE服务
 from flask_cors import CORS
 from admin import admin_bp
 from shop import shop_bp  # 确保在同一目录下
 from function.PlayerService import player_service
 from function.TaskService import task_service
 from function.GPSService import gps_service
-from function.RoadmapService import roadmap_service
+# RoadmapService现在通过模块集成方式导入
 from function.WeChatService import wechat_service
 from function.SchedulerService import scheduler_service  # 导入调度器服务
-from function.WebSocketService import websocket_service
+from function.SSEService import sse_service  # 替换WebSocketService为SSEService
 from config.private import AMAP_SECURITY_JS_CODE, WECHAT_TOKEN, WECHAT_ENCODING_AES_KEY, WECHAT_APP_ID
 import requests
 from function.NotificationService import notification_service
@@ -98,7 +87,7 @@ from wechat import wechat_bp  # 导入微信蓝图
 if ENV == 'prod':
     from car_park import car_park_bp  # 导入车场蓝图
 # 导入新的停车场管理模块（位于APP目录下）
-from APP.car_park import car_park_new_bp
+from APP.car_park_new import car_park_new_bp
 # APP模块集成 - 使用统一的应用集成服务
 try:
     # 直接导入AppIntegrationService类
@@ -129,10 +118,26 @@ try:
         # APP目录下的停车场管理系统
         {
             'app_name': '停车场管理系统',
-            'app_path': 'APP/car_park',
+            'app_path': 'APP/car_park_new',
             'module_name': 'app',
             'blueprint_name': 'car_park_new_bp',
             'url_prefix': '/car_park_new'
+        },
+        # APP目录下的数据库管理系统
+        {
+            'app_name': '数据库管理系统',
+            'app_path': 'APP/workdata',
+            'module_name': 'app',
+            'blueprint_name': 'workdata_bp',
+            'url_prefix': '/workdata'
+        },
+        # APP目录下的Roadmap模块
+        {
+            'app_name': 'Roadmap模块',
+            'app_path': 'APP/roadmap',
+            'module_name': 'app',
+            'blueprint_name': 'roadmap_bp',
+            'url_prefix': '/roadmap'
         },
         # 其他可能的应用可以在这里添加...
     ]
@@ -165,13 +170,13 @@ if ENV == 'prod':
     app.register_blueprint(car_park_bp, url_prefix='/car_park')
 # 停车场管理系统蓝图已通过应用集成服务注册
 # 初始化WebSocket服务
-websocket_service.init_app(app)
+sse_service.init_app(app)  # 初始化SSE服务
 
 # 配置 SocketIO
-socketio = websocket_service.socketio
+# SSE不需要socketio实例
 
 # 初始化日志服务的WebSocket
-log_service.init_websocket(websocket_service)
+log_service.init_sse(sse_service)  # 初始化日志服务的SSE支持
 
 # 为所有现有路由添加日志装饰器
 app.view_functions = {
@@ -514,7 +519,7 @@ def handle_nfc_card():
 
         # 调用 NFC 服务处理
         from function.NFCService import nfc_service
-        response, status_code = nfc_service.handle_nfc_card(card_id, player_id, socketio)
+        response, status_code = nfc_service.handle_nfc_card(card_id, player_id)
 
         print(f"[NFC API Debug] 处理结果: {json.dumps(response, ensure_ascii=False)}")
         print("[NFC API] ====== NFC卡片请求处理完成 ======\n")
@@ -527,10 +532,10 @@ def handle_nfc_card():
         print(f"[NFC API] 详细错误信息: ", traceback.format_exc())
 
         if 'player_id' in locals():
-            socketio.emit('nfc_task_update', {
+            sse_service.broadcast_to_room(f'user_{player_id}', 'nfc_task_update', {
                 'type': 'ERROR',
                 'message': error_msg
-            }, room=f'user_{player_id}')
+            })
 
         return json.dumps({
             'code': 500,
@@ -628,7 +633,7 @@ def add_gps():
             }
             
             print(f"[GPS] 发送新GPS点位更新通知: {socket_data}")
-            socketio.emit('gps_update', socket_data, room=f'user_{player_id}')
+            sse_service.broadcast_to_room(f'user_{player_id}', 'gps_update', socket_data)
         else:
             # 更新时间的情况
             socket_data = {
@@ -639,7 +644,7 @@ def add_gps():
                 'id': response_data['data']['id']  # 添加记录ID
             }
             print(f"[GPS] 仅更新时间，发送电量、速度、更新时间：{socket_data}")
-            socketio.emit('gps_update', socket_data, room=f'user_{player_id}')
+            sse_service.broadcast_to_room(f'user_{player_id}', 'gps_update', socket_data)
         return response_data
 
     except Exception as e:
@@ -666,32 +671,7 @@ def update_gps(gps_id):
     data = request.get_json()
     return gps_service.update_gps(gps_id, data)
 
-# 开发计划相关接口
-@app.route('/api/roadmap/login', methods=['POST'])
-def roadmap_login():
-    """开发计划登录"""
-    data = request.get_json()
-    return roadmap_service.roadmap_login(data)
-
-@app.route('/api/roadmap/check_login', methods=['GET'])
-def roadmap_check_login():
-    """开发计划检查登录"""
-    return roadmap_service.check_login()
-
-@app.route('/api/roadmap/logout', methods=['GET'])
-def roadmap_logout():
-    """开发计划登出"""
-    return roadmap_service.roadmap_logout()
-
-@app.route('/roadmap')
-def roadmap():
-    """开发计划首页"""
-    return render_template('client/roadmap.html')
-
-@app.route('/api/roadmap', methods=['GET'])
-def get_roadmap():
-    """获取开发计划"""
-    return roadmap_service.get_roadmap()
+# Roadmap相关路由已移至独立模块APP/roadmap中
 
 def sync_to_prod(methods=['POST', 'PUT', 'DELETE']):
     """装饰器：同步数据库操作到生产环境"""
@@ -759,44 +739,7 @@ def sync_to_prod(methods=['POST', 'PUT', 'DELETE']):
         return wrapper
     return decorator
 
-# 在需要同步的路由上使用装饰器
-@app.route('/api/roadmap/add', methods=['POST'])
-@sync_to_prod()
-def add_roadmap():
-    """添加开发计划"""
-    data = request.get_json()
-    return roadmap_service.add_roadmap(data)
-
-@app.route('/api/roadmap/<int:roadmap_id>', methods=['PUT'])
-@sync_to_prod()
-def update_roadmap(roadmap_id):
-    """更新开发计划"""
-    data = request.get_json()
-    return roadmap_service.update_roadmap(roadmap_id, data)
-
-@app.route('/api/roadmap/<int:roadmap_id>', methods=['DELETE'])
-@sync_to_prod()
-def delete_roadmap(roadmap_id):
-    """删除开发计划"""
-    return roadmap_service.delete_roadmap(roadmap_id)
-
-@app.route('/api/roadmap/get_sync', methods=['GET'])
-def sync_roadmap():
-    """手动触发同步_仅本地环境可用"""
-    return roadmap_service.sync_from_prod()
-
-# 在生产环境添加同步数据接口
-@app.route('/api/roadmap/sync', methods=['GET'])
-def sync_roadmap_data():
-    """提供数据同步接口（仅在生产环境可用）"""
-    return roadmap_service.sync_data()
-
-# 在生产环境添加批量同步数据接口
-@app.route('/api/roadmap/batch_sync', methods=['POST'])
-def batch_sync_roadmap_data():
-    """批量同步数据接口（仅在生产环境可用）"""
-    data = request.get_json()
-    return roadmap_service.batch_sync(data.get('updates', []))
+# Roadmap同步相关路由已移至独立模块APP/roadmap中
 
 
 # 通知相关接口
@@ -883,24 +826,32 @@ def get_unread_notifications_count():
             msg=str(e)
         )
 
-# WebSocket通知事件
-@socketio.on('notification:read')
-def handle_notification_read(data):
-    """处理通知已读事件"""
-    try:
-        notification_id = data.get('notification_id')
-        if not notification_id:
-            return
+# 移除WebSocket相关代码，已替换为SSE服务
         
+        # 通知已读REST API
+@app.route('/api/notification/mark_read/<int:notification_id>', methods=['POST'])
+@api_response
+def mark_notification_read(notification_id):
+    """将通知标记为已读"""
+    try:
         notification_service.mark_as_read(notification_id)
         
-        # 广播通知状态更新
-        emit('notification:update', {
+        # 通过SSE广播通知状态更新
+        sse_service.broadcast_notification_update({
             'id': notification_id,
             'is_read': True
-        }, broadcast=True)
+        })
+        
+        return {
+            'success': True,
+            'message': '通知已标记为已读'
+        }
     except Exception as e:
-        Logger.error('WebSocket', f'处理通知已读事件失败: {str(e)}')
+        logger.error(f"标记通知已读失败: {str(e)}")
+        return ResponseHandler.error(
+            code=StatusCode.SERVER_ERROR,
+            msg=f"服务器错误: {str(e)}"
+        )
 
 def setup_logging():
     """配置日志系统"""
@@ -1142,8 +1093,8 @@ if __name__ == '__main__':
     
     try:
         # 使用 ServerService 启动服务器，它会应用所有配置
-        socketio = SocketIO(app, cors_allowed_origins="*")
-        server_service.start_server(app, socketio)
+        # 不再需要socketio实例，使用SSE服务
+        server_service.start_server(app)
         
     except KeyboardInterrupt:
         logger.info("收到停止信号，正在关闭服务器...")

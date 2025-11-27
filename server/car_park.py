@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-03-28 17:04:22
-# LastEditTime: 2025-10-07 22:27:40
+# LastEditTime: 2025-11-10 10:25:11
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -30,6 +30,10 @@ from datetime import datetime, timedelta
 from typing import Tuple, Any, Dict, List, Optional
 from functools import wraps
 import os
+
+# 数据库路径常量
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "database", "car_park.db")
 
 # 创建蓝图
 car_park_bp = Blueprint('car_park', __name__)
@@ -393,7 +397,7 @@ class QYWeChatService:
                     return "车牌号不能为空"
                 
                 # 检查原车牌是否存在并获取车主姓名
-                conn = sqlite3.connect("database/car_park.db")
+                conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
                 
                 # 检查原车牌是否存在
@@ -531,7 +535,7 @@ class QYWeChatService:
         :return: 查询结果
         """
         try:
-            conn = sqlite3.connect("database/car_park.db")
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
 
             if is_name:
@@ -645,7 +649,7 @@ class QYWeChatService:
             car_number = parts[1].strip().upper()  # 车牌号转大写
 
             # 连接数据库
-            conn = sqlite3.connect("database/car_park.db")
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
 
             try:
@@ -715,7 +719,7 @@ class QYWeChatService:
         """
         # 更新Sys_Park_Plate表的pRemark字段 将content中的车牌号和备注内容分开
         try:
-            conn = sqlite3.connect("database/car_park.db")
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
 
             # 解析内容
@@ -822,7 +826,7 @@ class QYWeChatService:
                 from_user = "ShengTieXiaJiuJingGuoMinBan"
                 
             # 从数据库查询车辆信息
-            conn = sqlite3.connect("database/car_park.db")
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             try:
                 # 查询车主信息，先查询车辆
@@ -1116,7 +1120,7 @@ class QYWeChatService:
         """
         try:
             # 连接sqlite数据库
-            conn = sqlite3.connect("database/car_park.db")
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             
             try:
@@ -1202,7 +1206,7 @@ class QYWeChatService:
             str: 格式化的记录信息
         """
         try:
-            conn = sqlite3.connect("database/car_park.db")
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             
             # 查询最近的续期和修改记录
@@ -1488,7 +1492,7 @@ def save_car_park_info(car_info: dict) -> bool:
     :return: 是否保存成功
     """
     try:
-        conn = sqlite3.connect("database/car_park.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
         # 检查审批单号是否已经存在
@@ -1572,7 +1576,7 @@ def update_car_park_status(car_number: str, status: str, comment: str = None) ->
     conn = None
     cursor = None
     try:
-        conn = sqlite3.connect("database/car_park.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
         # 先获取车主信息
@@ -1646,7 +1650,7 @@ def update_car_park_status(car_number: str, status: str, comment: str = None) ->
 def get_car_park_statistics():
     """获取停车场统计信息"""
     try:
-        conn = sqlite3.connect("database/car_park.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         current_time = datetime.now()
 
@@ -1908,7 +1912,7 @@ def car_park_review():
     try:
         if request.method == 'GET':
             # 获取待处理的续期请求
-            conn = sqlite3.connect("database/car_park.db")
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
 
             cursor.execute('''
@@ -1989,7 +1993,7 @@ def car_park_info():
             car_number = request.args.get('car_number')
             owner_name = request.args.get('owner_name')
 
-            conn = sqlite3.connect("database/car_park.db")
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
 
             if car_number or owner_name:
@@ -2083,7 +2087,7 @@ def car_park_info():
             persons = data.get('persons', [])
             plates = data.get('plates', [])
 
-            conn = sqlite3.connect("database/car_park.db")
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
 
             try:
@@ -2284,7 +2288,7 @@ def client_alive():
 def check_expiring_vehicles():
     """检查即将过期和已过期的车辆并发送提醒"""
     try:
-        conn = sqlite3.connect("database/car_park.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         logger.info("[Car_Park] 开始检查即将过期和已过期的车辆")
         current_time = datetime.now()

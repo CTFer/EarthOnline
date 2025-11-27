@@ -1,7 +1,7 @@
 /*
  * @Author: 一根鱼骨棒 Email 775639471@qq.com
  * @Date: 2025-01-29 16:43:22
- * @LastEditTime: 2025-05-13 15:46:10
+ * @LastEditTime: 2025-11-20 16:26:02
  * @LastEditors: 一根鱼骨棒
  * @Description: 本开源代码使用GPL 3.0协议
  * Software: VScode
@@ -23,7 +23,7 @@ import MapService from "./service/mapService.js";
 import UIService from "./service/uiService.js";
 import AudioService from "./service/audioService.js";
 import Live2DService from "./service/live2dService.js";
-import WebSocketService from "./service/websocketService.js";
+import SSEService from "./service/sseService.js";
 import NotificationService from "./service/notificationService.js";
 import { gameUtils } from "../utils/utils.js";
 import { TASK_EVENTS, PLAYER_EVENTS, MAP_EVENTS, UI_EVENTS, WS_EVENTS, AUDIO_EVENTS, LIVE2D_EVENTS, SHOP_EVENTS, ROUTE_EVENTS } from "./config/events.js";
@@ -131,9 +131,9 @@ class GameManager {
 
       Logger.info("GameManager", "[initializeServices:120]", "DOM加载完成");
 
-      // 5. 初始化WebSocket服务（依赖：eventBus）
-      this.websocketService = new WebSocketService(this.eventBus);
-      await this.websocketService.initialize();
+      // 5. 初始化SSE服务（依赖：eventBus）
+      this.sseService = new SSEService(this.eventBus);
+      await this.sseService.initialize();
 
       // 6. 初始化玩家服务（依赖：api, eventBus, store）
       this.playerService = new PlayerService(this.api, this.eventBus, this.store);
@@ -159,7 +159,6 @@ class GameManager {
 
       // 12. 设置事件监听器
       await this.setupEventListeners();
-      await this.websocketService.connect();
       this.initialized = true;
       Logger.info("GameManager", "[initializeServices:131]", "服务组件初始化完成");
     } catch (error) {
@@ -236,24 +235,28 @@ class GameManager {
         // await this.playerService.loadPlayerInfo();
         // Logger.info("GameManager", "[initializeApplication:198]", "玩家信息加载完成");
 
-        // 2. 设置WebSocket订阅 - 确保在玩家信息加载后
+        // 2. 设置SSE订阅 - 确保在玩家信息加载后
         const playerId = this.playerService.getPlayerId();
-        if (playerId && this.websocketService && this.mapService) {
-            // 确保WebSocket已连接
-            if (!this.websocketService.socket?.connected) {
-                Logger.info("GameManager", "[initializeApplication]", "等待WebSocket连接...");
-                await new Promise((resolve) => {
-                    this.websocketService.socket.once('connect', resolve);
-                });
-            }
+        if (playerId && this.sseService && this.mapService) {
+            // 连接SSE并订阅玩家事件
+            Logger.info("GameManager", "[initializeApplication]", `为玩家 ${playerId} 设置SSE订阅`);
+            await this.sseService.connect(playerId);
             
-            Logger.info("GameManager", "[initializeApplication]", `为玩家 ${playerId} 设置WebSocket订阅`);
-            this.websocketService.subscribeToPlayerEvents(playerId);
-            this.mapService.setWebSocketManager(this.websocketService.getWSManager());
+            // 为mapService提供一个兼容的接口
+            this.mapService.setWebSocketManager({
+                subscribe: (eventName, callback) => {
+                    // 在SSE中，我们通过eventBus来处理事件
+                    this.eventBus.on(eventName, callback);
+                },
+                unsubscribe: (eventName, callback) => {
+                    this.eventBus.off(eventName, callback);
+                },
+                state: this.sseService.getConnectionState()
+            });
         } else {
-            Logger.warn("GameManager", "[initializeApplication]", "无法设置WebSocket订阅：", {
+            Logger.warn("GameManager", "[initializeApplication]", "无法设置SSE订阅：", {
                 playerId: playerId,
-                hasWebSocket: !!this.websocketService,
+                hasSSE: !!this.sseService,
                 hasMapService: !!this.mapService
             });
         }
@@ -312,7 +315,7 @@ class GameManager {
       if (!this.taskService) throw new Error("任务服务未初始化");
       if (!this.uiService) throw new Error("UI服务未初始化");
       if (!this.audioService) throw new Error("音频服务未初始化");
-      if (!this.websocketService) throw new Error("WebSocket服务未初始化");
+      if (!this.sseService) throw new Error("SSE服务未初始化");
 
       // 初始化事件管理器
       // 创建 EventManager 实例
@@ -323,7 +326,7 @@ class GameManager {
         uiService: this.uiService,
         mapService: this.mapService,
         audioService: this.audioService,
-        websocketService: this.websocketService,
+        websocketService: this.sseService, // 使用SSEService替代WebSocketService
         shopService: this.shopService,
         wordcloudService: this.wordcloudService,
         live2dService: this.live2dService,
@@ -347,7 +350,9 @@ class GameManager {
     this.swiperService.destroySwipers();
     this.wordcloudService.destroy();
     this.audioService.destroy();
-    this.websocketService.disconnect();
+    if (this.sseService) {
+      this.sseService.disconnect();
+    }
     this.live2dService.cleanup();
     Logger.info("GameManager", "资源清理完成");
   }

@@ -1,0 +1,16 @@
+{
+  "domain": "duonline.top",
+  "domains": [
+    "duonline.top",
+    "www.duonline.top"
+  ],
+  "email": "775639471@qq.com",
+  "webroot_path": "C:/www/server/static",
+  "nginx_config_path": "C:/nginx/conf/nginx.conf",
+  "nginx_service_name": "nginx",
+  "cert_dir": "C:/www/server/config/ssl",
+  "certbot_path": "certbot",
+  "renew_days_before_expiry": 30,
+  "check_interval_hours": 24,
+  "auto_restart_nginx": true
+}
