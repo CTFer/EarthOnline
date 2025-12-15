@@ -7,586 +7,35 @@
     <!-- 引入 Layui CSS -->
     <link rel="stylesheet" href="/static/layui/css/layui.css" />
     <link rel="icon" type="image/svg+xml" href="/static/img/favicon_roadmap.svg">
-    <style>
-      ::-webkit-scrollbar {
-        width: 6px;
-        background: transparent;
-      }
-
-      ::-webkit-scrollbar-track {
-        background: rgba(223, 226, 230, 0.5);
-        border-radius: 3px;
-      }
-
-      ::-webkit-scrollbar-thumb {
-        background: rgba(193, 193, 138, 0.3);
-        border-radius: 3px;
-
-        &:hover {
-          background: rgba(138, 162, 193, 0.5);
-        }
-      }
-
-      /* 自定义样式 */
-      .task-board {
-        display: flex;
-        gap: 20px;
-        /* padding: 20px; */
-        min-height: 80vh;
-      }
-
-      .task-column {
-        flex: 1;
-        background-color: #f4f5f7;
-        border-radius: 3px;
-        padding: 10px;
-        min-height: 20vh;
-      }
-
-      .task-list {
-        /* min-height: 50px; */
-        height: 100%;
-        padding: 15px 5px;
-        overflow-y: scroll;
-        max-height: 80vh;
-      }
-
-      .task-card {
-        background-color: #fff;
-        border-radius: 3px;
-        padding: 15px;
-        margin-bottom: 10px;
-        box-shadow: 0 1px 3px rgba(9, 30, 66, 0.1);
-        cursor: move;
-        position: relative;
-        transition: all 0.2s ease;
-        border-left: 4px solid #666;
-      }
-
-      .task-card:hover {
-        box-shadow: 0 3px 6px rgba(9, 30, 66, 0.2);
-      }
-
-      .task-card.dragging {
-        opacity: 0.5;
-        transform: scale(0.95);
-      }
-
-      .task-actions {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        display: none;
-        gap: 4px;
-      }
-
-      .task-card:hover .task-actions {
-        display: flex;
-      }
-
-      .task-actions .layui-btn-xs {
-        padding: 0 6px;
-        height: 22px;
-        line-height: 22px;
-      }
-
-      .task-actions .complete-task {
-        background-color: #ffb800;
-      }
-
-      .task-actions .complete-task:hover {
-        background-color: #ffb80099;
-      }
-
-      .task-content h3 {
-        margin: 0 0 8px 0;
-        padding-right: 60px;
-      }
-
-      .task-content p {
-        margin: 0;
-        color: #666;
-        font-size: 13px;
-      }
-
-      .column-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px;
-        font-weight: bold;
-        color: #333;
-        border-bottom: 1px solid #e6e6e6;
-      }
-
-      .column-title .title-text {
-        font-size: 18px;
-      }
-
-      .column-title .add-task-btn {
-        width: 50px;
-
-        font-size: 12px;
-        line-height: 32px;
-        border: none;
-        background: transparent;
-      }
-
-      .column-title .add-task-btn:hover {
-        color: #1e9fff;
-      }
-
-      .add-task-btn {
-        width: 100%;
-      }
-      .add-task-btn .layui-icon {
-        font-size: 18px;
-      }
-
-      .color-options {
-        padding: 8px 0;
-      }
-
-      .color-picker-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 4px;
-      }
-
-      .color-option {
-        width: 36px;
-        height: 36px;
-        border-radius: 4px;
-        cursor: pointer;
-        position: relative;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 2px solid transparent;
-      }
-
-      .color-option:hover {
-        transform: scale(1.1);
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-      }
-
-      .color-option.selected {
-        border-color: #1e9fff;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-      }
-
-      .color-option .layui-icon {
-        color: #fff;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-        font-size: 16px;
-        position: absolute;
-      }
-
-      .color-option.layui-bg-gray .layui-icon {
-        color: #333;
-        text-shadow: none;
-      }
-
-      .task-card[style*="background-color: #1e9fff"] {
-        border-left-color: #1e9fff;
-      }
-      .task-card[style*="background-color: #16b777"] {
-        border-left-color: #16b777;
-      }
-      .task-card[style*="background-color: #3f51b5"] {
-        border-left-color: #3f51b5;
-      }
-      .task-card[style*="background-color: #ffb800"] {
-        border-left-color: #ffb800;
-      }
-      .task-card[style*="background-color: #ff5722"] {
-        border-left-color: #ff5722;
-      }
-      .task-card[style*="background-color: #a233c6"] {
-        border-left-color: #a233c6;
-      }
-      .task-card[style*="background-color: #fafafa"] {
-        border-left-color: #666;
-      }
-
-      .task-list.drag-over {
-        background-color: rgba(30, 159, 255, 0.1);
-        border: 2px dashed #1e9fff;
-      }
-
-      /* Header样式 */
-      .header {
-        background-color: #fff;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        padding: 5px 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-      }
-
-      .header-title {
-        font-size: 24px;
-        line-height: 50px;
-        font-weight: bold;
-        color: #333;
-      }
-      .header-title i {
-        font-size: 42px;
-      }
-      .header-title span {
-        position: relative;
-        bottom: 2px;
-      }
-
-      .user-info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 18px;
-      }
-
-      .username {
-        color: #1e9fff;
-        font-weight: 500;
-      }
-
-      .logout-btn {
-        cursor: pointer;
-        color: #666;
-      }
-
-      .logout-btn:hover {
-        color: #ff5722;
-      }
-
-      /* 登录表单样式 */
-      .login-form {
-        max-width: 300px;
-        margin: 100px auto;
-        padding: 20px;
-        background: #fff;
-        border-radius: 4px;
-        /* box-shadow: 0 2px 10px rgba(0,0,0,.1); */
-      }
-
-      /* 暗黑模式样式 */
-      body.dark-mode {
-        background-color: #1a1a1a;
-        color: #e0e0e0;
-      }
-
-      /* Header样式 */
-      .header {
-        background-color: #fff;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: all 0.3s ease;
-      }
-
-      .dark-mode .header {
-        background-color: #2d2d2d;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-      }
-
-      /* 主要内容区域 */
-      .task-board {
-        transition: all 0.3s ease;
-      }
-
-      .dark-mode .task-board {
-        background-color: #1a1a1a;
-      }
-
-      .task-column {
-        transition: all 0.3s ease;
-      }
-
-      .dark-mode .task-column {
-        background-color: #2d2d2d;
-      }
-
-      .task-card {
-        transition: all 0.3s ease;
-      }
-
-      .dark-mode .task-card {
-        background-color: #3d3d3d;
-        color: #e0e0e0;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-      }
-
-      .dark-mode .task-card:hover {
-        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
-      }
-
-      /* 暗黑模式切换按钮 */
-      .theme-switch {
-        display: flex;
-        align-items: center;
-        margin-right: 20px;
-        cursor: pointer;
-        padding: 8px;
-        border-radius: 50%;
-        transition: all 0.3s ease;
-      }
-
-      .theme-switch:hover {
-        background-color: rgba(0, 0, 0, 0.05);
-      }
-
-      .dark-mode .theme-switch:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-      }
-
-      .theme-switch .layui-icon {
-        font-size: 20px;
-        transition: all 0.3s ease;
-      }
-
-      .dark-mode .theme-switch .layui-icon {
-        color: #e0e0e0;
-      }
-
-      /* 表单样式适配 */
-      .dark-mode .layui-form {
-        background-color: #2d2d2d;
-        color: #e0e0e0;
-      }
-
-      .dark-mode .layui-input,
-      .dark-mode .layui-textarea {
-        background-color: #3d3d3d;
-        border-color: #4d4d4d;
-        color: #e0e0e0;
-      }
-
-      .dark-mode .layui-form-label {
-        color: #e0e0e0;
-      }
-
-      /* 颜色选择器适配 */
-      .dark-mode .color-option {
-        border-color: #4d4d4d;
-      }
-
-      .dark-mode .color-option.selected {
-        border-color: #1e9fff;
-      }
-
-      /* Header文字颜色适配 */
-      .header-title {
-        color: #333;
-        transition: color 0.3s ease;
-      }
-
-      .dark-mode .header-title {
-        color: #e0e0e0;
-      }
-
-      .user-info {
-        color: #666;
-        transition: color 0.3s ease;
-      }
-
-      .dark-mode .user-info {
-        color: #bdbdbd;
-      }
-
-      .username {
-        color: #1e9fff;
-        transition: color 0.3s ease;
-      }
-
-      .dark-mode .username {
-        color: #42a5f5;
-      }
-
-      /* 列表标题文字颜色适配 */
-      .column-title {
-        color: #333;
-        transition: all 0.3s ease;
-        border-bottom: 1px solid #e6e6e6;
-      }
-
-      .dark-mode .column-title {
-        color: #e0e0e0;
-        border-bottom-color: #424242;
-      }
-
-      .title-text {
-        transition: color 0.3s ease;
-      }
-
-      .dark-mode .title-text {
-        color: #e0e0e0;
-      }
-
-      /* 任务卡片文字颜色适配 */
-      .task-card .task-content h3 {
-        color: #333;
-        transition: color 0.3s ease;
-      }
-
-      .dark-mode .task-card .task-content h3 {
-        color: #e0e0e0;
-      }
-
-      .task-card .task-content p {
-        color: #666;
-        transition: color 0.3s ease;
-      }
-
-      .dark-mode .task-card .task-content p {
-        color: #bdbdbd;
-      }
-
-      /* 颜色选择器适配 */
-      .color-option {
-        border: 2px solid transparent;
-        transition: all 0.3s ease;
-      }
-
-      .dark-mode .color-option {
-        border-color: rgba(255, 255, 255, 0.1);
-      }
-
-      .color-option:hover {
-        transform: scale(1.1);
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-      }
-
-      .dark-mode .color-option:hover {
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-      }
-
-      .color-option.selected {
-        border-color: #1e9fff;
-      }
-
-      .dark-mode .color-option.selected {
-        border-color: #42a5f5;
-      }
-
-      /* 按钮颜色适配 */
-      .add-task-btn {
-        color: #666;
-        transition: all 0.3s ease;
-      }
-
-      .dark-mode .add-task-btn {
-        color: #bdbdbd;
-      }
-
-      .add-task-btn:hover {
-        color: #1e9fff;
-      }
-
-      .dark-mode .add-task-btn:hover {
-        color: #42a5f5;
-      }
-      /* 暗黑模式END */
-
-      /* 暗黑模式适配 */
-      .dark-mode .task-actions .complete-task {
-        background-color: #e65100;
-      }
-
-      .dark-mode .task-actions .complete-task:hover {
-        background-color: #e6510099;
-      }
-
-      /* 在现有样式中添加 */
-      .task-count {
-        font-size: 14px;
-        color: #999;
-        margin-left: 5px;
-        font-weight: normal;
-      }
-
-      .dark-mode .task-count {
-        color: #bdbdbd;
-      }
-
-      .color-legend {
-        background-color: #f4f5f7;
-        border-radius: 4px;
-        padding: 15px 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 1px 3px rgba(9, 30, 66, 0.1);
-        transition: all 0.3s ease;
-      }
-
-      .legend-title {
-        font-size: 14px;
-        color: #666;
-        margin-bottom: 10px;
-      }
-
-      .legend-items {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 20px;
-      }
-
-      .legend-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .color-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        display: inline-block;
-      }
-
-      .legend-text {
-        font-size: 13px;
-        color: #666;
-      }
-
-      /* 暗黑模式适配 */
-      .dark-mode .color-legend {
-        background-color: #2d2d2d;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-      }
-
-      .dark-mode .legend-title {
-        color: #e0e0e0;
-      }
-
-      .dark-mode .legend-text {
-        color: #bdbdbd;
-      }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('roadmap.static', filename='css/index.min.css') }}" />
   </head>
 
   <body>
     <!-- 新增header -->
     <div class="header">
-      <div class="header-title">
-        <!-- <i class="layui-icon layui-icon-list"></i> -->
-        <i>
-          <img src="/static/img/logo_roadmap.svg" alt="logo" style=" height:100%;">
-        </i>
-        <!-- <span>计划管理</span> -->
-      </div>
-      <div class="user-info">
-        <div class="theme-switch" id="themeSwitch">
-          <i class="layui-icon layui-icon-light"></i>
+        <div class="header-title">
+            <!-- <i class="layui-icon layui-icon-list"></i> -->
+            <i>
+                <img src="/static/img/logo_roadmap.svg" alt="logo" style=" height:100%;">
+            </i>
+            <!-- <span>计划管理</span> -->
         </div>
-        <span>当前用户：</span>
-        <span class="username" id="currentUser"></span>
-        <span class="logout-btn" title="退出登录">
-          <i class="layui-icon layui-icon-logout"></i>
-        </span>
-      </div>
+        <div class="user-info">
+            <div class="theme-switch" id="themeSwitch">
+                <i class="layui-icon layui-icon-light"></i>
+            </div>
+            <span>当前用户：</span>
+            <span class="username" id="currentUser"></span>
+            <!-- SSE连接状态指示灯 -->
+            <div class="sse-status" id="sseStatus" title="SSE连接状态">
+                <span class="status-dot"></span>
+                <span class="status-text">SSE连接：</span>
+                <span class="status-value">未连接</span>
+            </div>
+            <span class="logout-btn" title="退出登录">
+                <i class="layui-icon layui-icon-logout"></i>
+            </span>
+        </div>
     </div>
 
     <div class="layui-container">
@@ -657,8 +106,11 @@
 
     <!-- 引入 Layui JavaScript -->
     <script src="/static/layui/layui.js"></script>
-    <script src="/static/js/socket.io.js"></script>
-    <script src="{{ url_for('roadmap.static', filename='js/client/roadmap.js') }}"></script>
+    
+    <!-- 唯一的应用入口 -->
+    <script src="{{ url_for('roadmap.static', filename='js/client/app.js') }}"></script>
+    <!-- 保留原有roadmap.js，用于兼容旧代码 -->
+    <!-- <script src="{{ url_for('roadmap.static', filename='js/client/roadmap.js') }}"></script> -->
 
     <!-- 添加任务表单模板 -->
     <script type="text/html" id="taskFormTpl">
@@ -678,6 +130,19 @@
         <div class="layui-form-item">
           <label class="layui-form-label">颜色</label>
           <div class="layui-input-block" id="colorOptions"></div>
+        </div>
+        <!-- 周期任务配置 -->
+        <div class="layui-form-item">
+          <label class="layui-form-label">周期任务</label>
+          <div class="layui-input-block">
+            <input type="checkbox" name="is_cycle_task" lay-skin="switch" lay-text="是|否" lay-filter="is_cycle_task" />
+          </div>
+        </div>
+        <div class="layui-form-item cycle-duration-row" style="display: none;">
+          <label class="layui-form-label">周期时长（天）</label>
+          <div class="layui-input-block">
+            <input type="number" name="cycle_duration" min="1" class="layui-input" placeholder="输入周期时长，如90表示每3个月" />
+          </div>
         </div>
         <div class="layui-form-item">
           <div class="layui-input-block">

@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-01-07 14:02:42
-# LastEditTime: 2025-11-20 15:00:14
+# LastEditTime: 2025-12-05 16:29:28
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -60,6 +60,8 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 明确指定templates文件夹路径
 app = Flask(__name__, static_folder='static', template_folder=os.path.join(BASE_DIR, 'templates'))
+# 设置全局路由配置，不严格要求URL末尾的斜杠
+app.url_map.strict_slashes = False
 
 # 立即应用服务器配置
 # app = server_service.configure_app(app)
@@ -178,11 +180,25 @@ sse_service.init_app(app)  # 初始化SSE服务
 # 初始化日志服务的WebSocket
 log_service.init_sse(sse_service)  # 初始化日志服务的SSE支持
 
-# 为所有现有路由添加日志装饰器
-app.view_functions = {
-    endpoint: log_service.log_request(func)
-    for endpoint, func in app.view_functions.items()
-}
+# 为所有现有路由添加日志装饰器，但排除SSE相关路由
+updated_view_functions = {}
+for endpoint, func in app.view_functions.items():
+    # 获取路由对应的URL规则
+    rule = None
+    for r in app.url_map.iter_rules():
+        if r.endpoint == endpoint:
+            rule = r
+            break
+    
+    # 排除SSE相关路由，避免日志处理导致的连接延迟
+    if rule and '/api/sse' in str(rule):
+        # 直接使用原始函数，不应用日志装饰器
+        updated_view_functions[endpoint] = func
+    else:
+        # 应用日志装饰器
+        updated_view_functions[endpoint] = log_service.log_request(func)
+
+app.view_functions = updated_view_functions
 
 # 添加模板目录配置
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
@@ -1042,6 +1058,10 @@ def handle_404(e):
 @app.before_request
 def before_request():
     """请求预处理"""
+    # 排除 SSE 相关路由，减少连接延迟
+    if '/api/sse' in request.path:
+        return None
+    
     # 添加 session 调试信息
     if '/api/' in request.path and request.method != 'OPTIONS':
         logger.debug(f"请求: {request.path}, IP: {request.remote_addr}, Session: {dict(session)}")

@@ -1,6 +1,8 @@
 vue-version/
 earthonline/
 __pycache__/
+build/
+dist/
 server/logs/
 server/config/private.py
 server/config/ssl/

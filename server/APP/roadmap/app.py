@@ -8,6 +8,12 @@ from flask import Blueprint, request, render_template, redirect, url_for, flash
 
 # 导入本模块的服务
 from .services import roadmap_service
+from .services.sse_service import sse_service
+
+# 初始化SSE服务
+sse_service.set_roadmap_service(roadmap_service)
+sse_service.start()
+print("[Roadmap App] SSE服务已初始化")
 
 # 创建蓝图
 roadmap_bp = Blueprint(
@@ -72,6 +78,14 @@ def delete_roadmap(roadmap_id):
     """删除开发计划"""
     return roadmap_service.delete_roadmap(roadmap_id)
 
+@roadmap_bp.route('/api/<int:roadmap_id>/complete_cycle', methods=['POST'])
+def complete_cycle_task(roadmap_id):
+    """完成周期任务"""
+    try:
+        return roadmap_service.complete_cycle_task(roadmap_id)
+    except Exception as e:
+        return json.dumps({'code': 500, 'msg': f'完成周期任务失败: {str(e)}'})
+
 # 同步相关接口
 @roadmap_bp.route('/api/sync', methods=['GET'])
 def sync_data():
@@ -97,6 +111,23 @@ def batch_sync_data():
         return roadmap_service.batch_sync(updates)
     except json.JSONDecodeError:
         return json.dumps({'code': 400, 'msg': '无效的JSON数据'})
+
+# 周期任务相关接口
+@roadmap_bp.route('/api/cycle_tasks/overdue', methods=['GET'])
+def get_overdue_cycle_tasks():
+    """获取过期的周期任务"""
+    return roadmap_service.get_overdue_cycle_tasks()
+
+@roadmap_bp.route('/api/cycle_tasks/overdue', methods=['PUT'])
+def update_overdue_cycle_tasks():
+    """更新过期周期任务的状态"""
+    return roadmap_service.update_overdue_cycle_tasks()
+
+# SSE路由
+@roadmap_bp.route('/api/sse')
+def sse():
+    """SSE连接端点"""
+    return sse_service.register_client()
 
 # 暴露蓝图以便主应用导入
 def get_blueprint():

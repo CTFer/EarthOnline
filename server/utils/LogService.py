@@ -181,8 +181,16 @@ class LogService:
                 'form': dict(request.form),
                 'headers': {k: v for k, v in request.headers.items()},
                 'remote_addr': request.remote_addr,
-                'request_data': request.get_json() if request.is_json else None
+                'request_data': None
             }
+            
+            # 安全获取JSON数据，避免空请求体导致的异常
+            if request.is_json:
+                try:
+                    log_entry['request_data'] = request.get_json()
+                except Exception:
+                    # 如果获取JSON失败，不记录request_data
+                    pass
 
             try:
                 response = f(*args, **kwargs)
@@ -196,6 +204,25 @@ class LogService:
                             'path': request.path
                         }
                     }
+                    self.add_request_log(log_entry)
+                    
+                    # 记录日志后立即返回，不再执行后续代码
+                    return response
+                
+                # 检查是否为SSE响应 - 这是修复SSE连接延迟的关键
+                if '/api/sse' in request.path:
+                    # 特殊处理SSE响应，避免阻塞
+                    log_entry['response'] = {
+                        'status_code': 200,
+                        'data': {
+                            'type': 'sse_response',
+                            'message': 'SSE连接已建立'
+                        }
+                    }
+                    self.add_request_log(log_entry)
+                    
+                    # 立即返回响应，不执行任何后续代码
+                    # 这是修复SSE连接延迟的核心：直接返回，不等待其他处理
                     return response
                     
                 # 处理其他类型的响应
@@ -206,9 +233,22 @@ class LogService:
                     status_code = 200
 
                 # 处理Response对象
-                if hasattr(response_data, 'get_json'):
+                if hasattr(response_data, 'mimetype') and response_data.mimetype == 'text/event-stream':
+                    # 明确处理SSE响应，避免读取流
+                    response_data = {
+                        'type': 'sse_response',
+                        'mimetype': 'text/event-stream'
+                    }
+                elif hasattr(response_data, 'get_json'):
                     try:
-                        response_data = response_data.get_json()
+                        # 检查是否为SSE响应的另一种方式（通过路径）
+                        if '/api/sse' in request.path:
+                            response_data = {
+                                'type': 'sse_response',
+                                'mimetype': response_data.mimetype if hasattr(response_data, 'mimetype') else 'unknown'
+                            }
+                        else:
+                            response_data = response_data.get_json()
                     except:
                         response_data = {
                             'type': 'non_json_response',
@@ -216,10 +256,30 @@ class LogService:
                         }
                 elif hasattr(response_data, 'response'):
                     try:
-                        response_data = response_data.response[0].decode('utf-8')
-                        response_data = json.loads(response_data)
+                        # 检查是否为流式响应
+                        if callable(response_data.response):
+                            # 流式响应，不尝试读取内容
+                            response_data = {
+                                'type': 'streaming_response',
+                                'mimetype': response_data.mimetype if hasattr(response_data, 'mimetype') else 'unknown'
+                            }
+                        elif hasattr(response_data.response, '__iter__') and not isinstance(response_data.response, list):
+                            # 迭代器响应，不尝试读取内容
+                            response_data = {
+                                'type': 'iterator_response',
+                                'mimetype': response_data.mimetype if hasattr(response_data, 'mimetype') else 'unknown'
+                            }
+                        elif isinstance(response_data.response, list) and response_data.response:
+                            # 列表响应，尝试读取第一个元素
+                            response_data = response_data.response[0].decode('utf-8')
+                            response_data = json.loads(response_data)
+                        else:
+                            response_data = str(response_data.response)
                     except:
-                        response_data = str(response_data.response)
+                        response_data = {
+                            'type': 'non_json_response',
+                            'mimetype': response_data.mimetype if hasattr(response_data, 'mimetype') else 'unknown'
+                        }
 
                 log_entry['response'] = {
                     'status_code': status_code,
@@ -236,16 +296,18 @@ class LogService:
                     code=StatusCode.SERVER_ERROR,
                     msg=f"服务器错误: {str(e)}"
                 )), 500
+            else:
+                # 只有非SSE响应才执行后续处理
+                if '/api/sse' not in request.path:
+                    # 记录请求日志 - 仅对非SSE响应执行
+                    self.add_request_log(log_entry)
 
-            # 记录请求日志
-            self.add_request_log(log_entry)
-
-            # 通过SSE广播日志更新
-            if self.sse_service and hasattr(self.sse_service, 'broadcast_log_update'):
-                self.sse_service.broadcast_log_update(
-                    self.get_request_logs(),
-                    log_entry
-                )
+                    # 通过SSE广播日志更新 - 仅对非SSE响应执行
+                    if self.sse_service and hasattr(self.sse_service, 'broadcast_log_update'):
+                        self.sse_service.broadcast_log_update(
+                            self.get_request_logs(),
+                            log_entry
+                        )
 
             return response
 

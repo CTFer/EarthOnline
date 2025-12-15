@@ -299,15 +299,18 @@ class DatabaseManager:
     """数据库管理器，用于管理多个数据库"""
     
     @staticmethod
-    def get_database_list(database_dir: str = 'd:/code/EarthOnline/server/APP/workdata/database') -> List[str]:
-        """获取数据库目录中的所有SQLite数据库文件
+    def get_database_list(database_dir: str = None) -> List[str]:
+        """
+        获取数据库目录中的所有SQLite数据库文件
         
         Args:
-            database_dir: 数据库目录路径
+            database_dir: 数据库目录路径，默认使用当前文件所在目录下的database子目录
         
         Returns:
             数据库文件名列表
         """
+        if database_dir is None:
+            database_dir = os.path.join(os.path.dirname(__file__), 'database')
         if not os.path.exists(database_dir):
             return []
         
@@ -319,29 +322,35 @@ class DatabaseManager:
         return sorted(db_files)
     
     @staticmethod
-    def get_database_path(db_name: str, database_dir: str = 'd:/code/EarthOnline/server/APP/workdata/database') -> str:
-        """获取数据库文件的完整路径
+    def get_database_path(db_name: str, database_dir: str = None) -> str:
+        """
+        获取数据库文件的完整路径
         
         Args:
             db_name: 数据库文件名
-            database_dir: 数据库目录路径
+            database_dir: 数据库目录路径，默认使用当前文件所在目录下的database子目录
         
         Returns:
             数据库文件的完整路径
         """
+        if database_dir is None:
+            database_dir = os.path.join(os.path.dirname(__file__), 'database')
         return os.path.join(database_dir, db_name)
     
     @staticmethod
-    def validate_database(db_name: str, database_dir: str = 'd:/code/EarthOnline/server/APP/workdata/database') -> bool:
-        """验证数据库文件是否存在且是有效的SQLite文件
+    def validate_database(db_name: str, database_dir: str = None) -> bool:
+        """
+        验证数据库文件是否存在且是有效的SQLite文件
         
         Args:
             db_name: 数据库文件名
-            database_dir: 数据库目录路径
+            database_dir: 数据库目录路径，默认使用当前文件所在目录下的database子目录
         
         Returns:
             是否有效
         """
+        if database_dir is None:
+            database_dir = os.path.join(os.path.dirname(__file__), 'database')
         db_path = DatabaseManager.get_database_path(db_name, database_dir)
         
         if not os.path.exists(db_path):
@@ -356,16 +365,19 @@ class DatabaseManager:
             return False
     
     @staticmethod
-    def create_database(db_name: str, database_dir: str = 'd:/code/EarthOnline/server/APP/workdata/database') -> bool:
-        """创建新的SQLite数据库文件
+    def create_database(db_name: str, database_dir: str = None) -> bool:
+        """
+        创建新的SQLite数据库文件
         
         Args:
             db_name: 数据库文件名
-            database_dir: 数据库目录路径
+            database_dir: 数据库目录路径，默认使用当前文件所在目录下的database子目录
         
         Returns:
             是否创建成功
         """
+        if database_dir is None:
+            database_dir = os.path.join(os.path.dirname(__file__), 'database')
         # 确保目录存在
         os.makedirs(database_dir, exist_ok=True)
         

@@ -23,6 +23,190 @@ class RoadmapService:
             )
         # 上次同步时间
         self.last_sync_time = 0
+        # 初始化数据库，添加周期任务相关字段
+        self.init_database()
+        
+    def init_database(self):
+        """初始化数据库，添加周期任务相关字段"""
+        conn = None
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 检查并添加周期任务相关字段
+            cursor.execute('PRAGMA table_info(roadmap)')
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            # 添加is_cycle_task字段
+            if 'is_cycle_task' not in columns:
+                cursor.execute('ALTER TABLE roadmap ADD COLUMN is_cycle_task INTEGER DEFAULT 0')
+                print("[Roadmap] 添加is_cycle_task字段成功")
+            
+            # 添加cycle_duration字段
+            if 'cycle_duration' not in columns:
+                cursor.execute('ALTER TABLE roadmap ADD COLUMN cycle_duration INTEGER')
+                print("[Roadmap] 添加cycle_duration字段成功")
+            
+            # 添加next_reminder_time字段
+            if 'next_reminder_time' not in columns:
+                cursor.execute('ALTER TABLE roadmap ADD COLUMN next_reminder_time INTEGER')
+                print("[Roadmap] 添加next_reminder_time字段成功")
+            
+            # 创建roadmap_history表，用于记录周期任务完成历史
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS roadmap_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    roadmap_id INTEGER NOT NULL,
+                    complete_time INTEGER NOT NULL,
+                    FOREIGN KEY (roadmap_id) REFERENCES roadmap (id)
+                )
+            ''')
+            print("[Roadmap] 检查并创建roadmap_history表成功")
+            
+            conn.commit()
+        except Exception as e:
+            print(f"[Roadmap] 初始化数据库失败: {str(e)}")
+            if conn:
+                conn.rollback()
+        finally:
+            if conn:
+                conn.close()
+    
+    def complete_cycle_task(self, roadmap_id):
+        """完成周期任务"""
+        conn = None
+        try:
+            # 检查登录状态
+            login_result = json.loads(self.check_login())
+            if login_result['code'] != 0:
+                return json.dumps(login_result)
+            
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            # 获取任务信息
+            cursor.execute('SELECT * FROM roadmap WHERE id = ?', (roadmap_id,))
+            task = cursor.fetchone()
+            
+            if not task:
+                return json.dumps({'code': 404, 'msg': '任务不存在'})
+            
+            task = dict(task)
+            
+            # 检查是否为周期任务
+            if not task['is_cycle_task']:
+                return json.dumps({'code': 400, 'msg': '该任务不是周期任务'})
+            
+            if not task['cycle_duration']:
+                return json.dumps({'code': 400, 'msg': '周期任务缺少周期时长配置'})
+            
+            current_time = int(time.time())
+            
+            # 1. 记录任务完成历史
+            cursor.execute('''
+                INSERT INTO roadmap_history (roadmap_id, complete_time)
+                VALUES (?, ?)
+            ''', (roadmap_id, current_time))
+            
+            # 2. 计算下次提醒时间
+            next_reminder_time = current_time + (task['cycle_duration'] * 86400)  # 86400秒/天
+            
+            # 3. 更新任务的next_reminder_time，将状态设为PLANNED
+            cursor.execute('''
+                UPDATE roadmap 
+                SET next_reminder_time = ?, 
+                    status = 'PLANNED',
+                    edittime = ?
+                WHERE id = ?
+            ''', (next_reminder_time, current_time, roadmap_id))
+            
+            conn.commit()
+            
+            return json.dumps({
+                'code': 0,
+                'msg': '本次任务已完成，下次提醒时间已更新',
+                'data': {
+                    'next_reminder_time': next_reminder_time,
+                    'cycle_duration': task['cycle_duration']
+                }
+            })
+        except Exception as e:
+            print(f"[Roadmap] 完成周期任务失败: {str(e)}")
+            if conn:
+                conn.rollback()
+            return json.dumps({'code': 500, 'msg': f'完成周期任务失败: {str(e)}'})
+        finally:
+            if conn:
+                conn.close()
+    
+    def get_overdue_cycle_tasks(self):
+        """获取过期的周期任务"""
+        conn = None
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            current_time = int(time.time())
+            
+            # 查询所有过期的周期任务
+            cursor.execute('''
+                SELECT * FROM roadmap 
+                WHERE is_cycle_task = 1 
+                AND next_reminder_time <= ? 
+                AND status != 'COMPLETED' 
+                AND is_deleted = 0
+            ''', (current_time,))
+            
+            tasks = [dict(row) for row in cursor.fetchall()]
+            
+            return json.dumps({
+                'code': 0,
+                'msg': '获取成功',
+                'data': tasks
+            })
+        except Exception as e:
+            print(f"[Roadmap] 获取过期周期任务失败: {str(e)}")
+            return json.dumps({'code': 500, 'msg': f'获取失败: {str(e)}'})
+        finally:
+            if conn:
+                conn.close()
+    
+    def update_overdue_cycle_tasks(self):
+        """更新过期周期任务的状态"""
+        conn = None
+        try:
+            conn = self.get_db()
+            cursor = conn.cursor()
+            
+            current_time = int(time.time())
+            
+            # 将过期的周期任务状态从PLANNED更新为WORKING
+            cursor.execute('''
+                UPDATE roadmap 
+                SET status = 'WORKING',
+                    edittime = ?
+                WHERE is_cycle_task = 1 
+                AND next_reminder_time <= ? 
+                AND status = 'PLANNED' 
+                AND is_deleted = 0
+            ''', (current_time, current_time))
+            
+            updated_count = cursor.rowcount
+            conn.commit()
+            
+            return json.dumps({
+                'code': 0,
+                'msg': f'成功更新{updated_count}个过期周期任务的状态',
+                'data': updated_count
+            })
+        except Exception as e:
+            print(f"[Roadmap] 更新过期周期任务失败: {str(e)}")
+            if conn:
+                conn.rollback()
+            return json.dumps({'code': 500, 'msg': f'更新失败: {str(e)}'})
+        finally:
+            if conn:
+                conn.close()
     # 
 
     def encrypt_password(self, password):
@@ -174,7 +358,7 @@ class RoadmapService:
             }
             
             # 1. 从生产环境获取增量更新
-            sync_url = f"{PROD_SERVER['URL']}/api/roadmap/sync"
+            sync_url = f"{PROD_SERVER['URL']}/roadmap/api/sync"
             print(f"[Sync] 从生产环境获取增量更新 - 上次同步时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_sync_time))}")
             
             # 添加SSL验证配置
@@ -208,24 +392,28 @@ class RoadmapService:
                             UPDATE roadmap 
                             SET name = ?, description = ?, status = ?, 
                                 color = ?, addtime = ?, edittime = ?,
-                                "order" = ?, user_id = ?, is_deleted = ?
+                                "order" = ?, user_id = ?, is_deleted = ?,
+                                is_cycle_task = ?, cycle_duration = ?, next_reminder_time = ?
                             WHERE id = ?
                         ''', (
                             item['name'], item['description'], item['status'],
                             item.get('color', '#ffffff'), item['addtime'], item['edittime'],
                             item.get('order', 0), item.get('user_id', 1), item.get('is_deleted', 0),
+                            item.get('is_cycle_task', 0), item.get('cycle_duration'), item.get('next_reminder_time'),
                             item['id']
                         ))
                         print(f"[Sync] 更新本地记录 {item['id']}: 生产环境时间 {item['edittime']} > 本地时间 {local_record['edittime']}")
                     else:
                         cursor.execute('''
                             INSERT INTO roadmap (id, name, description, status, color,
-                                addtime, edittime, "order", user_id, is_deleted)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                addtime, edittime, "order", user_id, is_deleted,
+                                is_cycle_task, cycle_duration, next_reminder_time)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
                             item['id'], item['name'], item['description'], item['status'],
                             item.get('color', '#ffffff'), item['addtime'], item['edittime'],
-                            item.get('order', 0), item.get('user_id', 1), item.get('is_deleted', 0)
+                            item.get('order', 0), item.get('user_id', 1), item.get('is_deleted', 0),
+                            item.get('is_cycle_task', 0), item.get('cycle_duration'), item.get('next_reminder_time')
                         ))
                         print(f"[Sync] 插入新记录 {item['id']}")
                     stats['from_prod'] += 1
@@ -248,7 +436,7 @@ class RoadmapService:
             if local_updates:
                 print(f"[Sync] 发现 {len(local_updates)} 条本地更新需要同步到生产环境")
                 
-                sync_url = f"{PROD_SERVER['URL']}/api/roadmap/batch_sync"
+                sync_url = f"{PROD_SERVER['URL']}/roadmap/api/batch_sync"
                 response = requests.post(
                     sync_url,
                     headers=headers,
@@ -393,7 +581,7 @@ class RoadmapService:
         conn = None
         if ENV == 'local':
             sync_result = self.auto_sync()
-            print(f"[Roadmap] 同步结果: {sync_result}")
+            # print(f"[Roadmap] 同步结果: {sync_result}")
         
         # 检查登录状态
         login_result = json.loads(self.check_login())
@@ -414,12 +602,26 @@ class RoadmapService:
             user_id = login_result['data']['user_id']
             print(f"[Roadmap] 获取用户 {user_id} 的开发计划")
             
-            # 只获取未删除的记录
-            cursor.execute('''
+            # 获取查询参数
+            is_cycle_task = request.args.get('is_cycle_task', None)
+            
+            # 构建查询条件
+            query = '''
                 SELECT * FROM roadmap 
                 WHERE is_deleted = 0 AND edittime > ? AND user_id = ?
-                ORDER BY "order" ASC, edittime DESC
-            ''', (one_year_ago, user_id))
+            '''
+            params = [one_year_ago, user_id]
+            
+            # 添加周期任务筛选条件
+            if is_cycle_task is not None:
+                query += ' AND is_cycle_task = ?'
+                params.append(int(is_cycle_task))
+            
+            # 添加排序条件
+            query += ' ORDER BY "order" ASC, edittime DESC'
+            
+            # 执行查询
+            cursor.execute(query, params)
             
             roadmaps = [dict(row) for row in cursor.fetchall()]
             print(f"[Roadmap] 获取到 {len(roadmaps)} 条记录")
@@ -464,11 +666,21 @@ class RoadmapService:
             user_id = login_result['data']['user_id']
             print(f"[Roadmap] 添加开发计划 - 用户: {user_id}")
             
+            # 计算next_reminder_time
+            is_cycle_task = data.get('is_cycle_task', 0)
+            cycle_duration = data.get('cycle_duration', None)
+            next_reminder_time = None
+            
+            if is_cycle_task and cycle_duration:
+                # 周期任务，计算下次提醒时间
+                next_reminder_time = current_time + (cycle_duration * 86400)  # 86400秒/天
+            
             cursor.execute('''
                 INSERT INTO roadmap (
                     name, description, status, color, 
-                    addtime, edittime, "order", user_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    addtime, edittime, "order", user_id,
+                    is_cycle_task, cycle_duration, next_reminder_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data.get('name'),
                 data.get('description'),
@@ -477,7 +689,10 @@ class RoadmapService:
                 current_time,
                 current_time,
                 0,
-                user_id
+                user_id,
+                is_cycle_task,
+                cycle_duration,
+                next_reminder_time
             ))
             
             new_id = cursor.lastrowid
@@ -519,6 +734,18 @@ class RoadmapService:
             
             current_time = int(time.time())
             
+            # 检查是否是周期任务且尝试标记为已完成
+            if 'status' in data and data['status'] == 'COMPLETED':
+                # 获取当前任务的is_cycle_task值
+                cursor.execute('SELECT is_cycle_task FROM roadmap WHERE id = ?', (roadmap_id,))
+                task = cursor.fetchone()
+                if task and task['is_cycle_task']:
+                    return json.dumps({
+                        'code': 400,
+                        'msg': '周期任务不能标记为已完成，请使用"完成本次任务"功能',
+                        'data': None
+                    })
+            
             # 构建更新字段
             update_fields = []
             params = []
@@ -540,10 +767,55 @@ class RoadmapService:
                 print(f"[Roadmap] Updating order to: {data['order']}")
                 update_fields.append('"order" = ?')
                 params.append(int(data['order']))  # 确保order是整数
+            
+            # 处理周期任务相关字段
+            if 'is_cycle_task' in data:
+                update_fields.append('is_cycle_task = ?')
+                params.append(int(data['is_cycle_task']))
+            
+            if 'cycle_duration' in data:
+                update_fields.append('cycle_duration = ?')
+                params.append(data['cycle_duration'] if data['cycle_duration'] else None)
+            
+            # 计算next_reminder_time
+            if 'cycle_duration' in data or 'is_cycle_task' in data:
+                # 获取当前周期任务信息
+                if 'is_cycle_task' in data:
+                    is_cycle_task = int(data['is_cycle_task'])
+                else:
+                    # 从数据库获取当前is_cycle_task值
+                    cursor.execute('SELECT is_cycle_task FROM roadmap WHERE id = ?', (roadmap_id,))
+                    is_cycle_task = cursor.fetchone()['is_cycle_task']
                 
-            # 添加更新时间
-            update_fields.append('edittime = ?')
-            params.append(current_time)
+                if 'cycle_duration' in data:
+                    cycle_duration = data['cycle_duration'] if data['cycle_duration'] else None
+                else:
+                    # 从数据库获取当前cycle_duration值
+                    cursor.execute('SELECT cycle_duration FROM roadmap WHERE id = ?', (roadmap_id,))
+                    cycle_duration = cursor.fetchone()['cycle_duration']
+                
+                if is_cycle_task and cycle_duration:
+                    # 周期任务，计算下次提醒时间
+                    next_reminder_time = current_time + (cycle_duration * 86400)  # 86400秒/天
+                    update_fields.append('next_reminder_time = ?')
+                    params.append(next_reminder_time)
+                else:
+                    # 非周期任务，清除下次提醒时间
+                    update_fields.append('next_reminder_time = ?')
+                    params.append(None)
+            
+            if 'next_reminder_time' in data:
+                update_fields.append('next_reminder_time = ?')
+                params.append(int(data['next_reminder_time']) if data['next_reminder_time'] else None)
+            
+            if 'edittime' in data:
+                print(f"[Roadmap] Updating edittime to: {data['edittime']}")
+                update_fields.append('edittime = ?')
+                params.append(int(data['edittime']))  # 确保edittime是整数
+            else:
+                # 默认更新edittime为当前时间
+                update_fields.append('edittime = ?')
+                params.append(current_time)
             
             # 添加ID到参数列表
             params.append(roadmap_id)
@@ -656,24 +928,28 @@ class RoadmapService:
                         UPDATE roadmap 
                         SET name = ?, description = ?, status = ?, 
                             color = ?, addtime = ?, edittime = ?,
-                            "order" = ?, user_id = ?, is_deleted = ?
+                            "order" = ?, user_id = ?, is_deleted = ?,
+                            is_cycle_task = ?, cycle_duration = ?, next_reminder_time = ?
                         WHERE id = ?
                     ''', (
                         item['name'], item['description'], item['status'],
                         item.get('color', '#ffffff'), item['addtime'], item['edittime'],
                         item.get('order', 0), item.get('user_id', 1), item.get('is_deleted', 0),
+                        item.get('is_cycle_task', 0), item.get('cycle_duration'), item.get('next_reminder_time'),
                         item['id']
                     ))
                     print(f"[Sync] 更新记录 {item['id']}")
                 else:
                     cursor.execute('''
                         INSERT INTO roadmap (id, name, description, status, color,
-                            addtime, edittime, "order", user_id, is_deleted)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            addtime, edittime, "order", user_id, is_deleted,
+                            is_cycle_task, cycle_duration, next_reminder_time)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
                         item['id'], item['name'], item['description'], item['status'],
                         item.get('color', '#ffffff'), item['addtime'], item['edittime'],
-                        item.get('order', 0), item.get('user_id', 1), item.get('is_deleted', 0)
+                        item.get('order', 0), item.get('user_id', 1), item.get('is_deleted', 0),
+                        item.get('is_cycle_task', 0), item.get('cycle_duration'), item.get('next_reminder_time')
                     ))
                     print(f"[Sync] 插入新记录 {item['id']}")
                 

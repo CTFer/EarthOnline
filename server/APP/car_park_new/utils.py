@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-11-01 11:00:00
-# LastEditTime: 2025-11-10 15:38:17
+# LastEditTime: 2025-12-03 20:08:05
 # LastEditors: 一根鱼骨棒
 # Description: 停车场管理功能函数 - 新版
 # Software: VScode
@@ -28,6 +28,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(BASE_DIR))))
 
 from flask import request, jsonify
 from utils.response_handler import ResponseHandler, StatusCode
+from config.config import PROD_SERVER
 from .services.qywechat_service import CAR_TYPE_MAP, CONFIG, get_qywechat_service
 
 logger = logging.getLogger(__name__)
@@ -36,11 +37,8 @@ logger = logging.getLogger(__name__)
 recent_records_cache = {}
 recent_records_expire = {}
 
-# 心跳时间
-last_heartbeat_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-# API密钥
-API_KEY = "car_park_api_key_2025"  # API密钥，生产环境请使用环境变量或配置文件
+# API密钥 - 从配置文件获取
+API_KEY = PROD_SERVER['API_KEY']
 
 # 最近续期记录缓存
 recent_records_cache = {}
@@ -428,18 +426,47 @@ def _get_recent_records(from_user: str) -> str:
         return "获取记录失败，请稍后再试"
 
 
-def update_car_park_status(car_id: int, status: int) -> bool:
-    """更新车辆状态"""
+def update_car_park_status(car_number: str, status: str, comment: str = None) -> bool:
+    """ 
+    更新车辆状态
+    :param car_number: 车牌号
+    :param status: 新状态
+    :param comment: 备注信息（可选）
+    :return: 是否更新成功
+    """
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        cursor.execute("""
-            UPDATE Sys_Park_Plate 
-            SET status = ? 
-            WHERE id = ?
-        """, (status, car_id))
-        
+
+        # 先获取车主信息
+        cursor.execute(
+            'SELECT owner FROM car_park WHERE car_number = ?', (car_number,))
+        result = cursor.fetchone()
+        owner = result[0] if result else "未知"
+
+        if comment:
+            # 根据状态决定更新哪个字段
+            if status == 'changed':
+                # 车牌修改完成，更新remark字段
+                cursor.execute('''
+                UPDATE car_park 
+                SET status = ?, remark = ?
+                WHERE car_number = ?
+                ''', (status, comment, car_number))
+            else:
+                # 续期等其他操作，更新comment字段
+                cursor.execute('''
+                UPDATE car_park 
+                SET status = ?, comment = ?
+                WHERE car_number = ?
+                ''', (status, comment, car_number))
+        else:
+            cursor.execute('''
+            UPDATE car_park 
+            SET status = ?
+            WHERE car_number = ?
+            ''', (status, car_number))
+
         conn.commit()
         conn.close()
         return True
@@ -713,10 +740,16 @@ def start_expiry_check():
 
 
 def update_heartbeat_time():
-    """更新心跳时间"""
-    global last_heartbeat_time
-    last_heartbeat_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    logger.info(f"[Car_Park] 心跳时间已更新: {last_heartbeat_time}")
+    """更新心跳时间到文件"""
+    try:
+        current_time = datetime.now()
+        with open(CONFIG["HEARTBEAT_FILE"], 'w') as f:
+            f.write(current_time.strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info(f"[Car_Park] 更新心跳时间: {current_time}")
+        return True
+    except Exception as e:
+        logger.error(f"[Car_Park] 更新心跳时间失败: {str(e)}")
+        return False
 
 
 # 启动过期检查任务 注意：过期检查任务不再自动启动，需要在app.py中手动触发

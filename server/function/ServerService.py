@@ -385,10 +385,8 @@ class ServerService:
 
     def stop(self) -> None:
         """停止服务器"""
-        if self.http_thread and self.http_thread.is_alive():
-            # 在这里可以添加清理代码
-            logger.info("正在停止HTTP服务器...")
-            
+        # 由于使用eventlet的wsgi.server()，不需要单独的线程管理
+        logger.info("正在停止服务器...")
         logger.info("服务器已停止")
 
 # 创建服务器管理实例

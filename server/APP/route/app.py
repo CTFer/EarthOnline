@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2023-11-14 13:28:31
-# LastEditTime: 2025-11-05 08:56:45
+# LastEditTime: 2025-11-27 16:09:10
 # LastEditors: 一根鱼骨棒
 # Description: 本开源代码使用GPL 3.0协议
 # Software: VScode
@@ -28,8 +28,8 @@ def create_route_blueprint():
                         static_folder=os.path.join(current_dir, 'static'))
     
     # 根路由重定向
-    @route_bp.route('/')
-    @route_bp.route('', methods=['GET'])
+
+    @route_bp.route('/', methods=['GET'])
     def route_index():
         from flask import redirect, url_for
         return redirect(url_for('route.index'))

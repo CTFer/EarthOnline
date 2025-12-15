@@ -45,7 +45,7 @@ ACME_CHALLENGE_DIR = os.path.join('static', '.well-known', 'acme-challenge')
 DATABASE_PATH = 'database/game.db'
 
 # 调试模式
-DEBUG = True
+DEBUG = False
 
 # GPS更新精度阈值 int值
 GPS_ACCURACY = 3

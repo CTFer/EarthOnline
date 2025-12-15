@@ -2,7 +2,7 @@
 
 # Author: 一根鱼骨棒 Email 775639471@qq.com
 # Date: 2025-11-01 11:00:00
-# LastEditTime: 2025-11-14 14:32:15
+# LastEditTime: 2025-12-02 15:05:05
 # LastEditors: 一根鱼骨棒
 # Description: 停车场管理应用路由主入口 - 新版
 # Software: VScode
@@ -13,19 +13,17 @@ import sys
 import logging
 import hashlib
 from datetime import datetime
-from flask import render_template, jsonify, request, make_response, session, redirect, url_for
-
-# 获取当前文件所在目录的绝对路径
+from flask import render_template, jsonify, request, make_response, session, redirect, url_for# 获取当前文件所在目录的绝对路径
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 添加服务器根目录到Python路径，确保能导入utils等模块
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(BASE_DIR))))
 
-from utils.response_handler import ResponseHandler, StatusCode
+from utils.response_handler import ResponseHandler, StatusCode, api_response
 
 # 从__init__.py导入蓝图
 from . import car_park_new_bp
-from .services.qywechat_service import get_qywechat_service
+from .services.qywechat_service import get_qywechat_service, CONFIG
 from .utils import (
     get_monthly_cars,
     _query_car_info,
@@ -39,7 +37,8 @@ from .utils import (
     get_car_park_record,
     add_car_park_record,
     update_car_park_record,
-    delete_car_park_record
+    delete_car_park_record,
+    update_car_park_status
 )
 
 logger = logging.getLogger(__name__)
@@ -163,7 +162,6 @@ def logout():
     return redirect(url_for('car_park_new.index'))
 
 @car_park_new_bp.route('/')
-@car_park_new_bp.route('')
 def index():
     """首页"""
     # 检查登录状态
@@ -603,213 +601,279 @@ def api_delete_car_park_record(record_id):
         )
 
 
-@car_park_new_bp.route('/review', methods=['POST'])
-@login_required
+@car_park_new_bp.route('/review', methods=['GET', 'POST'])
+@check_api_key  # 添加API密钥验证
+@api_response
 def handle_review():
-    """车辆续期审核请求 - 需要登录"""
+    """处理车辆续期审核请求"""
     try:
-        data = request.json
-        car_number = data.get('car_number')
-        owner_name = data.get('owner_name')
-        car_type = data.get('car_type', 1)
-        month_count = data.get('month_count', 1)
-        
-        if not all([car_number, owner_name]):
-            return ResponseHandler.error(
-                code=StatusCode.PARAM_ERROR,
-                msg="参数不完整"
-            )
-        
-        # 这里可以实现审核请求逻辑
-        # 例如调用企业微信审批API创建审批单
-        
-        return ResponseHandler.success(
-            msg="审核请求已提交",
-            data={
-                "car_number": car_number,
-                "owner_name": owner_name,
-                "month_count": month_count,
-                "status": "pending"
-            }
-        )
-        
+        if request.method == 'GET':
+            # 获取待处理的续期请求
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            cursor.execute('''
+            SELECT id, owner, car_number, time, addtime, status, remark, comment
+            FROM car_park
+            WHERE status = 'pending' OR status = 'change'
+            ORDER BY addtime DESC
+            ''')
+
+            reviews = []
+            for row in cursor.fetchall():
+                review_data = {
+                    'id': row[0],
+                    'owner': row[1],
+                    'car_number': row[2],
+                    'parktime': int(row[3]),
+                    'addtime': row[4],
+                    'status': row[5],
+                    'remark': row[6],   # 新车牌信息（用于修改功能）
+                    'comment': row[7]   # 备注信息（用于续期功能）
+                }
+                reviews.append(review_data)
+
+            conn.close()
+
+            # 更新心跳时间（仅在成功获取数据后）
+            update_heartbeat_time()
+            return ResponseHandler.success(data=reviews)
+
+        elif request.method == 'POST':
+            data = request.get_json()
+            if not data:
+                return ResponseHandler.error(
+                    code=StatusCode.PARAM_ERROR,
+                    msg="缺少请求数据"
+                )
+
+            # 更新审核状态
+            car_number = data.get('car_number')
+            status = data.get('status')
+            comment = data.get('comment')
+
+            if not all([car_number, status]):
+                return ResponseHandler.error(
+                    code=StatusCode.PARAM_ERROR,
+                    msg="缺少必要参数"
+                )
+
+            # 调用update_car_park_status函数更新状态
+            if update_car_park_status(car_number, status, comment):
+                # 更新心跳时间（仅在成功更新状态后）
+                update_heartbeat_time()
+                return ResponseHandler.success(msg="更新状态成功")
+            else:
+                return ResponseHandler.error(
+                    code=StatusCode.SERVER_ERROR,
+                    msg="更新状态失败"
+                )
+
     except Exception as e:
-        logger.error(f"[Car_Park] 处理审核请求失败: {str(e)}")
+        error_msg = f"处理续期审核请求失败: {str(e)}"
+        logger.error(f"[Car_Park] {error_msg}")
         return ResponseHandler.error(
             code=StatusCode.SERVER_ERROR,
-            msg="处理审核请求异常"
+            msg=error_msg
         )
 
 
 @car_park_new_bp.route('/car_park', methods=['GET', 'POST'])
+@api_response
+@check_api_key  # 添加API密钥验证
 def car_park_api():
     """查询/更新停车场车辆信息"""
     try:
         if request.method == 'GET':
-            # 查询车辆信息
+            # 获取查询参数，用于单独查询
             car_number = request.args.get('car_number')
             owner_name = request.args.get('owner_name')
-            sync_all = request.args.get('sync_all', 'false').lower() == 'true'
-            
+
             conn = get_db_connection()
             cursor = conn.cursor()
-            
-            if sync_all:
-                # 获取所有车辆信息
-                cursor.execute("""
-                    SELECT 
-                        p.id, p.plateNumber, p.plateStandard, p.endTime, p.pRemark, p.isDel,
-                        pp.pName, pp.pPhone, pp.pAddress
-                    FROM Sys_Park_Plate p
-                    JOIN Sys_Park_Person pp ON p.personId = pp.id
-                """)
-                cars = []
-                for row in cursor.fetchall():
-                    cars.append({
-                        'id': row['id'],
-                        'plateNumber': row['plateNumber'],
-                        'plateStandard': row['plateStandard'],
-                        'endTime': row['endTime'],
-                        'pRemark': row['pRemark'],
-                        'isDel': row['isDel'],
-                        'pName': row['pName'],
-                        'pPhone': row['pPhone'],
-                        'pAddress': row['pAddress']
-                    })
-                
-                conn.close()
-                return ResponseHandler.success(
-                    msg="获取全部车辆信息成功",
-                    data=cars,
-                    count=len(cars)
-                )
-            
-            elif car_number:
-                # 按车牌号查询
-                cursor.execute("""
-                    SELECT 
-                        p.id, p.plateNumber, p.plateStandard, p.endTime, p.pRemark,
-                        pp.pName, pp.pPhone, pp.pAddress
-                    FROM Sys_Park_Plate p
-                    JOIN Sys_Park_Person pp ON p.personId = pp.id
-                    WHERE p.isDel = 0 AND p.plateNumber = ?
-                """, (car_number,))
-                
-                row = cursor.fetchone()
-                conn.close()
-                
-                if row:
-                    return ResponseHandler.success(
-                        msg="查询成功",
-                        data={
-                            'id': row['id'],
-                            'plateNumber': row['plateNumber'],
-                            'plateStandard': row['plateStandard'],
-                            'endTime': row['endTime'],
-                            'pRemark': row['pRemark'],
-                            'pName': row['pName'],
-                            'pPhone': row['pPhone'],
-                            'pAddress': row['pAddress']
-                        }
-                    )
+
+            if car_number or owner_name:
+                # 单独查询模式
+                conditions = []
+                params = []
+                if car_number:
+                    conditions.append("p.plateNumber = ?")
+                    params.append(car_number)
+                if owner_name:
+                    conditions.append("pp.pName LIKE ?")
+                    params.append(f"%{owner_name}%")
+
+                query = """
+                SELECT pp.pName, p.plateNumber, p.beginTime, p.endTime, p.pRemark
+                FROM Sys_Park_Plate p
+                LEFT JOIN Sys_Park_Person pp ON p.personId = pp.id
+                WHERE """ + " OR ".join(conditions)
+
+                cursor.execute(query, params)
+                results = cursor.fetchall()
+
+                if results:
+                    car_info = [{
+                        "owner": row[0],
+                        "car_number": row[1],
+                        "begin_time": row[2],
+                        "end_time": row[3],
+                        "remark": row[4]
+                    } for row in results]
+                    conn.close()
+                    return ResponseHandler.success(data=car_info)
                 else:
+                    conn.close()
                     return ResponseHandler.error(
                         code=StatusCode.NOT_FOUND,
-                        msg="未找到车辆信息"
+                        msg="未找到相关车辆信息"
                     )
-            
-            elif owner_name:
-                # 按车主姓名查询
-                cursor.execute("""
-                    SELECT 
-                        p.id, p.plateNumber, p.plateStandard, p.endTime, p.pRemark,
-                        pp.pName, pp.pPhone, pp.pAddress
-                    FROM Sys_Park_Plate p
-                    JOIN Sys_Park_Person pp ON p.personId = pp.id
-                    WHERE p.isDel = 0 AND pp.pName LIKE ?
-                """, (f"%{owner_name}%",))
-                
-                cars = []
-                for row in cursor.fetchall():
-                    cars.append({
-                        'id': row['id'],
-                        'plateNumber': row['plateNumber'],
-                        'plateStandard': row['plateStandard'],
-                        'endTime': row['endTime'],
-                        'pRemark': row['pRemark'],
-                        'pName': row['pName'],
-                        'pPhone': row['pPhone'],
-                        'pAddress': row['pAddress']
-                    })
-                
-                conn.close()
-                
-                if cars:
-                    return ResponseHandler.success(
-                        msg="查询成功",
-                        data=cars,
-                        count=len(cars)
-                    )
-                else:
-                    return ResponseHandler.error(
-                        code=StatusCode.NOT_FOUND,
-                        msg="未找到车辆信息"
-                    )
-            
             else:
-                # 获取统计信息
-                stats = get_car_park_statistics()
-                return ResponseHandler.success(
-                    msg="获取统计信息成功",
-                    data=stats
-                )
+                # 同步模式：返回所有数据供客户端对比
+                # 获取所有人员数据
+                cursor.execute("""
+                    SELECT id, pName, pSex, departId, pAddress, pPhone, 
+                           pParkSpaceCount, pNumber, upload_yun, IDCardNumber, 
+                           upload_yun2, personIdStr, address1, address2, address3
+                    FROM Sys_Park_Person
+                """)
+                persons = []
+                for row in cursor.fetchall():
+                    person = {}
+                    for idx, col in enumerate(cursor.description):
+                        person[col[0]] = row[idx]
+                    persons.append(person)
+
+                # 获取所有车牌数据
+                cursor.execute("""
+                    SELECT id, personId, plateNumber, plateType, plateParkingSpaceName,
+                           beginTime, endTime, createTime, authType, upload_yun,
+                           cNumber, pChargeId, pRemark, balance, cardNumber,
+                           plateStandard, thirdCount, upload_third, freeTime,
+                           createName, plateIdStr, isDel, upload_yun2, parkHourMinutes
+                    FROM Sys_Park_Plate
+                """)
+                plates = []
+                for row in cursor.fetchall():
+                    plate = {}
+                    for idx, col in enumerate(cursor.description):
+                        # 处理日期时间字段
+                        if isinstance(row[idx], datetime):
+                            plate[col[0]] = row[idx].strftime(
+                                '%Y-%m-%d %H:%M:%S')
+                        else:
+                            plate[col[0]] = row[idx]
+                    plates.append(plate)
+
+                conn.close()
+
+                # 返回完整数据集
+                return ResponseHandler.success(data={
+                    "persons": persons,
+                    "plates": plates
+                })
         
         elif request.method == 'POST':
-            # 同步数据
-            data = request.json
+            # 接收同步数据
+            data = request.get_json()
             if not data:
                 return ResponseHandler.error(
                     code=StatusCode.PARAM_ERROR,
-                    msg="数据不能为空"
+                    msg="缺少请求数据"
                 )
-            
+
+            persons = data.get('persons', [])
+            plates = data.get('plates', [])
+
             conn = get_db_connection()
             cursor = conn.cursor()
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
-            # 处理人员数据
-            if 'persons' in data:
-                for person in data['persons']:
-                    # 尝试更新，不存在则插入
-                    cursor.execute("""
-                        INSERT OR REPLACE INTO Sys_Park_Person (id, pName, pPhone, pAddress)
-                        VALUES (?, ?, ?, ?)
-                    """, (person['id'], person['pName'], person['pPhone'], person['pAddress']))
-            
-            # 处理车牌数据
-            if 'plates' in data:
-                for plate in data['plates']:
-                    # 尝试更新，不存在则插入
-                    cursor.execute("""
-                        INSERT OR REPLACE INTO Sys_Park_Plate 
-                        (id, personId, plateNumber, plateStandard, endTime, pRemark, isDel, createTime, updateTime)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT createTime FROM Sys_Park_Plate WHERE id = ?), ?), ?)
-                    """, (
-                        plate['id'], plate['personId'], plate['plateNumber'], 
-                        plate['plateStandard'], plate['endTime'], plate['pRemark'], 
-                        plate['isDel'], plate['id'], current_time, current_time
-                    ))
-            
-            conn.commit()
-            conn.close()
-            
-            return ResponseHandler.success(
-                msg="数据同步成功",
-                data={
-                    'persons_count': len(data.get('persons', [])),
-                    'plates_count': len(data.get('plates', []))
-                }
-            )
+
+            try:
+                # 更新人员数据
+                if persons:
+                    for person in persons:
+                        # 检查记录是否存在
+                        cursor.execute("""
+                            SELECT id FROM Sys_Park_Person WHERE id = ?
+                        """, (person['id'],))
+                        exists = cursor.fetchone() is not None
+
+                        if exists:
+                            # 更新现有记录，但保留Wechat_id字段
+                            cursor.execute("""
+                                UPDATE Sys_Park_Person 
+                                SET pName = ?, pSex = ?, departId = ?, pAddress = ?, 
+                                    pPhone = ?, pParkSpaceCount = ?, pNumber = ?, 
+                                    upload_yun = ?, IDCardNumber = ?, upload_yun2 = ?, 
+                                    personIdStr = ?, address1 = ?, address2 = ?, 
+                                    address3 = ?
+                                WHERE id = ?
+                            """, (
+                                person.get('pName', ''), person.get('pSex', ''), person.get('departId', ''),
+                                person.get('pAddress', ''), person.get('pPhone', ''), person.get('pParkSpaceCount', 0),
+                                person.get('pNumber', ''), person.get('upload_yun', 0), person.get('IDCardNumber', ''),
+                                person.get('upload_yun2', 0), person.get('personIdStr', ''), person.get('address1', ''),
+                                person.get('address2', ''), person.get('address3', ''), person['id']
+                            ))
+                        else:
+                            # 插入新记录
+                            cursor.execute("""
+                                INSERT INTO Sys_Park_Person (
+                                    id, pName, pSex, departId, pAddress, pPhone,
+                                    pParkSpaceCount, pNumber, upload_yun, IDCardNumber,
+                                    upload_yun2, personIdStr, address1, address2, address3
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (
+                                person['id'], person.get('pName', ''), person.get('pSex', ''),
+                                person.get('departId', ''), person.get('pAddress', ''), person.get('pPhone', ''),
+                                person.get('pParkSpaceCount', 0), person.get('pNumber', ''),
+                                person.get('upload_yun', 0), person.get('IDCardNumber', ''),
+                                person.get('upload_yun2', 0), person.get('personIdStr', ''),
+                                person.get('address1', ''), person.get('address2', ''), person.get('address3', '')
+                            ))
+
+                # 更新车牌数据
+                for plate in plates:
+                        # 尝试更新，不存在则插入
+                        cursor.execute("""
+                            INSERT OR REPLACE INTO Sys_Park_Plate 
+                            (id, personId, plateNumber, plateType, plateParkingSpaceName,
+                            beginTime, endTime, createTime, authType, upload_yun,
+                            cNumber, pChargeId, pRemark, balance, cardNumber,
+                            plateStandard, thirdCount, upload_third, freeTime,
+                            createName, plateIdStr, isDel, upload_yun2, parkHourMinutes)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            plate['id'], plate.get('personId', ''), plate.get('plateNumber', ''), 
+                            plate.get('plateType', ''), plate.get('plateParkingSpaceName', ''),
+                            plate.get('beginTime', ''), plate.get('endTime', ''), plate.get('createTime', current_time),
+                            plate.get('authType', ''), plate.get('upload_yun', 0), plate.get('cNumber', ''),
+                            plate.get('pChargeId', ''), plate.get('pRemark', ''), plate.get('balance', 0),
+                            plate.get('cardNumber', ''), plate.get('plateStandard', 0), plate.get('thirdCount', 0),
+                            plate.get('upload_third', 0), plate.get('freeTime', ''), plate.get('createName', ''),
+                            plate.get('plateIdStr', ''), plate.get('isDel', 0), plate.get('upload_yun2', 0),
+                            plate.get('parkHourMinutes', 0)
+                        ))
+
+                conn.commit()
+                logger.info(
+                    f"[Car_Park] 同步数据成功 - {len(persons)}个人员, {len(plates)}个车牌"
+                )
+                # 输出同步车牌的详情
+                logger.info(f"[Car_Park] 同步车牌详情: {plates}")
+                return ResponseHandler.success(msg="数据同步成功")
+
+            except Exception as e:
+                conn.rollback()
+                error_msg = f"数据同步失败: {str(e)}"
+                logger.error(f"[Car_Park] {error_msg}")
+                return ResponseHandler.error(
+                    code=StatusCode.SERVER_ERROR,
+                    msg=error_msg
+                )
+            finally:
+                conn.close()
             
     except Exception as e:
         logger.error(f"[Car_Park] 处理车辆信息失败: {str(e)}")
